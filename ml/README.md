@@ -95,6 +95,12 @@ python -m vesta_ml.train     # cabezas; guarda en models/<nombre>/
 - `python -m vesta_ml.evaluate <modelo> --folder <ruta>` prueba el modelo con una carpeta de imágenes etiquetadas por el nombre de sus carpetas (`botas/`, `Calzado/zuecos/`; vale el nombre en español, en plural o un sinónimo). Sirve para imágenes **sin licencia para entrenar**, como las de Google Imágenes o webs de marcas: no se copian, no se cachean y nunca entran en el manifiesto. Muestra las métricas y la lista de fotos falladas.
 - `metrics.json` guarda, para val y test, exactitud, macro-F1, precisión/recall/F1 por clase, confusiones más frecuentes y el desglose por fuente. La fuente `clothing-dataset` (y en el futuro `vesta`) es la más parecida al uso real.
 
+## Segmentación por parches
+
+`python -m vesta_ml.segment embed` rasteriza las máscaras de prenda completa de Fashionpedia (solo fotos con licencia comercial; polígonos y RLE de COCO) sobre el letterbox de 224 px y calcula, para cada uno de los 16 × 16 parches, la fracción de cada clase (fondo, top, bottom, one-piece, outerwear, footwear, accessory) y los tokens de DINOv2 (≈1,7 GB en `segmentation/`, ~45 min en CPU). `python -m vesta_ml.segment train seg-v1` entrena un MLP por parche sobre el token del parche y el CLS (entropía cruzada suave con pesos por clase) y guarda `models/seg-v1/seg_head.pt` y `seg.json`.
+
+seg-v1 en val (256 fotos, a nivel de parche): prenda frente a fondo IoU 0,69; mIoU 0,51 (fondo 0,95, top 0,58, bottom 0,51, one-piece 0,57, outerwear 0,57, footwear 0,16, accessory 0,22). Calzado y accesorios rara vez son mayoría en un parche de 14 px; con umbral 0,25 el calzado se detecta con recall 0,97. `python -m vesta_ml.export heads-v4 --segmentation seg-v1` añade la salida `segmentation` al ONNX de la app.
+
 ## Exportación a la app
 
 ```sh

@@ -1,13 +1,15 @@
 import { TAXONOMY_VERSION, taxonomy } from '../ml/taxonomy'
 import type { GarmentCategory } from '../types/domain'
 import { findBrand, type BrandMatch } from './brands'
+import { garmentColors } from './colors'
 import { findComposition, findSize, type LabelValue } from './labelParser'
+import { garmentRegions, regionMask, type SegmentationMap } from './segmentation'
 import { fetchDescription, fetchModelFile, loadOrt } from './onnxRuntime'
 import { readText, type TextLine } from './textReader'
 
 // Own model trained in ml/ (DINOv2-small + heads); exported with python -m vesta_ml.export.
 export const CLOTHING_MODEL_ID = 'vesta/dinov2-small-heads'
-export const MODEL_DOWNLOAD_SIZE = 'aprox. 38,5 MB (clasificador de 25,6 MB y lector de texto de 12,9 MB)'
+export const MODEL_DOWNLOAD_SIZE = 'aprox. 52 MB (clasificador de 25,7 MB, lector de texto de 12,9 MB y recorte de 13,8 MB)'
 const MODEL_BASE = `${import.meta.env.BASE_URL}models/vesta/`
 
 /** Probabilities per head (category, subcategory, sleeve, fit, pattern), keyed by taxonomy id. */
@@ -39,6 +41,10 @@ export interface ClothingAnalysisSuggestion {
   modelVersion: string
   /** Scores adjusted by temperature scaling so that 80 % is right about 8 times in 10 (vesta_ml.calibrate). */
   calibrated: boolean
+  /** Coarse garment map of each photo, in order (undefined with a model without segmentation head). */
+  segmentations: Array<SegmentationMap | undefined>
+  /** Text read in each photo, in order (to tell a label photo among many); empty where reading failed. */
+  textByPhoto?: TextLine[][]
   analyzedAt: string
 }
 
@@ -52,17 +58,24 @@ interface ModelDescription {
   heads: Array<{ name: string; multiLabel: boolean; values: string[]; temperature?: number }>
   file: string
   bytes: number
+  /** Patch segmentation head (vesta_ml.segment), in models exported with --segmentation. */
+  segmentation?: { output: string; classes: string[]; grid: number }
 }
 
 interface NormalizedImage {
   blob: Blob
+  /** 96 × 96 sample of the whole photo, for colour. */
   pixels: ImageData
+  width: number
+  height: number
 }
 
 interface Classification {
   modelVersion: string
   probabilities: HeadProbabilities
   calibrated?: boolean
+  /** Where the garments are in the photo, when the model has a segmentation head. */
+  segmentation?: SegmentationMap
 }
 
 interface RankedPair {
@@ -81,101 +94,6 @@ let classifierPromise: Promise<Classifier> | undefined
 const categoryLabels = new Map(taxonomy.categories.map((entry) => [entry.id, entry.label as GarmentCategory]))
 const subcategoryEntries = new Map(taxonomy.subcategories.map((entry) => [entry.id, entry]))
 
-function getColorName(red: number, green: number, blue: number): string {
-  const maximum = Math.max(red, green, blue)
-  const minimum = Math.min(red, green, blue)
-  const brightness = (red * 299 + green * 587 + blue * 114) / 1000
-
-  if (brightness < 45) return 'Negro'
-  if (brightness > 226 && maximum - minimum < 36) return 'Blanco'
-  if (maximum - minimum < 24) return brightness > 165 ? 'Gris claro' : 'Gris'
-
-  if (red > 175 && green > 105 && blue < 115 && red - blue > 75) return 'Naranja'
-  if (red > green * 1.25 && red > blue * 1.25) return 'Rojo'
-  if (green > red * 1.18 && green > blue * 1.12) return 'Verde'
-  if (blue > red * 1.15 && blue > green * 1.08) return 'Azul'
-  if (red > 125 && blue > 85 && red > green * 1.05) return 'Morado'
-  if (red > 155 && green > 105 && blue < 140) return 'Marrón'
-  return 'Beige'
-}
-
-function colorBucket(red: number, green: number, blue: number): string {
-  return [red, green, blue].map((value) => Math.floor(value / 32)).join(':')
-}
-
-export function findDominantColor(pixels: ImageData): { color: string; score: number } | undefined {
-  const { data, width, height } = pixels
-  if (!width || !height || data.length < width * height * 4) return undefined
-
-  const edgeBuckets = new Map<string, number>()
-  const sampleStep = Math.max(1, Math.floor(Math.min(width, height) / 48))
-  for (let y = 0; y < height; y += sampleStep) {
-    for (let x = 0; x < width; x += sampleStep) {
-      if (x > sampleStep && x < width - sampleStep && y > sampleStep && y < height - sampleStep) continue
-      const offset = (y * width + x) * 4
-      const key = colorBucket(data[offset] ?? 0, data[offset + 1] ?? 0, data[offset + 2] ?? 0)
-      edgeBuckets.set(key, (edgeBuckets.get(key) ?? 0) + 1)
-    }
-  }
-
-  const backgroundBucket = [...edgeBuckets.entries()].sort((left, right) => right[1] - left[1])[0]?.[0]
-  const background = backgroundBucket?.split(':').map((value) => (Number(value) * 32) + 16)
-  const colors = new Map<string, { count: number; red: number; green: number; blue: number }>()
-  let considered = 0
-  const marginX = Math.floor(width * 0.08)
-  const marginY = Math.floor(height * 0.08)
-
-  for (let y = marginY; y < height - marginY; y += sampleStep) {
-    for (let x = marginX; x < width - marginX; x += sampleStep) {
-      const offset = (y * width + x) * 4
-      const red = data[offset] ?? 0
-      const green = data[offset + 1] ?? 0
-      const blue = data[offset + 2] ?? 0
-      if (background && Math.abs(red - background[0]!) + Math.abs(green - background[1]!) + Math.abs(blue - background[2]!) < 72) {
-        continue
-      }
-
-      considered += 1
-      const key = colorBucket(red, green, blue)
-      const bucket = colors.get(key) ?? { count: 0, red: 0, green: 0, blue: 0 }
-      bucket.count += 1
-      bucket.red += red
-      bucket.green += green
-      bucket.blue += blue
-      colors.set(key, bucket)
-    }
-  }
-
-  if (!considered) {
-    for (let y = marginY; y < height - marginY; y += sampleStep) {
-      for (let x = marginX; x < width - marginX; x += sampleStep) {
-        const offset = (y * width + x) * 4
-        const red = data[offset] ?? 0
-        const green = data[offset + 1] ?? 0
-        const blue = data[offset + 2] ?? 0
-        const key = colorBucket(red, green, blue)
-        const bucket = colors.get(key) ?? { count: 0, red: 0, green: 0, blue: 0 }
-        bucket.count += 1
-        bucket.red += red
-        bucket.green += green
-        bucket.blue += blue
-        colors.set(key, bucket)
-        considered += 1
-      }
-    }
-  }
-
-  const dominant = [...colors.values()].sort((left, right) => right.count - left.count)[0]
-  if (!dominant || !considered) return undefined
-  const red = Math.round(dominant.red / dominant.count)
-  const green = Math.round(dominant.green / dominant.count)
-  const blue = Math.round(dominant.blue / dominant.count)
-  return {
-    color: getColorName(red, green, blue),
-    score: dominant.count / considered
-  }
-}
-
 async function normalizeImage(image: Blob): Promise<NormalizedImage> {
   const bitmap = await createImageBitmap(image, { imageOrientation: 'from-image' })
   try {
@@ -185,6 +103,9 @@ async function normalizeImage(image: Blob): Promise<NormalizedImage> {
     canvas.height = Math.max(1, Math.round(bitmap.height * scale))
     const context = canvas.getContext('2d', { willReadFrequently: true })
     if (!context) throw new Error('El navegador no permite preparar la imagen.')
+    // Cut-outs are transparent: on white, as JPEG has no transparency (black otherwise).
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
 
     const colorCanvas = document.createElement('canvas')
@@ -201,7 +122,7 @@ async function normalizeImage(image: Blob): Promise<NormalizedImage> {
         else reject(new Error('No se pudo normalizar la imagen.'))
       }, 'image/jpeg', 0.9)
     })
-    return { blob, pixels }
+    return { blob, pixels, width: canvas.width, height: canvas.height }
   } finally {
     bitmap.close()
   }
@@ -249,6 +170,17 @@ function softmax(logits: ArrayLike<number>, temperature = 1): number[] {
   return exponentials.map((value) => value / total)
 }
 
+/** Softmax over the classes of every patch of the segmentation logits (grid * grid * classes). */
+function patchSoftmax(logits: Float32Array, settings: NonNullable<ModelDescription['segmentation']>): SegmentationMap {
+  const classes = settings.classes.length
+  const probabilities = new Float32Array(logits.length)
+  for (let patch = 0; patch < settings.grid * settings.grid; patch += 1) {
+    const scores = softmax(logits.subarray(patch * classes, (patch + 1) * classes))
+    probabilities.set(scores, patch * classes)
+  }
+  return { classes: settings.classes, grid: settings.grid, probabilities }
+}
+
 async function loadDescription(): Promise<ModelDescription> {
   const description = await fetchDescription<ModelDescription>(`${MODEL_BASE}vesta-model.json`)
   if (description.format !== 'vesta-model') throw new Error('La descripción del modelo no es válida.')
@@ -277,7 +209,13 @@ async function loadClassifier(): Promise<Classifier> {
           const scores = softmax(output.data as Float32Array, head.temperature)
           probabilities[head.name] = Object.fromEntries(head.values.map((value, index) => [value, scores[index] ?? 0]))
         }
-        return { modelVersion: description.name, probabilities, calibrated: heads.every((head) => head.temperature !== undefined) }
+        const segmentation = description.segmentation && outputs[description.segmentation.output]
+        return {
+          modelVersion: description.name,
+          probabilities,
+          calibrated: heads.every((head) => head.temperature !== undefined),
+          ...(segmentation && description.segmentation ? { segmentation: patchSoftmax(segmentation.data as Float32Array, description.segmentation) } : {})
+        }
       }
     })()
     classifierPromise = pending.catch((error: unknown) => {
@@ -331,8 +269,9 @@ export async function analyzeGarmentImage(
   // Probabilities of every photo are averaged per head; colours are counted per photo. The care label has its own
   // field and is read apart (readGarmentLabel), so it never weighs on these results.
   const averaged: HeadProbabilities = {}
-  const colorCounts = new Map<string, { count: number; confidence: number }>()
-  const textLines: TextLine[] = []
+  const colorShares = new Map<string, number>()
+  const segmentations: Array<SegmentationMap | undefined> = []
+  const textByPhoto: TextLine[][] = []
   let textFailed = false
   let modelVersion = ''
   let calibrated = true
@@ -347,7 +286,7 @@ export async function analyzeGarmentImage(
         return []
       })
     ])
-    textLines.push(...lines)
+    textByPhoto.push(lines)
     if (!result.probabilities.category || Object.values(result.probabilities).some((scores) =>
       Object.values(scores).some((score) => !Number.isFinite(score) || score < 0 || score > 1)
     )) {
@@ -360,12 +299,14 @@ export async function analyzeGarmentImage(
       for (const [value, score] of Object.entries(scores)) total[value] = (total[value] ?? 0) + score / imageList.length
     }
 
-    const dominantColor = findDominantColor(normalized.pixels)
-    if (dominantColor) {
-      const color = colorCounts.get(dominantColor.color) ?? { count: 0, confidence: 0 }
-      color.count += 1
-      color.confidence += dominantColor.score
-      colorCounts.set(dominantColor.color, color)
+    // With the segmentation head the colour is measured on the garment only; without it, on what is not border.
+    const [region] = result.segmentation ? garmentRegions(result.segmentation, normalized.width, normalized.height, true) : []
+    const mask = region && result.segmentation
+      ? regionMask(region, result.segmentation.grid, normalized.width, normalized.height, normalized.pixels.width, normalized.pixels.height, 0)
+      : undefined
+    segmentations.push(result.segmentation)
+    for (const { color, share } of garmentColors(normalized.pixels, mask)) {
+      colorShares.set(color, (colorShares.get(color) ?? 0) + share / imageList.length)
     }
   }
 
@@ -392,11 +333,12 @@ export async function analyzeGarmentImage(
     .map((head) => [head, attributeSuggestion(head, averaged[head])])
     .filter(([, suggestion]) => suggestion)) as Partial<Record<'pattern' | 'sleeve' | 'fit', AttributeSuggestion>>
 
-  const colors = [...colorCounts.entries()]
-    .sort((left, right) => right[1].count - left[1].count || right[1].confidence - left[1].confidence)
+  // A colour seen in only one of several photos (another garment, a reflection) does not count.
+  const colors = [...colorShares.entries()]
+    .filter(([, share]) => share >= 0.12)
+    .sort((left, right) => right[1] - left[1])
     .slice(0, 3)
-  const dominantColor = colors[0]
-  const brand = findBrand(textLines)
+  const brand = findBrand(textByPhoto.flat())
   return {
     category: categoryLabels.get(category)!,
     subcategory: labelOf(top.subcategory),
@@ -413,7 +355,7 @@ export async function analyzeGarmentImage(
       ...(top.subcategory ? { subcategory: top.conditional } : {}),
       ...(attributes.pattern ? { pattern: attributes.pattern.score } : {}),
       ...(brand ? { brand: brand.score } : {}),
-      ...(dominantColor ? { colors: dominantColor[1].confidence / dominantColor[1].count } : {})
+      ...(colors[0] ? { colors: colors[0][1] } : {})
     },
     unknownAttributes: [
       ...(!top.subcategory ? ['subcategory'] : []),
@@ -433,6 +375,8 @@ export async function analyzeGarmentImage(
     modelId: CLOTHING_MODEL_ID,
     modelVersion,
     calibrated,
+    segmentations,
+    textByPhoto,
     analyzedAt: new Date().toISOString()
   }
 }

@@ -15,6 +15,7 @@ const suggestion: ClothingAnalysisSuggestion = {
   modelId: 'vesta',
   modelVersion: 'heads-v4',
   calibrated: true,
+  segmentations: [],
   analyzedAt: '2026-10-31T00:00:00.000Z'
 }
 

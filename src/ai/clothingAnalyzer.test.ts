@@ -3,7 +3,6 @@ import {
   analyzeGarmentImage,
   attributeApplies,
   CLOTHING_MODEL_ID,
-  findDominantColor,
   labelSize,
   readGarmentLabel,
   type HeadProbabilities
@@ -42,11 +41,30 @@ const tee: HeadProbabilities = {
 }
 
 describe('clothing analyzer', () => {
-  it('reduces a uniform border background when finding the dominant garment color', () => {
-    expect(findDominantColor(makePixels())).toMatchObject({
-      color: 'Rojo',
-      score: 1
-    })
+  it('measures the colour on the garment the segmentation head finds, not on the rest of the photo', async () => {
+    // Left half blue (the garment), right half red (a chair), on a white border.
+    const data = new Uint8ClampedArray(20 * 20 * 4)
+    for (let i = 0; i < 400; i += 1) {
+      const x = i % 20
+      const y = Math.floor(i / 20)
+      const border = x < 2 || x > 17 || y < 2 || y > 17
+      data.set(border ? [250, 250, 250, 255] : x < 10 ? [52, 102, 190, 255] : [190, 32, 40, 255], i * 4)
+    }
+    const pixels = { data, width: 20, height: 20 } as ImageData
+    const normalize = async () => ({ blob: new Blob(['n']), pixels, width: 20, height: 20 })
+    const classes = ['background', 'top', 'bottom', 'one-piece', 'outerwear', 'footwear', 'accessory']
+    const probabilities = new Float32Array(256 * 7)
+    for (let patch = 0; patch < 256; patch += 1) {
+      const col = patch % 16
+      const row = Math.floor(patch / 16)
+      // A top on the left of the (square) photo, inside the white border.
+      probabilities[patch * 7 + (col >= 2 && col < 8 && row >= 2 && row < 14 ? 1 : 0)] = 1
+    }
+    const withMap = await analyzeGarmentImage(new Blob(['p']), async () => ({ ...result(tee), segmentation: { classes, grid: 16, probabilities } }), normalize, noText)
+    expect(withMap.colors).toEqual(['Azul'])
+    expect(withMap.segmentations).toHaveLength(1)
+    const withoutMap = await analyzeGarmentImage(new Blob(['p']), async () => result(tee), normalize, noText)
+    expect(withoutMap.colors).toEqual(['Azul', 'Rojo'])
   })
 
   it('applies attributes only where the taxonomy allows them', () => {
@@ -60,7 +78,7 @@ describe('clothing analyzer', () => {
   it('keeps the subcategory within the predicted category and fills pattern and sleeve', async () => {
     const image = new Blob(['private garment image'], { type: 'image/jpeg' })
     const normalizedBlob = new Blob(['normalized image'], { type: 'image/jpeg' })
-    const normalize = vi.fn(async () => ({ blob: normalizedBlob, pixels: makePixels() }))
+    const normalize = vi.fn(async () => ({ blob: normalizedBlob, pixels: makePixels(), width: 20, height: 20 }))
     const classify = vi.fn(async (received: Blob) => {
       expect(received).toBe(normalizedBlob)
       return result(tee)
@@ -89,7 +107,7 @@ describe('clothing analyzer', () => {
 
   it('averages the photos and shows the fit of trousers', async () => {
     const images = [new Blob(['front'], { type: 'image/jpeg' }), new Blob(['back'], { type: 'image/jpeg' })]
-    const normalize = vi.fn(async () => ({ blob: new Blob(['normalized']), pixels: makePixels() }))
+    const normalize = vi.fn(async () => ({ blob: new Blob(['normalized']), pixels: makePixels(), width: 20, height: 20 }))
     const jeans: HeadProbabilities = { ...tee, category: { top: 0.1, bottom: 0.9 } }
     const classify = vi.fn()
       .mockResolvedValueOnce(result(tee))
@@ -109,7 +127,7 @@ describe('clothing analyzer', () => {
 
   it('leaves the subcategory empty when the category has none in the model', async () => {
     const image = new Blob(['image'], { type: 'image/jpeg' })
-    const normalize = async () => ({ blob: image, pixels: makePixels() })
+    const normalize = async () => ({ blob: image, pixels: makePixels(), width: 20, height: 20 })
     const suggestion = await analyzeGarmentImage(image, async () => result({
       category: { accessory: 0.9, top: 0.1 },
       subcategory: { camiseta: 1 }
@@ -120,7 +138,7 @@ describe('clothing analyzer', () => {
 
   it('suggests a brand read in any photo and survives a text reader failure', async () => {
     const images = [new Blob(['side'], { type: 'image/jpeg' }), new Blob(['label'], { type: 'image/jpeg' })]
-    const normalize = async () => ({ blob: new Blob(['normalized']), pixels: makePixels() })
+    const normalize = async () => ({ blob: new Blob(['normalized']), pixels: makePixels(), width: 20, height: 20 })
     const read = vi.fn()
       .mockResolvedValueOnce([{ text: '42', score: 0.9 }])
       .mockResolvedValueOnce([{ text: 'N I K E', score: 0.9 }])
@@ -138,7 +156,7 @@ describe('clothing analyzer', () => {
   })
 
   it('reads the label photo apart, with only the text reader, and picks the size for the category', async () => {
-    const normalize = vi.fn(async () => ({ blob: new Blob(['label']), pixels: makePixels() }))
+    const normalize = vi.fn(async () => ({ blob: new Blob(['label']), pixels: makePixels(), width: 20, height: 20 }))
     const read = vi.fn(async () => [
       { text: 'ZARA', score: 0.97 },
       { text: 'M', score: 0.95 },
@@ -155,7 +173,7 @@ describe('clothing analyzer', () => {
 
   it('rejects invalid predictions instead of simulating a result', async () => {
     const image = new Blob(['image'], { type: 'image/jpeg' })
-    const normalize = async () => ({ blob: image, pixels: makePixels() })
+    const normalize = async () => ({ blob: image, pixels: makePixels(), width: 20, height: 20 })
 
     await expect(analyzeGarmentImage(image, async () => result({}), normalize, noText)).rejects.toThrow('puntuaciones o etiquetas no válidas')
     await expect(analyzeGarmentImage(image, async () => result({ category: { top: 1.5 } }), normalize, noText))

@@ -14,6 +14,9 @@ export function loadOrt(): Promise<Ort> {
     // Inference runs in a worker ONNX Runtime starts itself, so analysing photos never freezes the interface
     // (measured: 3 photos blocked the page 3.2 s on the main thread, 0 s with the worker).
     ort.env.wasm.proxy = true
+    // With cross-origin isolation (vite.config.ts, public/_headers, src/sw.ts) it also uses several threads: 4 halve
+    // the OCR detector's time. Except in the dev server, where thread workers never start; one thread there.
+    if (import.meta.env.DEV) ort.env.wasm.numThreads = 1
     // The OCR export has unused constants that ONNX Runtime reports as warnings on every load.
     ort.env.logLevel = 'error'
     return ort

@@ -1,17 +1,22 @@
+import { Search01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
-import Masonry from '../components/Masonry.jsx'
+import GarmentCard from '../components/GarmentCard'
 import PillNav from '../components/PillNav.jsx'
 import WardrobeData from '../components/WardrobeData'
 import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment } from '../types/domain'
 import { Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
-type Page = 'wardrobe' | 'add' | 'outfits' | 'packing'
+type Page = 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'packing'
 
 // Loaded when first needed, so the wardrobe opens without them: the form and the detail bring the analyser,
 // Outfits and Maleta their own screens, and the animated background its WebGL library.
 const GarmentForm = lazy(() => import('../components/GarmentForm'))
+const LookImport = lazy(() => import('../components/LookImport'))
+const BatchImport = lazy(() => import('../components/BatchImport'))
+const BatchReturn = lazy(() => import('../components/batchImport/BatchReturn'))
 const GarmentDetailPanel = lazy(() => import('../components/GarmentDetailPanel'))
 const OutfitGenerator = lazy(() => import('../components/OutfitGenerator'))
 const TripPlanner = lazy(() => import('../components/TripPlanner'))
@@ -19,17 +24,6 @@ const PatternWaves = lazy(() => import('../components/PatternWaves.jsx'))
 
 function ScreenLoader() {
   return <div className="loading-state"><LatticeLoader label="Cargando" pattern="ripple" fontSize={13} showTimer={false} /></div>
-}
-
-type GalleryItem = {
-  id: string
-  img: string
-  width: number
-  height: number
-  alt: string
-  title: string
-  description: string
-  garmentId: string
 }
 
 type PillItem = {
@@ -47,6 +41,8 @@ const navigation: PillItem[] = [
 const pageHrefs: Record<Page, string> = {
   wardrobe: '#armario',
   add: '#armario',
+  batch: '#armario',
+  look: '#armario',
   outfits: '#outfits',
   packing: '#maleta'
 }
@@ -60,7 +56,6 @@ function getGarmentLabel(garment: Garment) {
 function App() {
   const [page, setPage] = useState<Page>('wardrobe')
   const [garments, setGarments] = useState<Garment[]>([])
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([])
   const [displayCount, setDisplayCount] = useState(40)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -68,6 +63,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('Todas')
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [lookMessage, setLookMessage] = useState('')
   // Lives here, not in the wardrobe screen, so automatic Drive saves also follow changes made in Outfits.
   const drive = useDriveSync()
 
@@ -103,32 +99,20 @@ function App() {
     })
   }, [categoryFilter, garments, search])
 
-  const visibleGalleryItems = useMemo(() => {
-    const visibleIds = new Set(visibleGarments.map((garment) => garment.id))
-    return galleryItems.filter((item) => visibleIds.has(item.garmentId))
-  }, [galleryItems, visibleGarments])
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const garment of garments) counts.set(garment.category, (counts.get(garment.category) ?? 0) + 1)
+    return counts
+  }, [garments])
 
-  useEffect(() => {
-    const urls: string[] = []
-    const items = visibleGarments.slice(0, displayCount).map((garment) => {
-      const img = URL.createObjectURL(garment.thumbnail ?? garment.image)
-      urls.push(img)
-      const label = getGarmentLabel(garment)
-      const details = [garment.code, garment.category, ...garment.colors].filter(Boolean).join(' · ')
-      return {
-        id: garment.id,
-        garmentId: garment.id,
-        img,
-        width: garment.width,
-        height: garment.height,
-        alt: label,
-        title: label,
-        description: details
-      }
-    })
-    setGalleryItems(items)
-    return () => urls.forEach((url) => URL.revokeObjectURL(url))
-  }, [displayCount, visibleGarments])
+  // The tabs of the three ways of adding garments.
+  const addModes = (
+    <div className="add-modes" role="group" aria-label="Cómo añadir">
+      {([['add', 'Una prenda'], ['batch', 'Varias prendas'], ['look', 'Desde un look']] as const).map(([mode, label]) => (
+        <button key={mode} type="button" aria-pressed={page === mode} onClick={() => setPage(mode)}>{label}</button>
+      ))}
+    </div>
+  )
 
   const closeDetail = useCallback(() => setSelectedGarment(null), [])
 
@@ -161,12 +145,6 @@ function App() {
     event.preventDefault()
     const next = (['wardrobe', 'outfits', 'packing'] as const)[index]
     if (next) setPage(next)
-  }
-
-  function handleMasonryClick(garmentId: string | undefined) {
-      if (!garmentId) return
-      const garment = garments.find((entry) => entry.id === garmentId)
-    if (garment) setSelectedGarment(garment)
   }
 
   return (
@@ -211,72 +189,65 @@ function App() {
                 {({ menu, notices }) => <>
               <div className="page-heading">
                 <div>
-                  <p className="eyebrow">TU COLECCIÓN PERSONAL</p>
-                  <h1 id="wardrobe-title">Armario<span>.</span></h1>
-                  <p className="page-intro">Cada prenda cuenta una historia. Aquí empieza la tuya.</p>
+                                    <h1 id="wardrobe-title">Armario<span>.</span></h1>
+                  {garments.length > 0 && <p className="page-intro"><span className="wardrobe-count"><Counter value={garments.length} locale="es" fontSize="1em" fade={0.15} intro={false} /> {garments.length === 1 ? 'prenda' : 'prendas'}</span> en tu colección</p>}
                 </div>
                 <div className="page-actions">
                   {menu}
+                  <button className="button button-outline" type="button" onClick={() => setPage('batch')}>Añadir varias</button>
                   <button className="button button-dark" type="button" onClick={() => setPage('add')}>＋ Añadir prenda</button>
                 </div>
               </div>
               {notices}
+              {lookMessage && <p className="export-note" role="status">{lookMessage}</p>}
                 </>}
               </WardrobeData>
 
-              <div className="wardrobe-toolbar">
-                <span className="item-count"><Counter value={garments.length} locale="es" fontSize="1em" fade={0.15} intro={false} /> {garments.length === 1 ? 'PRENDA' : 'PRENDAS'}</span>
-                <div className="filters">
+              <Suspense fallback={null}><BatchReturn onOpen={() => setPage('batch')} /></Suspense>
+
+              {garments.length > 0 && (
+                <div className="wardrobe-toolbar">
                   <label className="search-field">
-                    <span aria-hidden="true">⌕</span>
+                    <HugeiconsIcon icon={Search01Icon} size={16} />
                     <span className="visually-hidden">Buscar prendas</span>
-                    <input value={search} onChange={(event) => { setSearch(event.target.value); setDisplayCount(40) }} placeholder="Buscar en tu armario" />
+                    <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setDisplayCount(40) }} placeholder="Buscar en tu armario" />
                   </label>
-                  <label className="visually-hidden" htmlFor="category-filter">Filtrar por categoría</label>
-                  <select id="category-filter" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setDisplayCount(40) }}>
-                    <option>Todas</option>
-                    {garmentCategories.map((category) => <option key={category}>{category}</option>)}
-                  </select>
+                  <div className="category-chips" role="group" aria-label="Filtrar por categoría">
+                    {['Todas', ...garmentCategories.filter((category) => categoryCounts.has(category))].map((category) => (
+                      <button key={category} type="button" aria-pressed={categoryFilter === category} onClick={() => { setCategoryFilter(category); setDisplayCount(40) }}>
+                        {category} <small>{category === 'Todas' ? garments.length : categoryCounts.get(category)}</small>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {loading ? (
                 <div className="loading-state"><LatticeLoader label="Abriendo tu armario" pattern="ripple" fontSize={13} showTimer={false} /></div>
               ) : visibleGarments.length === 0 ? (
                 <section className="empty-state">
                   <div className="empty-mark" aria-hidden="true">✳</div>
-                  <p className="eyebrow">{garments.length === 0 ? 'UN BUEN COMIENZO' : 'PRUEBA OTRA BÚSQUEDA'}</p>
                   <h2>{garments.length === 0 ? 'Tu armario empieza aquí.' : 'No encontramos esa prenda.'}</h2>
                   <p>{garments.length === 0
-                    ? 'Añade tu primera prenda y crea un espacio propio para todo lo que te encanta vestir.'
+                    ? 'Haz fotos a tus prendas y VESTA las reconoce y les quita el fondo. Puedes añadirlas de una en una o todas de golpe.'
                     : 'Cambia el texto o la categoría para ver más resultados.'}</p>
-                  {garments.length === 0 && <button className="button button-dark" type="button" onClick={() => setPage('add')}>Añadir primera prenda ↗</button>}
+                  {garments.length === 0 && (
+                    <div className="empty-actions">
+                      <button className="button button-dark" type="button" onClick={() => setPage('batch')}>Añadir varias de golpe</button>
+                      <button className="button button-outline" type="button" onClick={() => setPage('add')}>Añadir una prenda</button>
+                    </div>
+                  )}
                 </section>
-              ) : visibleGalleryItems.length === 0 ? (
-                <div className="loading-state" role="status">Preparando fotografías…</div>
               ) : (
-                <Masonry
-                  items={visibleGalleryItems}
-                  columns="auto"
-                  columnWidth={230}
-                  gap={18}
-                  radius={8}
-                  animateFrom="bottom"
-                  duration={0.45}
-                  blurToFocus={false}
-                  revealOnScroll={false}
-                  hoverEffect={reducedMotion ? 'none' : 'zoom'}
-                  captions="always"
-                  parallax={0}
-                  lightbox={false}
-                  draggable={false}
-                  onItemClick={(item: { garmentId?: string }) => handleMasonryClick(item.garmentId)}
-                  className="wardrobe-masonry"
-                />
+                <ul className="garment-grid">
+                  {visibleGarments.slice(0, displayCount).map((garment) => (
+                    <li key={garment.id}><GarmentCard garment={garment} label={getGarmentLabel(garment)} onOpen={() => setSelectedGarment(garment)} /></li>
+                  ))}
+                </ul>
               )}
-              {visibleGalleryItems.length < visibleGarments.length && !loading && (
+              {displayCount < visibleGarments.length && !loading && (
                 <div className="catalog-more">
-                  <p>Mostrando {visibleGalleryItems.length} de {visibleGarments.length} prendas.</p>
+                  <p>Mostrando {displayCount} de {visibleGarments.length} prendas.</p>
                   <button className="button button-outline" type="button" onClick={() => setDisplayCount((count) => count + 40)}>Cargar 40 más</button>
                 </div>
               )}
@@ -285,14 +256,47 @@ function App() {
 
           {page === 'add' && (
             <section className="form-screen" aria-labelledby="add-title">
-              <p className="eyebrow">UNA NUEVA HISTORIA</p>
-              <h1 id="add-title">Añadir prenda<span>.</span></h1>
-              <p className="page-intro">Las fotografías se procesan en este dispositivo y no se envían a ningún sitio.</p>
+                            <h1 id="add-title">Añadir prenda<span>.</span></h1>
+              {addModes}
               <Suspense fallback={<ScreenLoader />}>
                 <GarmentForm
                   onSave={createGarment}
                   onCancel={() => setPage('wardrobe')}
                   submitLabel="Guardar prenda"
+                />
+              </Suspense>
+            </section>
+          )}
+
+          {page === 'batch' && (
+            <section className="form-screen" aria-labelledby="batch-title">
+                            <h1 id="batch-title">Añadir varias prendas<span>.</span></h1>
+              {addModes}
+              <Suspense fallback={<ScreenLoader />}>
+                <BatchImport
+                  onDone={(added) => {
+                    void refreshGarments()
+                    setPage('wardrobe')
+                    setLookMessage(`${added} ${added === 1 ? 'prenda añadida' : 'prendas añadidas'}.`)
+                  }}
+                />
+              </Suspense>
+            </section>
+          )}
+
+          {page === 'look' && (
+            <section className="form-screen" aria-labelledby="look-title">
+                            <h1 id="look-title">Desde un look<span>.</span></h1>
+              {addModes}
+              <p className="page-intro">Una foto de cuerpo entero: VESTA busca cada prenda, la recorta y la reconoce. Es un prototipo; revisa lo que encuentre.</p>
+              <Suspense fallback={<ScreenLoader />}>
+                <LookImport
+                  onDone={(added) => {
+                    void refreshGarments()
+                    setPage('wardrobe')
+                    setLookMessage(`${added} ${added === 1 ? 'prenda añadida' : 'prendas añadidas'} desde el look.`)
+                  }}
+                  onCancel={() => setPage('add')}
                 />
               </Suspense>
             </section>

@@ -23,10 +23,12 @@ interface ChipsFieldProps {
   options: string[]
   placeholder: string
   suggested?: boolean
+  /** CSS colour shown in each chip, for colours. */
+  swatch?: (value: string) => string
 }
 
 /** A list of short values edited as chips; Enter, comma or leaving the field adds what was typed. */
-export function ChipsField({ label, values, onChange, options, placeholder, suggested }: ChipsFieldProps) {
+export function ChipsField({ label, values, onChange, options, placeholder, suggested, swatch }: ChipsFieldProps) {
   const id = useId()
   const [draft, setDraft] = useState('')
 
@@ -58,6 +60,7 @@ export function ChipsField({ label, values, onChange, options, placeholder, sugg
       <div className="chips-input">
         {values.map((value) => (
           <span className="chip" key={value}>
+            {swatch && <span className="color-dot" style={{ background: swatch(value) }} />}
             {value}
             <button type="button" onClick={() => onChange(values.filter((item) => item !== value))} aria-label={`Quitar ${value}`}>×</button>
           </span>
@@ -96,5 +99,18 @@ export function FormSection({ title, children }: { title: string; children: Reac
       <legend>{title}</legend>
       <div className="form-grid">{children}</div>
     </fieldset>
+  )
+}
+
+/** A section that can stay folded: its summary says what it holds, so most garments never need opening it. */
+export function FormFold({ title, summary, defaultOpen, children }: { title: string; summary?: string; defaultOpen?: boolean; children: ReactNode }) {
+  return (
+    <details className="form-fold" open={defaultOpen}>
+      <summary>
+        <span className="form-fold-title">{title}</span>
+        {summary && <span className="form-fold-summary">{summary}</span>}
+      </summary>
+      <div className="form-grid">{children}</div>
+    </details>
   )
 }
