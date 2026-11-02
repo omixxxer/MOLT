@@ -28,8 +28,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['wardrobe-icon.svg'],
       manifest: {
-        name: 'VESTA — Armario virtual',
-        short_name: 'VESTA',
+        name: 'Molt — Armario virtual',
+        short_name: 'Molt',
         description: 'Tu armario virtual, guardado en tu dispositivo.',
         theme_color: '#F5F5EF',
         background_color: '#F5F5EF',

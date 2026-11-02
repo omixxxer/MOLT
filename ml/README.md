@@ -1,4 +1,4 @@
-# Modelo propio de VESTA
+# Modelo propio de Molt
 
 Objetivo: sustituir Wargon por un clasificador propio que use la taxonomía de la app (incluidos calzado y accesorios) y que además prediga atributos útiles para el generador de outfits. Todo con datos y pesos que permitan uso comercial.
 
@@ -53,7 +53,7 @@ python -m vesta_ml.prepare clothing-dataset
 python -m vesta_ml.prepare fashionpedia --split val
 python -m vesta_ml.prepare open-images
 python -m vesta_ml.prepare photo-folders ruta/carpetas-unsplash-pexels
-python -m vesta_ml.prepare vesta-export ruta/vesta-dataset-AAAA-MM-DD.zip
+python -m vesta_ml.prepare vesta-export ruta/molt-dataset-AAAA-MM-DD.zip
 python -m vesta_ml.prepare merge
 ```
 

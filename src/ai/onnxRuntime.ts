@@ -2,7 +2,7 @@ import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url'
 import wasmModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url'
 
 // Shared by the garment classifier and the text reader: one WebAssembly runtime, one model cache.
-const MODEL_CACHE = 'vesta-model'
+const MODEL_CACHE = 'molt-model'
 
 export type Ort = typeof import('onnxruntime-web/wasm')
 

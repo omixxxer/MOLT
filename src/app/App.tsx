@@ -1,6 +1,6 @@
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
 import GarmentCard from '../components/GarmentCard'
 import PillNav from '../components/PillNav.jsx'
@@ -9,7 +9,7 @@ import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment } from '../types/domain'
 import { Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
-type Page = 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'packing'
+type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
 
 // Loaded when first needed, so the wardrobe opens without them: the form and the detail bring the analyser,
 // Outfits and Maleta their own screens, and the animated background its WebGL library.
@@ -20,6 +20,8 @@ const BatchReturn = lazy(() => import('../components/batchImport/BatchReturn'))
 const GarmentDetailPanel = lazy(() => import('../components/GarmentDetailPanel'))
 const OutfitGenerator = lazy(() => import('../components/OutfitGenerator'))
 const TripPlanner = lazy(() => import('../components/TripPlanner'))
+const HomeScreen = lazy(() => import('../components/home/HomeScreen'))
+const WearHistory = lazy(() => import('../components/history/WearHistory'))
 const PatternWaves = lazy(() => import('../components/PatternWaves.jsx'))
 
 function ScreenLoader() {
@@ -29,16 +31,20 @@ function ScreenLoader() {
 type PillItem = {
   label: string
   href: string
-  icon: string
+  icon: ReactNode
 }
 
 const navigation: PillItem[] = [
-  { label: 'Armario', href: '#armario', icon: '▦' },
-  { label: 'Outfits', href: '#outfits', icon: '✳' },
-  { label: 'Maleta', href: '#maleta', icon: '▣' }
+  { label: 'Inicio', href: '#inicio', icon: <span className="pill-nav__icon" aria-hidden="true">◉</span> },
+  { label: 'Armario', href: '#armario', icon: <span className="pill-nav__icon" aria-hidden="true">▦</span> },
+  { label: 'Outfits', href: '#outfits', icon: <span className="pill-nav__icon" aria-hidden="true">✳</span> },
+  { label: 'Historial', href: '#historial', icon: <span className="pill-nav__icon" aria-hidden="true">◷</span> },
+  { label: 'Maleta', href: '#maleta', icon: <span className="pill-nav__icon" aria-hidden="true">▣</span> }
 ]
 
 const pageHrefs: Record<Page, string> = {
+  home: '#inicio',
+  history: '#historial',
   wardrobe: '#armario',
   add: '#armario',
   batch: '#armario',
@@ -54,7 +60,7 @@ function getGarmentLabel(garment: Garment) {
 }
 
 function App() {
-  const [page, setPage] = useState<Page>('wardrobe')
+  const [page, setPage] = useState<Page>('home')
   const [garments, setGarments] = useState<Garment[]>([])
   const [displayCount, setDisplayCount] = useState(40)
   const [loading, setLoading] = useState(true)
@@ -64,6 +70,11 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('Todas')
   const [reducedMotion, setReducedMotion] = useState(false)
   const [lookMessage, setLookMessage] = useState('')
+  const [outfitAround, setOutfitAround] = useState<{ id: string; nonce: number }>()
+  // Used once: coming back to Outfits later does not start around that garment again.
+  useEffect(() => {
+    if (page !== 'outfits') setOutfitAround(undefined)
+  }, [page])
   // Lives here, not in the wardrobe screen, so automatic Drive saves also follow changes made in Outfits.
   const drive = useDriveSync()
 
@@ -143,7 +154,7 @@ function App() {
 
   function handleNavigation(_item: PillItem, index: number, event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>) {
     event.preventDefault()
-    const next = (['wardrobe', 'outfits', 'packing'] as const)[index]
+    const next = (['home', 'wardrobe', 'outfits', 'history', 'packing'] as const)[index]
     if (next) setPage(next)
   }
 
@@ -175,14 +186,20 @@ function App() {
       </Suspense>
       <div className="app-shell">
         <header className="app-header">
-          <a className="wordmark" href="#armario" onClick={() => setPage('wardrobe')} aria-label="VESTA, ir al armario">
-            VESTA<span aria-hidden="true">.</span>
+          <a className="wordmark" href="#inicio" onClick={() => setPage('home')} aria-label="Molt, ir al inicio">
+            Molt<span aria-hidden="true">.</span>
           </a>
           <span className="privacy-note"><span className="privacy-indicator" />{localStorageMessage}</span>
         </header>
 
         <main className="screen-content">
           {error && <div className="alert" role="alert">{error}</div>}
+          {page === 'home' && (
+            <Suspense fallback={<ScreenLoader />}>
+              <HomeScreen garments={garments} loading={loading} onNavigate={setPage} onOpenGarment={setSelectedGarment} />
+            </Suspense>
+          )}
+
           {page === 'wardrobe' && (
             <section aria-labelledby="wardrobe-title">
               <WardrobeData garments={garments} onImported={refreshGarments} drive={drive}>
@@ -229,7 +246,7 @@ function App() {
                   <div className="empty-mark" aria-hidden="true">✳</div>
                   <h2>{garments.length === 0 ? 'Tu armario empieza aquí.' : 'No encontramos esa prenda.'}</h2>
                   <p>{garments.length === 0
-                    ? 'Haz fotos a tus prendas y VESTA las reconoce y les quita el fondo. Puedes añadirlas de una en una o todas de golpe.'
+                    ? 'Haz fotos a tus prendas y Molt las reconoce y les quita el fondo. Puedes añadirlas de una en una o todas de golpe.'
                     : 'Cambia el texto o la categoría para ver más resultados.'}</p>
                   {garments.length === 0 && (
                     <div className="empty-actions">
@@ -288,7 +305,7 @@ function App() {
             <section className="form-screen" aria-labelledby="look-title">
                             <h1 id="look-title">Desde un look<span>.</span></h1>
               {addModes}
-              <p className="page-intro">Una foto de cuerpo entero: VESTA busca cada prenda, la recorta y la reconoce. Es un prototipo; revisa lo que encuentre.</p>
+              <p className="page-intro">Una foto de cuerpo entero: Molt busca cada prenda, la recorta y la reconoce. Es un prototipo; revisa lo que encuentre.</p>
               <Suspense fallback={<ScreenLoader />}>
                 <LookImport
                   onDone={(added) => {
@@ -304,10 +321,15 @@ function App() {
 
           {page === 'outfits' && (
             <Suspense fallback={<ScreenLoader />}>
-              <OutfitGenerator garments={garments} onAvailabilityChange={updateAvailability} />
+              <OutfitGenerator garments={garments} onAvailabilityChange={updateAvailability} onAddGarments={() => setPage('batch')} startGarmentId={outfitAround} />
             </Suspense>
           )}
-          {page === 'packing' && <Suspense fallback={<ScreenLoader />}><TripPlanner garments={garments} /></Suspense>}
+          {page === 'history' && (
+            <Suspense fallback={<ScreenLoader />}>
+              <WearHistory garments={garments} onAddGarments={() => setPage('batch')} onCreateOutfit={() => setPage('outfits')} onOpenGarment={setSelectedGarment} />
+            </Suspense>
+          )}
+          {page === 'packing' && <Suspense fallback={<ScreenLoader />}><TripPlanner garments={garments} onAvailabilityChange={updateAvailability} onAddGarments={() => setPage('batch')} /></Suspense>}
         </main>
 
         {/* Content scrolling under the bottom navigation blurs softly instead of being cut; gone at the end of the page. */}
@@ -333,7 +355,7 @@ function App() {
           collapse="never"
           intro={false}
           ariaLabel="Navegación principal"
-          className="vesta-pill-nav"
+          className="molt-pill-nav"
         />
       </div>
 
@@ -341,6 +363,11 @@ function App() {
         <Suspense fallback={null}>
           <GarmentDetailPanel
             garment={selectedGarment}
+            onCreateOutfit={(garment) => {
+              setSelectedGarment(null)
+              setOutfitAround({ id: garment.id, nonce: Date.now() })
+              setPage('outfits')
+            }}
             onClose={closeDetail}
             onSave={updateGarment}
             onDelete={removeGarment}

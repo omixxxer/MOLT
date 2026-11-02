@@ -252,7 +252,7 @@ async function loadReader(): Promise<TextReader> {
   if (!readerPromise) {
     const pending = (async (): Promise<TextReader> => {
       const [ort, description] = await Promise.all([loadOrt(), fetchDescription<OcrDescription>(`${OCR_BASE}ocr-model.json`)])
-      if (description.format !== 'vesta-ocr') throw new Error('La descripción del OCR no es válida.')
+      if (description.format !== 'molt-ocr') throw new Error('La descripción del OCR no es válida.')
       const { detector, recognizer } = description
       const [detectorModel, recognizerModel] = await Promise.all([
         fetchModelFile(`${OCR_BASE}${detector.file}?v=${detector.bytes}`),

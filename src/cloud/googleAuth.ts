@@ -4,7 +4,7 @@
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
-const CHANNEL = 'vesta-google-oauth'
+const CHANNEL = 'molt-google-oauth'
 const SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000
 
 export interface GoogleToken {
@@ -44,7 +44,7 @@ export function parseTokenFragment(fragment: string, expectedState: string, now 
   const expiresIn = Number(params.get('expires_in'))
   if (!accessToken || !Number.isFinite(expiresIn)) throw new Error('Google no ha devuelto un acceso válido.')
   if (!(params.get('scope') ?? '').split(' ').includes(DRIVE_SCOPE)) {
-    throw new Error('Para guardar la copia hay que permitir el acceso a la carpeta de VESTA en Drive.')
+    throw new Error('Para guardar la copia hay que permitir el acceso a la carpeta de Molt en Drive.')
   }
   return { accessToken, expiresAt: now + Math.max(0, expiresIn - 60) * 1000 }
 }
@@ -70,7 +70,7 @@ export async function signIn(): Promise<GoogleToken> {
     include_granted_scopes: 'false',
     prompt: 'select_account'
   }).toString()
-  const popup = window.open(url, 'vesta-google', 'popup,width=480,height=640')
+  const popup = window.open(url, 'molt-google', 'popup,width=480,height=640')
   if (!popup) throw new Error('El navegador ha bloqueado la ventana de Google. Permite las ventanas emergentes para esta página.')
 
   const fragment = await new Promise<string>((resolve, reject) => {
@@ -82,7 +82,7 @@ export async function signIn(): Promise<GoogleToken> {
     }
     const accept = (data: unknown) => {
       const message = data as { type?: string; fragment?: string } | null
-      if (message?.type !== 'vesta-google-oauth' || typeof message.fragment !== 'string') return
+      if (message?.type !== 'molt-google-oauth' || typeof message.fragment !== 'string') return
       if (new URLSearchParams(message.fragment).get('state') !== state) return
       finish()
       resolve(message.fragment)

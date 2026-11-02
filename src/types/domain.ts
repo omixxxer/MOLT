@@ -1,3 +1,5 @@
+import type { DailyWeather, Place } from '../weather/openMeteo'
+
 export const garmentCategories = [
   'Parte superior',
   'Parte inferior',
@@ -51,7 +53,7 @@ export interface GarmentAnalysis {
   }
   confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand', number>>
   // wargon-vit and clip-zero-shot only appear in garments analysed by earlier versions of the app.
-  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand' | 'size' | 'composition', 'vesta-dinov2' | 'paddle-ocr' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
+  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand' | 'size' | 'composition', 'molt-dinov2' | 'vesta-dinov2' | 'paddle-ocr' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
   unknownAttributes: string[]
   correctedAttributes: string[]
 }
@@ -69,6 +71,8 @@ export interface Garment {
   size?: string
   /** Free text, e.g. "95 % algodón, 5 % elastano". */
   composition?: string
+  /** What it cost, in euros; for the cost per wearing. */
+  price?: number
   notes?: string
   seasons: Season[]
   styles: string[]
@@ -132,4 +136,37 @@ export interface TrendPack {
     name: string
     rules: Array<{ attribute: string; value: string; weight: number }>
   }>
+}
+
+export type PackingStyle = 'light' | 'balanced' | 'roomy'
+
+export interface TripDay {
+  date: string
+  weather: DailyWeather
+  occasion: string
+  garmentIds: string[]
+  /** Chosen or changed by the user: replanning leaves it alone. */
+  edited?: boolean
+}
+
+/** Something for the suitcase that is not in the wardrobe. */
+export interface TripExtra {
+  id: string
+  label: string
+  packed: boolean
+}
+
+export interface Trip {
+  id: string
+  place: Place
+  startDate: string
+  endDate: string
+  kind: string
+  style: PackingStyle
+  days: TripDay[]
+  packedIds: string[]
+  extras: TripExtra[]
+  fetchedAt?: string
+  createdAt: string
+  updatedAt: string
 }

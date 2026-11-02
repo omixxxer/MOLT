@@ -28,7 +28,7 @@ export default function AnalysisCard({ analyzing, photoCount, suggestion, labelH
       {!analyzing && suggestion && (
         <>
           <div className="analysis-headline">
-            <p className="analysis-label">VESTA cree que es</p>
+            <p className="analysis-label">Molt cree que es</p>
             <p className="analysis-main">{suggestion.subcategory || suggestion.category}</p>
             <p className="analysis-meta">
               {suggestion.subcategory ? `${suggestion.category} · ` : ''}
@@ -61,7 +61,7 @@ export default function AnalysisCard({ analyzing, photoCount, suggestion, labelH
         <button type="button" onClick={onAnalyze} disabled={!photoCount || analyzing || disabled}>{analyzing ? 'Analizando…' : 'Analizar de nuevo'}</button>
         <details className="analysis-details">
           <summary>¿Cómo se analiza?</summary>
-          <p>Las fotos se analizan en este dispositivo y no se envían. El modelo de VESTA combina todas las fotos para sugerir categoría, subcategoría y estampado, y estima la manga o el corte del pantalón. El color se mide sobre la prenda, no sobre el fondo. La marca se lee si aparece escrita (etiqueta, lengüeta…); los logos sin letras no se reconocen. Talla y composición salen de la foto de la etiqueta, que solo se usa para leer texto: no cuenta para el tipo ni el color, y lo que lee sustituye a lo que hubiera en esos campos. Temporadas, estilo y estética se sugieren según el tipo de prenda, la manga y la composición, y puedes cambiarlos. Descarga del modelo la primera vez: {MODEL_DOWNLOAD_SIZE}.</p>
+          <p>Las fotos se analizan en este dispositivo y no se envían. El modelo de Molt combina todas las fotos para sugerir categoría, subcategoría y estampado, y estima la manga o el corte del pantalón. El color se mide sobre la prenda, no sobre el fondo. La marca se lee si aparece escrita (etiqueta, lengüeta…); los logos sin letras no se reconocen. Talla y composición salen de la foto de la etiqueta, que solo se usa para leer texto: no cuenta para el tipo ni el color, y lo que lee sustituye a lo que hubiera en esos campos. Temporadas, estilo y estética se sugieren según el tipo de prenda, la manga y la composición, y puedes cambiarlos. Descarga del modelo la primera vez: {MODEL_DOWNLOAD_SIZE}.</p>
         </details>
       </div>
     </div>

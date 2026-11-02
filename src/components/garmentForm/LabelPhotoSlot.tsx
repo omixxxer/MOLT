@@ -60,7 +60,7 @@ export default function LabelPhotoSlot({ photo, reading, read, findings, error, 
       ) : (
         <label className="label-upload">
           <span aria-hidden="true">＋</span>
-          <span>Añadir foto de la etiqueta <small>VESTA lee la marca, la talla y la composición</small></span>
+          <span>Añadir foto de la etiqueta <small>Molt lee la marca, la talla y la composición</small></span>
           <input
             type="file"
             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"

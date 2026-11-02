@@ -1,10 +1,12 @@
 import { signOut, type GoogleToken } from './googleAuth'
 
 // The wardrobe backup (the same ZIP as «Exportar copia») kept as one file in the app's hidden Drive folder
-// (appDataFolder): only VESTA can see it, and the user's other Drive files are out of its reach. Drive keeps
+// (appDataFolder): only Molt can see it, and the user's other Drive files are out of its reach. Drive keeps
 // previous versions of the file for a while, so a bad save can be undone from there.
 
-export const DRIVE_FILE_NAME = 'vesta-armario.zip'
+export const DRIVE_FILE_NAME = 'molt-armario.zip'
+/** The copy saved before the app was renamed: still found, and renamed the next time it is saved. */
+const LEGACY_DRIVE_FILE_NAME = 'vesta-armario.zip'
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3'
 /** Upload in parts, so a large wardrobe never goes in one request; Drive needs multiples of 256 KB. */
@@ -47,7 +49,7 @@ async function call(token: GoogleToken, url: string, init: RequestInit = {}): Pr
 export async function findDriveBackup(token: GoogleToken): Promise<DriveBackupInfo | undefined> {
   const query = new URLSearchParams({
     spaces: 'appDataFolder',
-    q: `name = '${DRIVE_FILE_NAME}' and trashed = false`,
+    q: `(name = '${DRIVE_FILE_NAME}' or name = '${LEGACY_DRIVE_FILE_NAME}') and trashed = false`,
     fields: 'files(id,modifiedTime,size)',
     orderBy: 'modifiedTime desc',
     pageSize: '1'
@@ -73,7 +75,7 @@ export async function uploadDriveBackup(
       'X-Upload-Content-Type': 'application/zip',
       'X-Upload-Content-Length': String(archive.size)
     },
-    body: JSON.stringify(existingId ? {} : { name: DRIVE_FILE_NAME, parents: ['appDataFolder'], mimeType: 'application/zip' })
+    body: JSON.stringify(existingId ? { name: DRIVE_FILE_NAME } : { name: DRIVE_FILE_NAME, parents: ['appDataFolder'], mimeType: 'application/zip' })
   })
   const location = session.headers.get('Location')
   if (!location) throw new Error('Google Drive no ha aceptado la subida.')

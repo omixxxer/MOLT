@@ -1,5 +1,5 @@
 'use client';
-// From React Bits (MIT + Commons Clause, see THIRD_PARTY_NOTICES.md); texts adapted to Spanish for VESTA.
+// From React Bits (MIT + Commons Clause, see THIRD_PARTY_NOTICES.md); texts adapted to Spanish for Molt.
 
 import React from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';

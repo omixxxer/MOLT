@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { europeanEquivalent } from '../ai/labelParser'
 import { categoryIdForLabel } from '../ml/taxonomy'
+import { askConfirm } from './confirmDialog'
 import type { Garment } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
 import GarmentForm from './GarmentForm'
@@ -10,13 +11,15 @@ interface GarmentDetailPanelProps {
   onClose: () => void
   onSave: (garment: Garment) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  /** To the outfits screen, to build an outfit around this garment. */
+  onCreateOutfit?: (garment: Garment) => void
 }
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(date))
 }
 
-export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete }: GarmentDetailPanelProps) {
+export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete, onCreateOutfit }: GarmentDetailPanelProps) {
   const panelRef = useRef<HTMLElement>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -73,7 +76,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
   }, [onClose])
 
   async function confirmDelete() {
-    if (!window.confirm('¿Eliminar esta prenda? No se puede deshacer')) return
+    if (!await askConfirm('¿Eliminar esta prenda? No se puede deshacer.', 'Eliminar prenda')) return
     setDeleteError('')
     try {
       await onDelete(garment.id)
@@ -133,6 +136,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
               <div><dt>Marca</dt><dd>{garment.brand || 'Sin especificar'}</dd></div>
               <div><dt>Talla</dt><dd>{garment.size ? (european ? `${garment.size} (≈ ${european} EU)` : garment.size) : 'Sin especificar'}</dd></div>
               {garment.composition && <div><dt>Composición</dt><dd>{garment.composition}</dd></div>}
+              {garment.price !== undefined && <div><dt>Precio</dt><dd>{new Intl.NumberFormat('es', { style: 'currency', currency: 'EUR' }).format(garment.price)}</dd></div>}
               <div><dt>Temporadas</dt><dd>{garment.seasons.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estilo</dt><dd>{garment.dressLevels.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estética</dt><dd>{garment.styles.join(', ') || 'Sin especificar'}</dd></div>
@@ -140,9 +144,9 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                 <div className="property-notes">
                   <dt>Procedencia del análisis</dt>
                   <dd>
-                    Sugerencias locales de {garment.analysis.modelId} ({garment.analysis.modelVersion.slice(0, 8)}).
-                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'vesta-dinov2'
-                      ? 'modelo propio de VESTA (DINOv2)'
+                    Sugerencias locales de {garment.analysis.modelId.replace(/^vesta\//, 'molt/')} ({garment.analysis.modelVersion.slice(0, 8)}).
+                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'molt-dinov2' || garment.analysis.sourcesByAttribute.category === 'vesta-dinov2'
+                      ? 'modelo propio de Molt (DINOv2)'
                       : garment.analysis.sourcesByAttribute.category === 'clip-zero-shot'
                         ? 'CLIP zero-shot'
                         : garment.analysis.sourcesByAttribute.category === 'wargon-vit'
@@ -161,6 +165,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
             {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
             <footer className="detail-actions">
               <button className="button button-danger" type="button" onClick={() => void confirmDelete()}>Eliminar</button>
+              {onCreateOutfit && <button className="button button-outline" type="button" onClick={() => onCreateOutfit(garment)}>Crear outfit con esta prenda</button>}
               <button className="button button-dark" type="button" onClick={() => setIsEditing(true)}>Editar</button>
             </footer>
           </>

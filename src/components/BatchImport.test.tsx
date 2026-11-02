@@ -17,7 +17,7 @@ function suggestion(file: Blob): ClothingAnalysisSuggestion {
     alternatives: [],
     confidenceByAttribute: { category: Number(confidence ?? 0.95), subcategory: 0.9 },
     unknownAttributes: [],
-    modelId: 'vesta/dinov2-small-heads',
+    modelId: 'molt/dinov2-small-heads',
     modelVersion: 'heads-test',
     calibrated: true,
     segmentations: [{ classes: [], grid: 16, probabilities: new Float32Array(0) }],
@@ -88,9 +88,15 @@ describe('adding many garments', () => {
     expect(screen.getByLabelText('Tipo de prenda')).toHaveValue('Chaqueta')
     expect(screen.getByText('Comprueba el tipo')).toBeInTheDocument()
 
+    // The selector offers every type of the category, not only the current one.
+    const options = within(screen.getByLabelText('Tipo de prenda')).getAllByRole('option').map((option) => option.textContent)
+    expect(options).toEqual(expect.arrayContaining(['Chaqueta', 'Blazer', 'Abrigo', 'Plumífero', 'Otro…']))
+
     // Correcting it clears the warning and the count, but the card stays while it is being typed in.
-    await user.type(screen.getByLabelText('Tipo de prenda'), ' vaquera')
-    expect(screen.getByLabelText('Tipo de prenda')).toHaveValue('Chaqueta vaquera')
+    await user.selectOptions(screen.getByLabelText('Tipo de prenda'), 'Otro…')
+    await user.type(screen.getByLabelText('Escribe el tipo de prenda'), 'Chaqueta vaquera')
+    expect(screen.getByLabelText('Escribe el tipo de prenda')).toHaveValue('Chaqueta vaquera')
+    expect(screen.getByLabelText('Tipo de prenda')).toHaveValue('other')
     expect(screen.queryByText('Comprueba el tipo')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Por revisar (0)' })).toBeInTheDocument()
 
@@ -117,6 +123,24 @@ describe('adding many garments', () => {
     await user.click(screen.getByRole('button', { name: 'Es otra prenda' }))
     expect(getBatch().garments).toHaveLength(2)
     await waitFor(() => expect(getBatch().running).toBe(false))
+  })
+
+  it('changes the type from the selector and offers the types of a new category', async () => {
+    const { user, onDone } = await start([photo('Parte superior|Camiseta|Blanco|0')])
+    const type = await screen.findByLabelText('Tipo de prenda')
+    expect(type).toHaveValue('Camiseta')
+    await user.selectOptions(type, 'Polo')
+    expect(type).toHaveValue('Polo')
+
+    await user.selectOptions(screen.getByLabelText('Categoría'), 'Calzado')
+    expect(screen.getByLabelText('Tipo de prenda')).toHaveValue('')
+    expect(screen.getByText('Elige el tipo', { selector: '.batch-reason' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Tipo de prenda')).getByRole('option', { name: 'Botas' })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Tipo de prenda'), 'Botas')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar 1 prenda' }))
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith(1))
+    expect((await database.garments.toArray())[0]).toMatchObject({ category: 'Calzado', subcategory: 'Botas' })
   })
 
   it('can keep the background and fix the colours of a garment', async () => {

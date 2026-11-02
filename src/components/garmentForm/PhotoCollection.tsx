@@ -63,7 +63,7 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
       <label className="photo-drop" {...dropHandlers} {...(dragging ? { 'data-dragging': '' } : {})}>
         <span className="photo-drop-icon" aria-hidden="true"><HugeiconsIcon icon={Image02Icon} size={26} /></span>
         <strong>Añade una foto de la prenda</strong>
-        <small>VESTA sugiere el tipo, el color y el estampado, y le quita el fondo.</small>
+        <small>Molt sugiere el tipo, el color y el estampado, y le quita el fondo.</small>
         <span className="button button-dark">Elegir fotos</span>
         <small>Hasta {max} fotos · JPG, PNG o WebP · 8 MB cada una</small>
         {fileInput}

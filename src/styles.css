@@ -41,7 +41,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-family: var(--serif);
   font-size: 25px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .02em;
   text-decoration: none;
 }
 .wordmark > span, h1 > span { color: var(--sage); }
@@ -171,7 +171,7 @@ h1, h2, p { margin-top: 0; }
 .add-modes button { flex: none; min-height: 38px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; font-size: 13px; font-weight: 650; transition: background-color .18s ease; }
 .add-modes button[aria-pressed=true] { background: var(--white); box-shadow: 0 1px 3px rgba(48, 53, 47, .16); }
 
-/* The garment form: the photo in large beside what VESTA understood, the rest folded. */
+/* The garment form: the photo in large beside what Molt understood, the rest folded. */
 .garment-form { display: grid; gap: 18px; container-type: inline-size; }
 .garment-form-layout { display: grid; gap: 22px; }
 .garment-form-media, .garment-form-fields { min-width: 0; display: grid; align-content: start; gap: 16px; }
@@ -309,7 +309,7 @@ button.photo-stage-pill { text-decoration: underline; }
 .detail-panel .garment-form > .form-footer { bottom: 0; }
 .form-footer-name { flex: 1; min-width: 0; align-self: center; overflow: hidden; padding-left: 4px; font-family: var(--serif); font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-panel .photo-stage { aspect-ratio: 4 / 3; }
-.feature-screen { max-width: 760px; margin: 0 auto; }
+.feature-screen { max-width: 1040px; margin: 0 auto; }
 .coming-soon { min-height: 340px; border: 1px solid var(--line); border-radius: 6px; background: rgba(245, 245, 239, .68); }
 .coming-soon .empty-mark { margin-bottom: 21px; }
 .coming-soon p { margin-bottom: 0; }
@@ -351,7 +351,7 @@ button.photo-stage-pill { text-decoration: underline; }
 .property-list .property-notes { grid-column: 1 / -1; }
 .property-list dt { margin-bottom: 4px; color: var(--graphite); font-size: 11px; font-weight: 650; opacity: .75; }
 .property-list dd { margin: 0; color: var(--graphite); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
-.detail-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; }
+.detail-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 20px; }
 .detail-actions .button { min-width: 110px; }
 .detail-panel.editing { width: min(650px, 100%); }
 .detail-panel.editing .detail-heading { margin-bottom: 19px; }
@@ -406,66 +406,386 @@ button.photo-stage-pill { text-decoration: underline; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
 
-.outfit-generator > .page-intro { max-width: 720px; margin: 0 0 24px; }
-.outfit-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
-.outfit-controls .form-field { min-width: 0; }
-.garment-selection, .preference-settings { margin: 14px 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.garment-selection > summary, .preference-settings > summary { cursor: pointer; font-size: 12px; font-weight: 650; }
-.garment-selection-list { display: grid; gap: 8px; margin-top: 14px; }
-.garment-selection-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto auto minmax(170px, .7fr); align-items: center; gap: 12px; padding: 9px; background: var(--soft-surface); font-size: 11px; }
-.garment-selection-row > span { overflow-wrap: anywhere; }
-.garment-selection-row label { display: flex; align-items: center; gap: 5px; }
-.garment-selection-row label:last-child { justify-content: space-between; }
-.garment-selection-row select { max-width: 120px; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--white); }
-.preference-actions, .outfit-generate-actions, .outfit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.score-note { margin: 18px 0 12px; color: var(--graphite); font-size: 10px; line-height: 1.6; }
-.outfit-notice { padding: 11px 13px; border-left: 3px solid var(--sage); background: var(--soft-surface); font-size: 11px; line-height: 1.5; }
-.outfit-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }
-.outfit-card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: 7px; background: rgba(245, 245, 239, .8); }
-.outfit-spotlight { min-width: 0; padding: 0; border-radius: 7px; }
-.outfit-spotlight > .outfit-card { border: 0; background: transparent; }
-.outfit-card header { display: flex; justify-content: space-between; gap: 10px; }
-.outfit-card .eyebrow { margin-bottom: 6px; }
-.outfit-card h2 { margin: 0; font-family: var(--serif); font-size: 19px; font-weight: 500; }
-.outfit-garments { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; margin: 15px 0; }
-.outfit-garments figure { min-width: 0; margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: var(--soft-surface); }
-.outfit-garments img { display: block; width: 100%; height: 130px; object-fit: contain; }
-.outfit-garments figcaption { min-height: 32px; padding: 6px; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
-.outfit-explanation { margin: 12px 0; font-size: 10px; line-height: 1.6; }
-.outfit-actions .button { min-height: 36px; padding: 0 9px; font-size: 10px; }
-.outfit-history { margin-top: 34px; }
-.outfit-history > h2 { margin: 0; font-family: var(--serif); font-size: 24px; font-weight: 500; }
-.outfit-history .outfit-card h3 { margin: 0; font-family: var(--serif); font-size: 17px; font-weight: 500; }
-.outfit-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 18px; border-bottom: 1px solid var(--line); }
-.outfit-tabs [role="tab"] { min-height: 42px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; color: var(--graphite); background: transparent; font-size: 11px; }
-.outfit-tabs [aria-selected="true"] { border-bottom-color: var(--graphite); font-weight: 700; }
-.weather-action { display: grid; align-content: end; justify-items: start; gap: 7px; }
-.weather-action > span { color: var(--graphite); font-size: 9px; line-height: 1.5; }
-.outfit-swipe-list .outfit-card { touch-action: pan-y; }
-.swipe-hint { margin: 10px 0 0; color: var(--graphite); font-size: 9px; line-height: 1.5; }
-.manual-outfit { display: grid; gap: 14px; }
-.manual-outfit > h2, .trip-planner .outfit-history > h2 { margin: 0; font-family: var(--serif); font-size: 24px; font-weight: 500; }
-.manual-garment-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: 420px; overflow: auto; padding: 1px; }
-.manual-garment-list > label { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 8px; border: 1px solid var(--line); background: rgba(245, 245, 239, .8); font-size: 10px; }
-.manual-garment-list > label > span { overflow-wrap: anywhere; }
+/* Outfits and Maleta: one clear choice and one button first; the rest folded. */
+.outfit-tabs { display: inline-flex; max-width: 100%; margin: 18px 0 22px; padding: 3px; border-radius: 9px; background: var(--soft-surface); }
+.outfit-tabs [role="tab"] { min-height: 38px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; font-size: 13px; font-weight: 650; transition: background-color .18s ease; }
+.outfit-tabs [aria-selected="true"] { background: var(--white); box-shadow: 0 1px 3px rgba(48, 53, 47, .16); }
+.feature-screen > .form-error { margin-bottom: 14px; }
+.outfit-notice { margin: 14px 0 0; padding: 11px 14px; border-radius: 8px; background: rgba(154, 165, 142, .2); font-size: 13px; line-height: 1.5; }
+.outfit-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-items: start; gap: 18px; margin-top: 22px; scroll-margin-top: 16px; }
+.outfit-card { display: grid; min-width: 0; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(245, 245, 239, .86); animation: batch-rise .32s ease both; }
+.outfit-card h2, .outfit-card h3 { margin: 0; font-family: var(--serif); font-size: 19px; font-weight: 500; line-height: 1.25; }
+.outfit-origin { margin: 0 0 -8px; font-size: 10px; font-weight: 650; letter-spacing: .8px; opacity: .7; }
+.outfit-garments { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+.outfit-garments figure { min-width: 0; margin: 0; }
+/* The surface is on the wrapper: thumbnails have a white background that melts into it when multiplied. */
+.garment-tile { display: block; aspect-ratio: 4 / 5; overflow: hidden; border: 2px solid transparent; border-radius: 10px; background: #ecebe1; }
+.garment-tile img { display: block; width: 100%; height: 100%; padding: 6px; object-fit: contain; mix-blend-mode: multiply; }
+.outfit-garments figcaption { padding: 5px 2px 0; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.outfit-explanation { margin: 0; font-size: 12px; line-height: 1.5; opacity: .85; }
+.outfit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.outfit-actions .button { min-height: 40px; padding: 0 13px; }
+.icon-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--stone); border-radius: 50%; background: var(--white); transition: background-color .18s ease; }
+.icon-button:hover { background: var(--stone); }
+.outfit-folds { margin-top: 26px; }
+.outfit-folds label.form-field, .trip-form label.form-field { font-size: 12px; font-weight: 650; }
+.preference-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.score-note { margin: 0; font-size: 12px; font-weight: 400; line-height: 1.6; }
+
+.outfit-history .outfit-notice { margin-bottom: 0; }
+
+@media (min-width: 900px) {
+}
+.packing-count { margin-left: 6px; font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 500; opacity: .8; }
+.packing { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(245, 245, 239, .86); }
+.packing .trip-heading { font-size: 20px; }
+.packing-progress { display: grid; gap: 6px; margin-bottom: 12px; }
+.packing-progress .batch-dock-bar { border-radius: 2px; overflow: hidden; }
+.packing-progress p { margin: 0; font-size: 12px; }
+.packing-list { display: grid; gap: 4px; max-height: min(60vh, 560px); overflow-y: auto; }
+.packing-item { display: flex; min-width: 0; align-items: center; gap: 10px; min-height: 44px; padding: 5px 6px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.packing-item:hover { background: var(--soft-surface); }
+.packing-item input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--graphite); }
+.packing-item > span { min-width: 0; overflow-wrap: anywhere; }
+.packing-item > img { flex: none; width: 36px; height: 44px; border-radius: 5px; object-fit: contain; mix-blend-mode: multiply; }
+.packing-item[data-packed] > span { text-decoration: line-through; opacity: .6; }
+.packing-item[data-packed] > img { opacity: .5; }
+
 .catalog-more { display: grid; justify-items: center; gap: 8px; margin: 26px 0; }
-.catalog-more > p { margin: 0; color: var(--graphite); font-size: 10px; }
-.trip-days { display: grid; gap: 14px; margin-top: 16px; }
-.trip-days .outfit-card h3 { margin: 0; font-family: var(--serif); font-size: 17px; font-weight: 500; }
-.packing-count { margin-left: 8px; color: var(--graphite); font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif; font-size: 10px; font-weight: 500; }
-.packing-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
-.packing-item { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); background: rgba(245, 245, 239, .8); font-size: 10px; }
-.packing-item > span { overflow-wrap: anywhere; }
-.packing-item > img { width: 42px; height: 48px; object-fit: contain; background: var(--soft-surface); }
+.catalog-more > p { margin: 0; color: var(--graphite); font-size: 12px; }
 
 @media (max-width: 720px) {
-  .outfit-controls, .outfit-results { grid-template-columns: 1fr; }
-  .garment-selection-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
-  .garment-selection-row label:last-child { grid-column: 1 / -1; }
-  .outfit-garments img { height: 110px; }
-  .manual-garment-list, .packing-list { grid-template-columns: 1fr; }
-  .outfit-tabs { gap: 0; }
+  .outfit-tabs { display: flex; }
   .outfit-tabs [role="tab"] { flex: 1; padding: 0 8px; }
+  .outfit-results { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The outfit studio: the plan on top, the outfit in large with its pieces, and what to do with it beside it. */
+.outfit-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 24px; margin-bottom: 20px; }
+.outfit-heading h1 { margin-bottom: 0; }
+.outfit-heading .outfit-tabs { margin: 0 0 6px; }
+button.choice-chip { font-family: inherit; }
+.studio { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.studio-plan { display: grid; gap: 10px; }
+.studio-link { padding: 0; border: 0; background: transparent; font-size: 12px; text-decoration: underline; }
+.studio-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 20px; }
+@media (min-width: 860px) {
+  .studio-layout { grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 28px; }
+  .studio-side { position: sticky; top: 16px; }
+}
+.studio-board { padding: 14px; border-radius: 16px; background: var(--soft-surface); touch-action: pan-y; }
+.studio-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.studio-slot { position: relative; display: grid; align-content: start; gap: 5px; min-width: 0; animation: batch-rise .28s ease both; }
+.studio-slot-photo { display: block; width: 100%; padding: 0; border: 0; border-radius: 12px; background: transparent; cursor: pointer; }
+.studio-slot-photo .garment-tile { background: var(--white); transition: border-color .18s ease; }
+.studio-slot-photo:hover .garment-tile { border-color: var(--sage); }
+.studio-slot-tools { position: absolute; top: 7px; right: 7px; display: grid; gap: 5px; }
+.studio-slot-tools .icon-button { width: 32px; height: 32px; }
+.studio-slot-name { padding: 0 3px; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.studio-slot-empty { align-self: stretch; }
+.studio-slot-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 100%; min-height: 150px; padding: 10px; border: 1px dashed var(--graphite); border-radius: 12px; background: transparent; font-size: 12px; font-weight: 600; }
+.studio-slot-add:hover { background: rgba(245, 245, 239, .7); }
+.studio-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.studio-side .outfit-notice { margin: 0; }
+.studio-verdict { display: grid; gap: 8px; }
+.studio-fit { margin: 0; font-family: var(--serif); font-size: 25px; line-height: 1.15; }
+.studio-reasons, .studio-warnings { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.35; }
+.studio-reasons li, .studio-warnings li { display: flex; align-items: flex-start; gap: 6px; }
+.studio-reasons svg, .studio-warnings svg { flex: none; margin-top: 2px; }
+.studio-warnings { color: var(--error); }
+.studio-actions, .studio-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.studio-actions .button:disabled { cursor: default; }
+.studio-actions .button-dark { flex: 1 1 110px; }
+.studio-ideas h2 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+.studio-ideas ul { display: flex; gap: 8px; margin: 0; padding: 2px; overflow-x: auto; list-style: none; scrollbar-width: thin; }
+.studio-ideas button { display: grid; grid-template-columns: repeat(2, 34px); gap: 2px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: #ecebe1; }
+.studio-ideas button[aria-pressed=true] { border-color: var(--graphite); box-shadow: inset 0 0 0 1px var(--graphite); }
+.studio-ideas img { display: block; width: 34px; height: 40px; object-fit: contain; mix-blend-mode: multiply; }
+.icon-button:disabled { cursor: default; opacity: .6; }
+.icon-button[aria-pressed=true] { border-color: var(--graphite); color: var(--white); background: var(--graphite); }
+
+.picker { display: grid; align-content: start; gap: 12px; width: min(720px, 100%); max-height: min(88vh, 860px); overflow: auto; padding: 20px; border-radius: 14px; background: var(--white); box-shadow: 0 18px 60px rgba(48, 53, 47, .28); }
+.picker:focus { outline: none; }
+.picker-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.picker-header h2 { margin: 0; font-family: var(--serif); font-size: 23px; font-weight: 500; }
+.picker-header .close-button { display: grid; place-items: center; }
+.picker-remove { justify-self: start; }
+.picker-empty { margin: 0; font-size: 13px; }
+.picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px 10px; margin: 0; padding: 0; list-style: none; }
+.picker-grid > li { display: grid; align-content: start; gap: 3px; min-width: 0; }
+.picker-option { position: relative; display: grid; gap: 4px; padding: 0; border: 0; background: transparent; text-align: left; }
+.picker-option:hover .garment-tile { border-color: var(--sage); }
+.picker-best { position: absolute; top: 6px; left: 6px; padding: 2px 7px; border-radius: 10px; color: var(--white); background: var(--graphite); font-size: 10px; font-weight: 650; }
+.picker-name { font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.picker-wash, .picker-away button { justify-self: start; padding: 0; border: 0; background: transparent; font-size: 11px; text-decoration: underline; opacity: .8; }
+.picker-away h3 { margin: 4px 0 8px; font-size: 13px; font-weight: 650; }
+.picker-away ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.picker-away li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.picker-away img { flex: none; width: 34px; height: 42px; object-fit: contain; mix-blend-mode: multiply; }
+.picker-away span { flex: 1; min-width: 0; }
+
+.saved-outfits { display: grid; gap: 16px; }
+.saved-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start; gap: 16px; }
+.saved-name { width: calc(100% + 8px); min-width: 0; margin: -2px -4px 0; padding: 2px 4px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-family: var(--serif); font-size: 19px; }
+.saved-name:hover { border-color: var(--stone); }
+.saved-name:focus { border-color: var(--graphite); background: var(--white); }
+.outfit-remove { margin-left: auto; }
+
+@media (max-width: 720px) {
+  .outfit-heading .outfit-tabs { width: 100%; }
+  .studio-board { padding: 10px; }
+  .studio-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  /* The actions stay in reach, over the navigation, while the outfit is looked at. */
+  .studio-side { display: contents; }
+  .studio-actions { position: sticky; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 3; flex-wrap: nowrap; padding: 8px; border-radius: 12px; background: var(--white); box-shadow: 0 6px 22px rgba(48, 53, 47, .2); }
+  .studio-actions .button { flex: 1 1 auto; min-width: 0; padding-inline: 10px; }
+  .studio-actions .icon-button { flex: none; }
+  .picker { width: 100%; max-height: 88dvh; padding: 16px; border-radius: 16px 16px 0 0; }
+  .picker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .saved-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Home: today's outfit first, how the wardrobe is used beside it, and the guide for those who are starting. */
+.home { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.home-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.home-heading h1 { margin-bottom: 0; }
+.home-heading .page-intro { margin-top: 4px; }
+.home-heading .page-intro::first-letter { text-transform: uppercase; }
+.home-start { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 20px; }
+.home-today { display: grid; gap: 12px; padding: 16px; border-radius: 16px; background: var(--soft-surface); }
+.home-today .garment-tile { background: var(--white); }
+.home-today .outfit-garments { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.home h2, .calendar-detail > h2, .stat-section h2 { margin: 0; font-family: var(--serif); font-size: 21px; font-weight: 500; }
+.calendar-detail > h2::first-letter { text-transform: uppercase; }
+.home-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.home-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: transparent; text-align: left; transition: background-color .18s ease; }
+.home-stats:hover { background: var(--soft-surface); }
+.home-stats-title { grid-column: 1 / -1; font-size: 12px; font-weight: 650; }
+.home-forgotten ul { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.home-forgotten .garment-tile { width: 100%; padding: 0; cursor: pointer; }
+.home-forgotten .garment-tile:hover { border-color: var(--sage); }
+.home-gap p { margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
+.home-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-links .button { flex: 1 1 140px; }
+@media (min-width: 860px) {
+  .home-layout { grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 28px; }
+}
+
+/* The guide: numbered steps joined by a line, one panel at a time. */
+.guide { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
+.guide-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.guide-header .close-button { display: grid; place-items: center; }
+.guide-steps { display: flex; margin: 0; padding: 0; list-style: none; }
+.guide-steps li { position: relative; flex: 1; display: flex; justify-content: center; }
+.guide-steps li + li::before { content: ''; position: absolute; top: 50%; right: 50%; width: 100%; height: 2px; background: var(--stone); transition: background-color .25s ease; }
+.guide-steps li.done + li::before { background: var(--graphite); }
+.guide-steps button { position: relative; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 2px solid var(--stone); border-radius: 50%; background: var(--white); font-size: 13px; font-weight: 650; transition: background-color .25s ease, border-color .25s ease, color .25s ease; }
+.guide-steps li.done button, .guide-steps button[aria-current] { border-color: var(--graphite); color: var(--white); background: var(--graphite); }
+.guide-steps button[aria-current] { box-shadow: 0 0 0 3px var(--stone); }
+.guide-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; min-height: 196px; align-content: start; animation: batch-rise .28s ease both; }
+.guide-panel:focus { outline: none; }
+.guide-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: var(--soft-surface); }
+.guide-count { margin: 0 0 2px; font-size: 11px; font-weight: 650; }
+.guide-panel h3 { margin: 0 0 6px; font-family: var(--serif); font-size: 24px; font-weight: 500; line-height: 1.15; }
+.guide-panel p:not(.guide-count) { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
+.guide-panel ul { display: grid; gap: 5px; margin: 0 0 10px; padding: 0; list-style: none; font-size: 13px; line-height: 1.4; }
+.guide-panel li { display: flex; align-items: flex-start; gap: 6px; }
+.guide-panel li svg { flex: none; margin-top: 2px; }
+.guide-nav { display: flex; justify-content: space-between; gap: 8px; }
+.guide-nav .button:disabled { cursor: default; opacity: .45; }
+
+/* Calendar */
+.calendar-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 20px; }
+.calendar { padding: 14px; border-radius: 16px; background: var(--soft-surface); }
+.calendar-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; text-align: center; }
+.calendar-header h2 { margin: 0; font-family: var(--serif); font-size: 22px; font-weight: 500; }
+.calendar-header h2::first-letter { text-transform: uppercase; }
+.calendar-header p { margin: 0; font-size: 12px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calendar-weekday { padding-bottom: 4px; font-size: 11px; font-weight: 650; text-align: center; }
+.calendar-day { position: relative; display: block; aspect-ratio: 4 / 5; min-width: 0; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: rgba(245, 245, 239, .75); }
+.calendar-day:disabled { cursor: default; background: transparent; opacity: .4; }
+.calendar-day:not(:disabled):hover { border-color: var(--sage); }
+.calendar-day[aria-pressed=true] { border-color: var(--graphite); }
+.calendar-day.worn { background: #ecebe1; }
+.calendar-day img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 14px 3px 3px; object-fit: contain; mix-blend-mode: multiply; }
+.calendar-number { position: absolute; top: 2px; left: 4px; z-index: 1; font-size: 11px; font-weight: 600; }
+.calendar-day.today .calendar-number { padding: 0 4px; border-radius: 8px; color: var(--white); background: var(--graphite); }
+.calendar-more { position: absolute; right: 3px; bottom: 2px; z-index: 1; font-size: 10px; font-weight: 700; }
+.calendar-detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.calendar-entry { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.calendar-entry h3 { margin: 0; font-size: 14px; font-weight: 650; }
+.calendar-entry .studio-link { display: inline-flex; align-items: center; justify-self: start; gap: 4px; }
+.calendar-empty { margin: 0; font-size: 13px; line-height: 1.5; }
+.calendar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.calendar-choices { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.calendar-choices button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: 13px; text-align: left; }
+.calendar-choices button:hover { background: var(--soft-surface); }
+.calendar-strip { display: flex; flex: none; gap: 2px; padding: 3px; border-radius: 7px; background: #ecebe1; }
+.calendar-strip img { display: block; width: 30px; height: 36px; object-fit: contain; mix-blend-mode: multiply; }
+@media (min-width: 860px) {
+  .calendar-layout { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 28px; }
+}
+
+/* Statistics: figures first, single-ink bars with their number always beside them. */
+.stats { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.stats .stat-tile { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.stat-tile { display: grid; gap: 1px; min-width: 0; }
+.stat-tile strong { font-family: var(--serif); font-size: 26px; font-weight: 500; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat-tile span { font-size: 12px; }
+.stat-sections { columns: 2 320px; column-gap: 32px; }
+.stat-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; margin-bottom: 26px; break-inside: avoid; }
+.stat-section h2 small { font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif; font-size: 13px; }
+.stat-section h3 { margin: 4px 0 0; font-size: 12px; font-weight: 650; }
+.stat-note { margin: 0; font-size: 12px; line-height: 1.45; }
+.stat-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.stat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; font-size: 13px; }
+.stat-row-label { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-row-label i { flex: none; width: 11px; height: 11px; border: 1px solid var(--line); border-radius: 50%; }
+.stat-row-value { font-size: 12px; font-variant-numeric: tabular-nums; }
+.stat-bar { grid-column: 1 / -1; display: block; height: 6px; border-radius: 3px; background: var(--soft-surface); }
+.stat-bar span { display: block; height: 100%; border-radius: 3px; background: var(--graphite); }
+.stat-garments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; margin: 0; padding: 0; list-style: none; }
+.stat-garment { display: grid; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; font-size: 12px; line-height: 1.3; text-align: left; overflow-wrap: anywhere; }
+.stat-garment:hover .garment-tile { border-color: var(--sage); }
+.stat-garment small { display: block; margin-top: 1px; font-size: 11px; }
+.stat-gaps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.4; }
+.stat-gaps li { display: flex; align-items: flex-start; gap: 7px; }
+.stat-gaps svg { flex: none; margin-top: 2px; }
+.stat-gaps strong { display: block; font-weight: 650; }
+
+@media (max-width: 720px) {
+  .guide { padding: 14px; }
+  .guide-panel { grid-template-columns: minmax(0, 1fr); gap: 10px; min-height: 270px; }
+  .guide-icon { width: 52px; height: 52px; }
+  .calendar { padding: 8px; }
+  .calendar-grid { gap: 3px; }
+  .calendar-day img { padding: 13px 1px 1px; }
+  .stat-tile strong { font-size: 23px; }
+  /* Five places in the bottom navigation: the words alone fit a phone. */
+  .molt-pill-nav .pill-nav__item { padding: 0 8px; font-size: 12px; }
+  .molt-pill-nav .pill-nav__icon { display: none; }
+}
+
+/* Asking before what cannot be undone, over any panel. */
+.confirm-backdrop { z-index: 1000; align-items: center; padding: 16px; }
+.confirm-dialog { width: min(420px, 100%); padding: 20px; border-radius: 14px; background: var(--white); box-shadow: 0 18px 60px rgba(48, 53, 47, .28); animation: batch-rise .2s ease both; }
+.confirm-dialog p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.confirm-actions .button { flex: 0 1 auto; }
+
+.trip-heading { margin: 0 0 12px; font-family: var(--serif); font-size: 24px; font-weight: 500; }
+/* The weather line every outfit screen shares. */
+.weather-bar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.weather-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; line-height: 1.4; }
+.weather-line svg { flex: none; }
+.weather-line strong { font-weight: 650; }
+.weather-days { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--soft-surface); }
+.weather-days button { min-height: 26px; padding: 0 9px; border: 0; border-radius: 5px; background: transparent; font-size: 12px; font-weight: 600; }
+.weather-days button[aria-pressed=true] { background: var(--white); box-shadow: 0 1px 3px rgba(48, 53, 47, .16); }
+.weather-note { margin: 0; font-size: 11px; line-height: 1.5; }
+.weather-credit { color: inherit; }
+.weather-edit { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 8px; padding: 12px; border-radius: 10px; background: var(--soft-surface); }
+.weather-edit .place-field { width: 100%; }
+
+.place-field { position: relative; display: grid; gap: 5px; min-width: 0; }
+.place-field > label { font-size: 12px; font-weight: 650; }
+.place-field input { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--stone); border-radius: 8px; background: var(--white); font-size: 14px; }
+.place-results { position: absolute; top: 100%; right: 0; left: 0; z-index: 8; max-height: 260px; margin: 4px 0 0; padding: 4px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--white); box-shadow: 0 10px 30px rgba(48, 53, 47, .18); list-style: none; }
+.place-results li { display: grid; gap: 1px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.place-results li[aria-selected=true], .place-results li[role=option]:hover { background: var(--soft-surface); }
+.place-results strong { font-weight: 650; }
+.place-results span { font-size: 12px; }
+.place-results .place-none { cursor: default; }
+.place-hint { margin: 0; font-size: 12px; color: var(--error); }
+
+/* Maleta */
+.trip-planner > h1 { margin-bottom: 14px; }
+.trip-list { display: flex; gap: 8px; margin-bottom: 18px; padding: 2px; overflow-x: auto; scrollbar-width: thin; }
+.trip-chip { display: grid; flex: none; gap: 1px; min-height: 48px; padding: 6px 13px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: 12px; text-align: left; }
+.trip-chip strong { font-size: 13px; font-weight: 650; }
+.trip-chip[aria-pressed=true] { color: var(--white); border-color: var(--graphite); background: var(--graphite); }
+.trip-chip-new { display: flex; align-items: center; gap: 5px; font-weight: 600; }
+.trip-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 640px; }
+.trip-form .page-intro { margin: 0; }
+.trip-form > .button { justify-self: start; min-width: 220px; }
+.trip-form .button:disabled { cursor: default; }
+.trip-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.trip-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
+.trip-choice legend { margin-bottom: 7px; padding: 0; font-size: 12px; font-weight: 650; }
+.trip-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.trip-style { display: grid; align-content: start; gap: 2px; min-height: 66px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: 11px; line-height: 1.3; text-align: left; }
+.trip-style strong { font-size: 13px; font-weight: 650; }
+.trip-style[aria-pressed=true] { border-color: var(--graphite); box-shadow: inset 0 0 0 1px var(--graphite); background: var(--soft-surface); }
+
+.trip { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.trip-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 20px; }
+.trip-header h2 { margin: 0; font-family: var(--serif); font-size: 30px; font-weight: 500; line-height: 1.1; }
+.trip-header p { margin: 3px 0 0; font-size: 13px; }
+.trip-header .trip-place { font-size: 11px; }
+.trip-tools { display: flex; align-items: center; gap: 8px; }
+.trip-tools .button:disabled { cursor: default; }
+.trip-capitalize { display: inline-block; }
+.trip-capitalize::first-letter { text-transform: uppercase; }
+.trip-changes { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 18px; padding: 12px 14px; border: 1px solid var(--graphite); border-radius: 12px; font-size: 13px; }
+.trip-changes ul { margin: 4px 0 0; padding: 0; list-style: none; line-height: 1.5; }
+.trip-changes-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.trip-weather { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.weather-strip { display: flex; gap: 6px; margin: 0; padding: 2px; overflow-x: auto; list-style: none; scrollbar-width: thin; }
+.weather-strip li { display: grid; flex: 1 0 64px; justify-items: center; gap: 2px; max-width: 110px; padding: 8px 4px; border-radius: 10px; background: var(--soft-surface); font-size: 11px; }
+.weather-strip li.climate { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.weather-strip strong { font-family: var(--serif); font-size: 18px; font-weight: 500; line-height: 1.1; }
+.weather-strip small { font-size: 11px; }
+.trip-advice { display: grid; gap: 3px; font-size: 13px; line-height: 1.45; }
+.trip-advice p { margin: 0; }
+.trip-tabs { display: none; padding: 3px; border-radius: 9px; background: var(--soft-surface); }
+.trip-tabs [role=tab] { flex: 1; min-height: 38px; border: 0; border-radius: 7px; background: transparent; font-size: 13px; font-weight: 650; }
+.trip-tabs [aria-selected=true] { background: var(--white); box-shadow: 0 1px 3px rgba(48, 53, 47, .16); }
+.trip-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 22px; }
+@media (min-width: 900px) {
+  .trip-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+  .packing { position: sticky; top: 16px; }
+}
+.trip-days { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.trip-day { gap: 10px; }
+.trip-day-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px 12px; }
+.trip-day-header h3 { margin: 0; font-size: 14px; font-weight: 650; }
+.trip-day-header h3::first-letter { text-transform: uppercase; }
+.trip-day-header p { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 2px 0 0; font-size: 12px; }
+.trip-occasion select { min-height: 34px; padding: 4px 8px; border: 1px solid var(--stone); border-radius: 7px; background: var(--white); font-size: 12px; }
+.trip-pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.trip-pieces li { min-width: 0; }
+.trip-pieces button { display: grid; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; text-align: left; }
+.trip-pieces button:hover .garment-tile { border-color: var(--sage); }
+.trip-piece-name { padding: 0 2px; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.trip-day-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.trip-day-actions .button:disabled { cursor: default; }
+.trip-add { display: inline-flex; align-items: center; gap: 3px; min-height: 30px; padding: 0 9px; border: 1px dashed var(--graphite); border-radius: 15px; background: transparent; font-size: 11px; font-weight: 600; }
+.packing-list h3 { margin: 10px 0 2px; font-size: 12px; font-weight: 650; }
+.packing-list section:first-child h3 { margin-top: 0; }
+.packing-item small { display: block; font-size: 11px; font-weight: 400; }
+.packing-extra label { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.packing-extra input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--graphite); }
+.packing-extra[data-packed] label span { text-decoration: line-through; opacity: .6; }
+.packing-extra button { display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; }
+.packing-extra button:hover { background: var(--stone); }
+.packing-add { display: flex; gap: 6px; margin-top: 6px; }
+.packing-add input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 10px; border: 1px solid var(--stone); border-radius: 7px; background: var(--white); font-size: 13px; }
+.packing-add .button { min-height: 38px; padding: 0 11px; }
+.packing-add .button:disabled { cursor: default; }
+
+@media (max-width: 899px) {
+  .trip-tabs { display: flex; }
+  .trip-layout[data-pane=days] .packing { display: none; }
+  .trip-layout[data-pane=list] .trip-days { display: none; }
+  .packing-list { max-height: none; }
+}
+@media (max-width: 720px) {
+  .place-field input, .packing-add input { font-size: 16px; }
+  .trip-form > .button { width: 100%; }
+  .trip-pieces { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* Adding the garments of a full-body photo at once. */
@@ -534,6 +854,7 @@ button.photo-stage-pill { text-decoration: underline; }
 .batch-title { width: calc(100% + 8px); min-width: 0; padding: 2px 4px; margin: 0 -4px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-family: var(--serif); font-size: 17px; line-height: 1.25; text-overflow: ellipsis; }
 .batch-title:hover { border-color: var(--stone); }
 .batch-title:focus { border-color: var(--graphite); background: var(--white); }
+.batch-other { width: 100%; min-width: 0; min-height: 34px; padding: 4px 8px; border: 1px solid var(--stone); border-radius: 6px; background: var(--white); font-size: 13px; }
 .batch-category { width: 100%; min-width: 0; padding: 2px 0; margin-top: -4px; border: 0; background: transparent; color: var(--graphite); font-size: 11px; opacity: .85; cursor: pointer; }
 .batch-colors-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 3px 0; border: 0; background: transparent; font-size: 11px; text-align: left; }
 .batch-read { margin: 0; font-size: 11px; line-height: 1.45; opacity: .85; }
@@ -558,7 +879,7 @@ button.photo-stage-pill { text-decoration: underline; }
   .batch-drop strong { font-size: 22px; }
   .batch-steps { grid-template-columns: 1fr; gap: 14px; }
     .batch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .batch-title, .batch-category { font-size: 16px; }
+  .batch-title, .batch-category, .batch-other { font-size: 16px; }
   .batch-dock-row { flex-wrap: wrap; padding: 9px 10px 10px 12px; }
   .batch-dock-text { flex: 1 0 100%; }
   .batch-dock-actions { flex: 1; }

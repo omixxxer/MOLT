@@ -1,4 +1,4 @@
-# VESTA — Armario virtual
+# Molt — Armario virtual
 
 Armario virtual *local-first*: catalogas tus prendas con una foto, generas outfits según la ocasión y el tiempo, y preparas la maleta de un viaje. No hay cuenta, servidor ni analítica: prendas, fotos y outfits se guardan en el navegador (IndexedDB), y el análisis de las fotos se hace en el propio dispositivo con un modelo de IA propio.
 
@@ -11,12 +11,12 @@ Armario virtual *local-first*: catalogas tus prendas con una foto, generas outfi
 - Hasta 4 fotos por prenda (JPG, PNG o WebP de hasta 8 MB), con portada elegible y miniaturas locales de 640 px como máximo.
 - **Fotos reducidas al guardar:** se guardan a 2048 px por lado como máximo, en JPEG al 85 % (las transparencias, sobre blanco). Una foto de móvil de 12 MP pasa de ~3 MB a ~0,3 MB, así que 1.000 prendas ocupan unos 0,7 GB en lugar de unos 4,6 GB. Las fotos que ya miden 2048 px o menos y pesan menos de 1 MB se guardan tal cual. El análisis se hace antes, con la foto original. Las fotos guardadas antes de este cambio no se reducen.
 - **Código único por prenda** según su tipo, como `SDC-002` (sudadera con capucha nº 2) o `VAQ-001`, para distinguir prendas parecidas. No cambia al editar la prenda y no se reutiliza al borrarla.
-- **Añadir prenda:** pestañas para una prenda, varias o desde un look. Con una prenda, primero solo se pide la foto; después se ven la foto en grande, lo que VESTA cree que es, los datos principales y, plegados con su resumen, «Uso» y «Notas».
+- **Añadir prenda:** pestañas para una prenda, varias o desde un look. Con una prenda, primero solo se pide la foto; después se ven la foto en grande, lo que Molt cree que es, los datos principales y, plegados con su resumen, «Uso» y «Notas».
 - Detalle de cada prenda con sus fotos, la foto de la etiqueta, los atributos y la procedencia del análisis; edición y borrado.
 
 ### Catalogación automática
 Al añadir o cambiar fotos, la app propone los campos y marca cada uno como **Sugerido** hasta que lo revisas:
-- **Categoría, subcategoría y estampado** con el modelo propio de VESTA, combinando todas las fotos de la prenda, más tres alternativas para elegir con un toque. Informa también de la manga y del corte del pantalón.
+- **Categoría, subcategoría y estampado** con el modelo propio de Molt, combinando todas las fotos de la prenda, más tres alternativas para elegir con un toque. Informa también de la manga y del corte del pantalón.
 - **Confianza calibrada:** un 80 % acierta aproximadamente 8 de cada 10 veces.
 - **Fondo quitado:** la foto principal se recorta sobre fondo transparente y la galería, el detalle y los outfits muestran el recorte; se puede volver a la original con «Ver con fondo». Si el recorte no es fiable, se guarda la foto original.
 - **Color** medido solo sobre la prenda y nombrado con la paleta completa (incluidos rosa, amarillo y azul marino; hasta tres colores).
@@ -28,24 +28,42 @@ Al añadir o cambiar fotos, la app propone los campos y marca cada uno como **Su
 El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arreglado y Formal), y cada prenda marca todos los que le encajan: una camisa blanca vale de Diario a Formal y unos vaqueros, de Diario a Arreglado. La **estética** (Minimalista, Clásico, Urbano, Vintage…) es libre y opcional.
 
 ### Varias prendas a la vez
-- **Añadir prenda → «¿Muchas prendas?»:** eliges o arrastras todas las fotos de golpe (el carrete entero si quieres) y VESTA las analiza una a una en el dispositivo: tipo, color, texto y fondo quitado. El análisis sigue aunque cambies de pantalla, con progreso y tiempo estimado.
+- **Añadir prenda → «¿Muchas prendas?»:** eliges o arrastras todas las fotos de golpe (el carrete entero si quieres) y Molt las analiza una a una en el dispositivo: tipo, color, texto y fondo quitado. El análisis sigue aunque cambies de pantalla, con progreso y tiempo estimado.
 - **Agrupa sola las fotos de cada prenda:** las fotos hechas con menos de 40 s de diferencia (hora EXIF de la cámara), del mismo tipo y con un color principal en común son la misma prenda (delante, detrás, detalle). Las fotos de etiqueta se reconocen por su texto (composición, «made in», talla, lavado) y se unen a su prenda: de ellas salen marca, talla y composición. Un estampado con mucho texto no cuenta como etiqueta. Sin hora en la foto (capturas, fotos descargadas) cada foto es una prenda.
 - **Revisión antes de guardar:** una tarjeta por prenda con el recorte, sus otras fotos y lo leído en la etiqueta. El tipo se corrige escribiendo sobre él y los colores desde una paleta; se decide cuáles añadir y si la prenda se guarda con fondo («Ver con fondo»). La pestaña **Por revisar** deja solo lo dudoso (el modelo tiene poca confianza en el tipo o falta el color), para no repasar cien tarjetas. La agrupación se arregla con «Es la misma que la anterior» y, tocando una miniatura, «Hacer principal», «Es la etiqueta» y «Es otra prenda». Una barra fija abajo muestra el progreso y guarda. Al guardar, cada prenda queda como si se hubiera añadido con el formulario (fotos reducidas, recorte, uso sugerido y registro del análisis). Si se cierra la app antes de guardar, el análisis se pierde.
 
 ### Desde un look (prototipo)
-- **Añadir prenda → «¿Llevas varias prendas en una foto?»:** con una foto de cuerpo entero, VESTA localiza cada prenda, la recorta y la reconoce. Revisas el tipo, marcas cuáles añadir y, si quieres, el look se guarda también como outfit usado hoy.
+- **Añadir prenda → «¿Llevas varias prendas en una foto?»:** con una foto de cuerpo entero, Molt localiza cada prenda, la recorta y la reconoce. Revisas el tipo, marcas cuáles añadir y, si quieres, el look se guarda también como outfit usado hoy.
 - La foto completa, con la cara, no se guarda: solo el recorte de cada prenda.
 - Aún no detecta si una prenda ya está en el armario (duplicados) y en fotos de modelo el recorte puede incluir manos o pelo.
 
 ### Outfits
-- Generador con prendas reales, que puntúa cada combinación según la ocasión (Diario, Arreglado, Formal, Deportivo, Frío y capas, Calor y pocas capas), el tiempo, los colores y estampados, tus preferencias, el feedback y la rotación.
-- Tiempo de mañana opcional desde Open-Meteo por ciudad.
-- Valoración con botones o deslizando en el móvil, favoritos, historial de «usado» y outfits creados a mano.
-- Prendas marcadas como no disponibles (por ejemplo, en la lavadora) excluidas de las propuestas.
-- Preferencias de colores, estéticas y estilo.
+- **Estudio:** al entrar ya hay un outfit para hoy según la ocasión y el tiempo. Cada pieza se puede **fijar** (no cambia), **cambiar** por la siguiente mejor o **elegir** en un selector que muestra primero lo que mejor combina con el resto. También se puede empezar de cero y dejar que Molt complete el outfit, o crear uno desde el detalle de una prenda.
+- **Motor** ([`outfitGenerator.ts`](src/outfits/outfitGenerator.ts), en el dispositivo): valora cuánto abriga cada tipo de prenda y su composición frente al tiempo o la temporada, la armonía de colores (un color protagonista, vecinos, complementarios, neutros), los estampados, si las prendas encajan con la ocasión y entre sí, tus gustos (sobre todo las prendas que han ido juntas, con menos peso cuanto más antiguo) y la rotación (descansa lo reciente y recupera lo olvidado). Busca entre todo el armario, propone outfits distintos entre sí, varía de un día a otro, lleva calzado si hay alguno que encaje, y avisa de lo que puede no funcionar («Puede darte calor», «Calzado abierto con lluvia»).
+- El tiempo de la ciudad guardada se consulta solo, una vez al día, en Open-Meteo (solo se envía la ciudad); sin ciudad se usa la temporada.
+- **Mis outfits:** guardados y usados, con cuántas veces y cuándo se han puesto; se pueden renombrar, volver a poner, cambiar o eliminar. Una combinación descartada no vuelve a proponerse.
+- Las prendas en la lavadora quedan fuera de las propuestas y se gestionan desde el propio selector.
+
+### Inicio e historial
+- **Inicio:** al abrir la app ves la propuesta de hoy o lo que ya llevas, cómo vas en los últimos 30 días, prendas que te esperan y lo que le falta al armario. La primera vez, con el armario vacío, se abre una guía por pasos, que luego está siempre en «Cómo funciona».
+- **Calendario:** lo que llevaste cada día. Se puede apuntar un outfit guardado en cualquier día pasado o quitarlo. Borrar un outfit de la lista no borra sus días.
+- **Estadísticas** ([`wardrobeStats.ts`](src/stats/wardrobeStats.ts), en el dispositivo): días apuntados, prendas en uso, lo que más llevas, lo olvidado (más de 30 días o sin estrenar), coste por puesta con el precio opcional de cada prenda, categorías, colores y marcas, y huecos del armario.
 
 ### Maleta
-- Plan de hasta 14 días para una ciudad y una fecha: un outfit por día según la previsión y una lista de equipaje única y editable. Los planes aún no se guardan.
+- **Viajes guardados** en el dispositivo y en las copias de seguridad; el que está en curso o por venir se abre primero.
+- Eliges destino de una lista (hay varias Valencias), fechas, tipo de viaje y cómo de ligera quieres la maleta. El **motor** ([`packingPlan.ts`](src/trips/packingPlan.ts)) reparte un outfit por día **compartiendo prendas**: cada prenda nueva en la maleta cuenta en contra, según el estilo, y hay un límite de días por prenda y de calzado y capas.
+- Cada día se puede cambiar: otra opción, pieza a pieza o según el plan de ese día. Lo que editas no se toca al reajustar.
+- **Lista para marcar** por tipo de prenda, con cuántos días se lleva cada una y aviso si está en la lavadora, más lo que no es ropa según el tiempo (paraguas, protector solar…), editable y copiable.
+- Al volver a abrir un viaje se mira de nuevo el tiempo: si cambia, avisa de qué días y ofrece reajustar.
+
+### Previsión del tiempo
+[`openMeteo.ts`](src/weather/openMeteo.ts) es el único acceso, compartido por Inicio, Outfits y Maleta:
+- **Lugares reales** con coordenadas, elegidos de una lista; solo se envía el nombre del lugar, sus coordenadas y las fechas.
+- **Se viste para cómo se siente el día:** sensación térmica, con más peso de las horas de día, y el rango: un día de 10 a 22 °C pide una capa aunque la media sea templada. La lluvia cuenta solo si es probable (≥ 40 % o ≥ 1 mm), porque el código del tiempo da el peor momento del día.
+- **Cualquier fecha:** la previsión llega a 16 días; más allá se usa la media de esas fechas en los dos años anteriores, marcada como tal.
+- **Sin conexión:** respuestas guardadas (3 horas la previsión, 7 días las medias), última previsión si no hay red, un reintento, tiempo límite y errores que dicen qué hacer.
+
+Datos de [Open-Meteo](https://open-meteo.com/) (CC BY 4.0). **Su API gratuita es solo para uso no comercial;** una versión de pago de Molt necesitará su plan comercial.
 
 ### Copia de seguridad y datos
 El menú **Datos** del armario reúne:
@@ -55,8 +73,8 @@ El menú **Datos** del armario reúne:
 - **Exportar datos de entrenamiento:** un ZIP con las fotos y sus etiquetas normalizadas, sin nombre, marca, talla, notas ni foto de la etiqueta.
 
 #### Copia en Google Drive
-- La copia es el mismo ZIP, guardado como `vesta-armario.zip` en la **carpeta oculta de la app** de tu Drive (permiso `drive.appdata`): VESTA no puede ver el resto de tu Drive y el archivo no aparece entre tus archivos; lo ves (y puedes borrarlo) en Drive → Configuración → Administrar aplicaciones. Drive conserva versiones anteriores durante un tiempo.
-- **Varios dispositivos:** si la copia de Drive se ha guardado desde otro dispositivo después de la última vez que este la vio, VESTA no la sobrescribe: ofrece **Restaurar y combinar** o, confirmándolo, **Sobrescribir Drive**.
+- La copia es el mismo ZIP, guardado como `molt-armario.zip` en la **carpeta oculta de la app** de tu Drive (permiso `drive.appdata`): Molt no puede ver el resto de tu Drive y el archivo no aparece entre tus archivos; lo ves (y puedes borrarlo) en Drive → Configuración → Administrar aplicaciones. Drive conserva versiones anteriores durante un tiempo.
+- **Varios dispositivos:** si la copia de Drive se ha guardado desde otro dispositivo después de la última vez que este la vio, Molt no la sobrescribe: ofrece **Restaurar y combinar** o, confirmándolo, **Sobrescribir Drive**.
 - **Inicio de sesión sin scripts de Google en la app:** una ventana va a la página de Google y vuelve a `/oauth/google.html`, que entrega el token a la app y se cierra. El token solo vive en memoria, dura una hora y no se guarda; en el navegador solo se recuerda si el guardado automático está activo y cuándo se guardó.
 
 **Activarlo** (una vez, con tu cuenta de Google):
@@ -68,7 +86,7 @@ El menú **Datos** del armario reúne:
    - Cuando la app tenga dirección pública, añade también su origen y su `/oauth/google.html`.
 4. Copia `.env.example` a `.env.local`, pon el ID de cliente en `VITE_GOOGLE_CLIENT_ID` y reinicia `npm run dev`. El ID de cliente no es secreto; `.env.local` está en `.gitignore`.
 
-Formato de la copia (`vesta-wardrobe-backup`, versión 1): `backup.json` con todos los registros, donde cada foto se sustituye por la ruta de su archivo en `photos/<id de prenda>/`, más esos archivos. Así podrá sincronizarse archivo a archivo más adelante.
+Formato de la copia (`molt-wardrobe-backup`, versión 1; se siguen leyendo las `vesta-wardrobe-backup` anteriores al cambio de nombre): `backup.json` con todos los registros, donde cada foto se sustituye por la ruta de su archivo en `photos/<id de prenda>/`, más esos archivos. Así podrá sincronizarse archivo a archivo más adelante.
 
 ## Privacidad
 
@@ -96,7 +114,7 @@ npm run preview    # previsualizar la compilación
 
 ## Arquitectura
 
-React 19, TypeScript y Vite (pantallas, formulario, detalle de prenda y fondo animado cargados bajo demanda con `React.lazy`); Dexie sobre IndexedDB; PWA con `vite-plugin-pwa`; inferencia con `onnxruntime-web` (WebAssembly). La interfaz usa componentes de [React Bits](https://reactbits.dev) (MIT + Commons Clause) e iconos de Hugeicons: Pill Nav (navegación inferior), Pattern Waves (fondo, con OGL), Gradual Blur (desenfoque del contenido que pasa bajo la navegación), Lattice Loader (estados de carga, con cronómetro mientras se analizan fotos o se lee la etiqueta), Counter (número de prendas y puntuación de los outfits, con cifras que ruedan) y Spotlight Card (luz que sigue al puntero en las recomendaciones). Todos respetan la preferencia de movimiento reducido del sistema. Se usan a través de [`reactBits.ts`](src/components/reactBits.ts), que les da tipos con todas las propiedades opcionales.
+React 19, TypeScript y Vite (pantallas, formulario, detalle de prenda y fondo animado cargados bajo demanda con `React.lazy`); Dexie sobre IndexedDB; PWA con `vite-plugin-pwa`; inferencia con `onnxruntime-web` (WebAssembly). La interfaz usa componentes de [React Bits](https://reactbits.dev) (MIT + Commons Clause) e iconos de Hugeicons: Pill Nav (navegación inferior), Pattern Waves (fondo, con OGL), Gradual Blur (desenfoque del contenido que pasa bajo la navegación), Lattice Loader (estados de carga, con cronómetro mientras se analizan fotos o se lee la etiqueta) y Counter (número de prendas, con cifras que ruedan). Todos respetan la preferencia de movimiento reducido del sistema. Se usan a través de [`reactBits.ts`](src/components/reactBits.ts), que les da tipos con todas las propiedades opcionales.
 
 | Carpeta | Contenido |
 |---|---|
@@ -113,7 +131,7 @@ React 19, TypeScript y Vite (pantallas, formulario, detalle de prenda y fondo an
 
 ### Base de datos
 
-La base local se llama `vesta-wardrobe` y está en la versión 6:
+La base local se llama `molt-wardrobe` y está en la versión 7. Al abrirse trae los datos de `vesta-wardrobe`, el nombre anterior de la app, en una sola transacción, y borra la antigua en un arranque posterior:
 
 | Almacén | Índices | Contenido |
 |---|---|---|
@@ -129,7 +147,7 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
 ## Modelos de IA
 
 ### Clasificador de prendas
-- **Modelo:** propio de VESTA, entrenado en [`ml/`](ml/README.md). Es DINOv2 ViT-S/14 (Meta, Apache-2.0) congelado, más cabezas de categoría, subcategoría, manga, corte de pantalón y estampado, con la taxonomía de la app ([`ml/taxonomy.json`](ml/taxonomy.json)).
+- **Modelo:** propio de Molt, entrenado en [`ml/`](ml/README.md). Es DINOv2 ViT-S/14 (Meta, Apache-2.0) congelado, más cabezas de categoría, subcategoría, manga, corte de pantalón y estampado, con la taxonomía de la app ([`ml/taxonomy.json`](ml/taxonomy.json)).
 - **Datos:** solo con licencia que permite uso comercial (Clothing Dataset, Fashionpedia, Open Images, Unsplash, Pexels y fotos propias).
 - **Formato:** un único ONNX int8 de ~25,6 MB en `public/models/vesta/`, con `vesta-model.json` (salidas, preprocesado, reglas y temperaturas de calibración).
 - **Cómo combina las fotos:** promedia las probabilidades de todas las fotos, elige la categoría y busca la subcategoría solo dentro de ella; las alternativas se ordenan por P(categoría) × P(subcategoría | categoría). La app rechaza un modelo exportado con otra versión de taxonomía.
@@ -171,12 +189,12 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
 - [x] Quitar el fondo de las fotos y medir el color solo sobre la prenda.
 - [x] Prototipo: añadir prendas desde una foto de cuerpo entero y guardar el look.
 - [ ] Validar «Desde un look» con selfies reales, detectar duplicados ("¿es esta prenda?") y registrar el look como «me lo pongo hoy».
-- [ ] «Me lo pongo hoy» con calendario, y estadísticas (coste por uso, prendas olvidadas, colores, marcas).
+- [x] «Me lo pongo hoy» con calendario, y estadísticas (coste por uso, prendas olvidadas, colores, marcas).
 - [ ] Separar metadatos e imágenes en IndexedDB y cargar miniaturas bajo demanda.
 - [x] Copia de seguridad opcional en el Google Drive del propio usuario.
 - [ ] Copia en Drive por archivos (solo las fotos que cambian) en lugar de un ZIP completo, para armarios grandes.
 - [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.
-- [ ] Guardar los planes de viaje.
+- [x] Guardar los planes de viaje.
 - [ ] Tendencias, con una fuente fiable y fechada.
 - [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB).
 - [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
