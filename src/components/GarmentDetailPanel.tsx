@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { europeanEquivalent } from '../ai/labelParser'
+import { categoryIdForLabel } from '../ml/taxonomy'
 import type { Garment } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
 import GarmentForm from './GarmentForm'
@@ -19,10 +21,14 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
   const [isEditing, setIsEditing] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
+  // A US or UK size is kept as written; its approximate European size is shown next to it.
+  const european = garment.size ? europeanEquivalent(garment.size, categoryIdForLabel(garment.category)) : undefined
   const photos = [garment.image, ...(garment.additionalImages ?? [])]
-  // The label photo is shown last, apart from the garment photos.
-  const viewable = garment.labelImage ? [...photos, garment.labelImage] : photos
+  // The cut-out first (as in the gallery), then the photos, and the label photo last, apart from them.
+  const first = garment.cutout ? 1 : 0
+  const viewable = [...(garment.cutout ? [garment.cutout] : []), ...photos, ...(garment.labelImage ? [garment.labelImage] : [])]
   const selectedPhoto = viewable[selectedPhotoIndex] ?? photos[0]
+  const thumbLabel = (index: number) => index < first ? 'Ver sin fondo' : index >= first + photos.length ? 'Ver etiqueta' : `Ver foto ${index - first + 1}`
 
   useEffect(() => {
     setSelectedPhotoIndex(0)
@@ -106,11 +112,11 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                   <div className="detail-photo-list" aria-label="Fotos de la prenda">
                     {viewable.map((photo, index) => (
                       <button
-                        className={`${index === selectedPhotoIndex ? 'selected' : ''} ${index >= photos.length ? 'label-thumb' : ''}`}
+                        className={`${index === selectedPhotoIndex ? 'selected' : ''} ${index >= first + photos.length ? 'label-thumb' : ''}`}
                         type="button"
                         key={index}
                         onClick={() => setSelectedPhotoIndex(index)}
-                        aria-label={index >= photos.length ? 'Ver etiqueta' : `Ver foto ${index + 1}`}
+                        aria-label={thumbLabel(index)}
                         aria-pressed={index === selectedPhotoIndex}
                       >
                         <GarmentPhoto image={photo} alt="" />
@@ -125,7 +131,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
               <div><dt>Colores</dt><dd>{garment.colors.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estampado</dt><dd>{garment.pattern || 'Sin especificar'}</dd></div>
               <div><dt>Marca</dt><dd>{garment.brand || 'Sin especificar'}</dd></div>
-              <div><dt>Talla</dt><dd>{garment.size || 'Sin especificar'}</dd></div>
+              <div><dt>Talla</dt><dd>{garment.size ? (european ? `${garment.size} (≈ ${european} EU)` : garment.size) : 'Sin especificar'}</dd></div>
               {garment.composition && <div><dt>Composición</dt><dd>{garment.composition}</dd></div>}
               <div><dt>Temporadas</dt><dd>{garment.seasons.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estilo</dt><dd>{garment.dressLevels.join(', ') || 'Sin especificar'}</dd></div>

@@ -10,7 +10,7 @@ export const BACKUP_FORMAT = 'vesta-wardrobe-backup'
 export const BACKUP_VERSION = 1
 const MANIFEST = 'backup.json'
 
-type PhotoField = 'image' | 'thumbnail' | 'labelImage'
+type PhotoField = 'image' | 'thumbnail' | 'labelImage' | 'cutout'
 
 interface PhotoReference {
   path: string
@@ -24,6 +24,7 @@ export type GarmentRecord = Omit<Garment, PhotoField | 'additionalImages'> & {
     thumbnail: PhotoReference
     additionalImages?: PhotoReference[]
     labelImage?: PhotoReference
+    cutout?: PhotoReference
   }
 }
 
@@ -78,7 +79,7 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
   for (const id of await database.garments.toCollection().primaryKeys()) {
     const garment = await database.garments.get(id)
     if (!garment) continue
-    const { image, thumbnail, additionalImages, labelImage, ...fields } = garment
+    const { image, thumbnail, additionalImages, labelImage, cutout, ...fields } = garment
     garments.push({
       ...fields,
       photos: {
@@ -87,7 +88,8 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
         ...(additionalImages?.length
           ? { additionalImages: await Promise.all(additionalImages.map((photo, index) => addPhoto(id, `photo-${index + 1}`, photo))) }
           : {}),
-        ...(labelImage ? { labelImage: await addPhoto(id, 'label', labelImage) } : {})
+        ...(labelImage ? { labelImage: await addPhoto(id, 'label', labelImage) } : {}),
+        ...(cutout ? { cutout: await addPhoto(id, 'cutout', cutout) } : {})
       }
     })
   }
@@ -139,7 +141,8 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
     image: photo(photos.image),
     thumbnail: photo(photos.thumbnail),
     ...(photos.additionalImages ? { additionalImages: photos.additionalImages.map(photo) } : {}),
-    ...(photos.labelImage ? { labelImage: photo(photos.labelImage) } : {})
+    ...(photos.labelImage ? { labelImage: photo(photos.labelImage) } : {}),
+    ...(photos.cutout ? { cutout: photo(photos.cutout) } : {})
   }))
   return {
     exportedAt: manifest.exportedAt,

@@ -1,0 +1,4 @@
+# Cross-origin isolation, so ONNX Runtime can use several threads (Netlify and Cloudflare Pages read this file).
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

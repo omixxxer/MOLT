@@ -14,6 +14,15 @@ export type DressLevel = (typeof dressLevels)[number]
 /** Single formality saved before database version 6, converted to dress levels by the upgrade. */
 export type LegacyFormality = 'Casual' | 'Smart casual' | 'Formal'
 export type GarmentRole = 'Top' | 'Bottom' | 'Una pieza' | 'Capa' | 'Calzado' | 'Accesorio'
+/** The part a garment plays in an outfit, from its category. */
+export const roleByCategory: Record<GarmentCategory, GarmentRole> = {
+  'Parte superior': 'Top',
+  'Parte inferior': 'Bottom',
+  'Vestido / mono': 'Una pieza',
+  Abrigo: 'Capa',
+  Calzado: 'Calzado',
+  Accesorio: 'Accesorio'
+}
 export type Season = 'Primavera' | 'Verano' | 'Otoño' | 'Invierno'
 export type GarmentAvailability = 'available' | 'laundry' | 'unavailable'
 export type OutfitFeedbackType = 'like' | 'dislike' | 'saved' | 'worn' | 'included' | 'excluded'
@@ -71,6 +80,8 @@ export interface Garment {
   additionalImages?: Blob[]
   /** Close-up of the care label, only read for brand, size and composition; not a garment photo. */
   labelImage?: Blob
+  /** The main photo cut out on a transparent background (segmentation + SlimSAM); the thumbnail is made from it. */
+  cutout?: Blob
   thumbnail: Blob
   width: number
   height: number

@@ -6,21 +6,25 @@ import {
   type ClothingAnalysisSuggestion,
   type LabelReading
 } from '../ai/clothingAnalyzer'
+import { colorSwatch } from '../ai/colors'
+import { cutOutGarments, cutoutColors } from '../ai/cutout'
+import type { SegmentationMap } from '../ai/segmentation'
 import { suggestUsage } from '../ai/usageRules'
 import { createThumbnail, reducePhoto } from '../db/imageProcessing'
 import { taxonomy } from '../ml/taxonomy'
 import {
   dressLevels,
   garmentCategories,
+  roleByCategory,
   type DressLevel,
   type Garment,
   type GarmentCategory,
-  type GarmentRole,
   type Season
 } from '../types/domain'
+import ColorPalette from './ColorPalette'
 import AnalysisCard from './garmentForm/AnalysisCard'
 import { analysisRecord } from './garmentForm/analysisRecord'
-import { ChipsField, FieldHeading, FormSection, SuggestedBadge } from './garmentForm/fields'
+import { ChipsField, FormFold, FieldHeading, FormSection, SuggestedBadge } from './garmentForm/fields'
 import { createSuggestedGarmentName } from './garmentForm/garmentName'
 import LabelPhotoSlot, { type LabelFinding } from './garmentForm/LabelPhotoSlot'
 import PhotoCollection from './garmentForm/PhotoCollection'
@@ -44,15 +48,6 @@ type SuggestedField = 'category' | 'subcategory' | 'colors' | 'pattern' | 'brand
 // Suggested from the garment type (usageRules) and kept up to date with it until the user changes them.
 type UsageField = 'seasons' | 'dressLevels' | 'styles'
 const usageFields: UsageField[] = ['seasons', 'dressLevels', 'styles']
-
-const roles: Record<GarmentCategory, GarmentRole> = {
-  'Parte superior': 'Top',
-  'Parte inferior': 'Bottom',
-  'Vestido / mono': 'Una pieza',
-  Abrigo: 'Capa',
-  Calzado: 'Calzado',
-  Accesorio: 'Accesorio'
-}
 
 interface GarmentFormProps {
   garment?: Garment
@@ -78,6 +73,10 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   const [nameManuallyEdited, setNameManuallyEdited] = useState(Boolean(garment?.name))
   const [photos, setPhotos] = useState<Blob[]>(() => garment ? [garment.image, ...(garment.additionalImages ?? [])] : [])
   const [imageChanged, setImageChanged] = useState(false)
+  // The main photo without its background, shown and saved unless the user prefers the original.
+  const [cutout, setCutout] = useState<Blob | undefined>(garment?.cutout)
+  const [cuttingOut, setCuttingOut] = useState(false)
+  const [useCutout, setUseCutout] = useState(true)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
@@ -92,8 +91,8 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   const analysisRequestId = useRef(0)
   const labelRequestId = useRef(0)
   // Analyses finish later; they must see what the user typed meanwhile, not the values when they started.
-  const typed = useRef({ brand, size, composition, suggested })
-  typed.current = { brand, size, composition, suggested }
+  const typed = useRef({ brand, size, composition, suggested, category })
+  typed.current = { brand, size, composition, suggested, category }
   // A saved garment keeps the use the user gave it; a new one follows the suggestion until the user changes it.
   const usageTouched = useRef(new Set<UsageField>(garment ? usageFields : []))
 
@@ -174,6 +173,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   }
 
   function updatePhotos(nextPhotos: Blob[]) {
+    setCutout(undefined)
     setPhotos(nextPhotos)
     setImageChanged(true)
     setAnalysisSuggestion(undefined)
@@ -195,6 +195,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
       if (requestId !== analysisRequestId.current) return
       const filled: SuggestedField[] = ['category', 'subcategory', 'colors']
       setAnalysisSuggestion(suggestion)
+      void cutOutMainPhoto(imagesToAnalyze[0]!, suggestion.segmentations[0], requestId)
       setCategory(suggestion.category)
       setSubcategory(suggestion.subcategory)
       setColors(suggestion.colors)
@@ -219,6 +220,28 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
       }
     } finally {
       if (requestId === analysisRequestId.current) setAnalyzing(false)
+    }
+  }
+
+  /** Cuts the main photo out in the background; a newer analysis (other photos) makes this result obsolete. */
+  async function cutOutMainPhoto(photo: Blob, map: SegmentationMap | undefined, requestId: number) {
+    if (!map) return
+    setCuttingOut(true)
+    try {
+      const [main] = await cutOutGarments(photo, map, 'single')
+      if (requestId !== analysisRequestId.current) return
+      setCutout(main?.image)
+      // The cut-out's own pixels give the colours more exactly than the coarse map; only if the user kept them.
+      if (main && typed.current.suggested.has('colors')) {
+        const measured = await cutoutColors(main.image)
+        if (measured.length && requestId === analysisRequestId.current && typed.current.suggested.has('colors')) {
+          setColors(measured.map((entry) => entry.color))
+        }
+      }
+    } catch (error) {
+      console.warn('No se pudo quitar el fondo de la foto:', error)
+    } finally {
+      if (requestId === analysisRequestId.current) setCuttingOut(false)
     }
   }
 
@@ -249,13 +272,20 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
       const reading = await readGarmentLabel(image)
       if (requestId !== labelRequestId.current) return
       setLabelReading(reading)
-      // Brand and composition only fill empty fields; the size is chosen by the effect above, for the category.
+      // A new label photo is the latest word on what it shows: what it reads replaces brand, size and composition,
+      // even if typed. Fields it does not read are left as they are. Later category changes choose the size again
+      // (effect above).
       const filled: SuggestedField[] = []
-      if (reading.brand && !typed.current.brand.trim()) {
+      if (reading.brand) {
         setBrand(reading.brand.brand)
         filled.push('brand')
       }
-      if (reading.composition && !typed.current.composition.trim()) {
+      const readSize = labelSize(reading, typed.current.category)
+      if (readSize) {
+        setSize(readSize.value)
+        filled.push('size')
+      }
+      if (reading.composition) {
         setComposition(reading.composition.value)
         filled.push('composition')
       }
@@ -297,8 +327,10 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
       // Stored photos are reduced (≤ 2048 px); photos already saved are not processed again.
       const [image, ...additionalImages] = (imageChanged ? await Promise.all(photos.map(reducePhoto)) : photos) as [Blob, ...Blob[]]
       const labelImage = labelPhoto && labelPhoto !== garment?.labelImage ? await reducePhoto(labelPhoto) : labelPhoto
-      const processedImage = imageChanged || !garment || !garment.thumbnail || !garment.width || !garment.height
-        ? await createThumbnail(image)
+      // The gallery shows the cut-out when there is one; its thumbnail and size come from it.
+      const savedCutout = useCutout ? cutout : undefined
+      const processedImage = imageChanged || savedCutout !== garment?.cutout || !garment || !garment.thumbnail || !garment.width || !garment.height
+        ? await createThumbnail(savedCutout ?? image)
         : {
             thumbnail: garment.thumbnail,
             width: garment.width,
@@ -328,11 +360,12 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         seasons: selectedSeasons,
         styles,
         dressLevels: levels,
-        role: roles[category],
+        role: roleByCategory[category],
         availability: garment?.availability,
         image,
         ...(additionalImages.length ? { additionalImages } : {}),
         ...(labelImage ? { labelImage } : {}),
+        ...(savedCutout ? { cutout: savedCutout } : {}),
         thumbnail: processedImage.thumbnail,
         width: processedImage.width,
         height: processedImage.height,
@@ -359,115 +392,136 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   const brandRead = labelReading?.brand ?? analysisSuggestion?.brand
   const readFromLabel: LabelFinding[] = ([
     ['Marca', brandRead?.brand, brandRead?.text],
-    ['Talla', sizeFromLabel?.value, sizeFromLabel?.text],
+    ['Talla', sizeFromLabel && (sizeFromLabel.european ? `${sizeFromLabel.value} (≈ ${sizeFromLabel.european} EU)` : sizeFromLabel.value), sizeFromLabel?.text],
     ['Composición', labelReading?.composition?.value, labelReading?.composition?.text]
   ] as const).filter(([, value]) => value)
 
+  const hasPhotos = photos.length > 0
+  const labelSummary = [brand, size, composition].filter(Boolean).join(' · ')
+  const usageSummary = [selectedSeasons.length === seasons.length ? 'Todo el año' : selectedSeasons.join(', '), levels.join(', '), styles.join(', ')].filter(Boolean).join(' · ')
+
   return (
     <form className="garment-form" onSubmit={(event) => void submit(event)}>
-      <div className="garment-form-layout">
+      <div className="garment-form-layout" {...(hasPhotos ? {} : { 'data-empty': '' })}>
         <aside className="garment-form-media">
-          <PhotoCollection photos={photos} max={maxPhotos} disabled={saving} onAdd={selectImages} onChange={updatePhotos} />
-
-          <LabelPhotoSlot
-            id={fieldId}
-            photo={labelPhoto}
-            reading={readingLabel}
-            read={Boolean(labelReading)}
-            findings={readFromLabel}
-            error={labelError}
+          <PhotoCollection
+            photos={photos}
+            max={maxPhotos}
             disabled={saving}
-            onSelect={selectLabelPhoto}
-            onRead={(photo) => void readLabel(photo)}
-            onRemove={removeLabelPhoto}
-          />
-
-          <AnalysisCard
-            analyzing={analyzing}
-            photoCount={photos.length}
-            suggestion={analysisSuggestion}
-            labelHasBrand={Boolean(labelReading?.brand)}
-            error={analysisError}
-            disabled={saving}
-            onAlternative={(candidate) => {
-              setCategory(candidate.category)
-              setSubcategory(candidate.subcategory)
-              setName(candidate.subcategory)
-              edited('category')
-              edited('subcategory')
-            }}
-            onAnalyze={() => void analyzeImage()}
+            onAdd={selectImages}
+            onChange={updatePhotos}
+            cutout={useCutout ? cutout : undefined}
+            cuttingOut={cuttingOut}
+            canToggleCutout={Boolean(cutout)}
+            onToggleCutout={() => setUseCutout((current) => !current)}
           />
         </aside>
 
-        <div className="garment-form-fields">
-          <FormSection title="Qué es">
-            <div className="form-field">
-              <FieldHeading htmlFor={`${fieldId}-category`} label="Categoría" suggested={suggested.has('category')} />
-              <select id={`${fieldId}-category`} value={category} onChange={(event) => { setCategory(event.target.value as GarmentCategory); edited('category') }}>
-                {garmentCategories.map((value) => <option key={value}>{value}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <FieldHeading htmlFor={`${fieldId}-subcategory`} label="Subcategoría" suggested={suggested.has('subcategory')} />
-              <input id={`${fieldId}-subcategory`} list={`${fieldId}-subcategories`} value={subcategory} onChange={(event) => { setSubcategory(event.target.value); edited('subcategory') }} placeholder="p. ej. Camiseta" maxLength={50} />
-              <datalist id={`${fieldId}-subcategories`}>{subcategoryOptions.map((value) => <option key={value} value={value} />)}</datalist>
-            </div>
-            <div className="form-field full">
-              <FieldHeading htmlFor={`${fieldId}-name`} label="Nombre" hint={nameManuallyEdited ? 'Opcional' : 'Opcional · se propone con subcategoría, color y marca'} />
-              <input id={`${fieldId}-name`} value={name} onChange={(event) => { setName(event.target.value); setNameManuallyEdited(true) }} placeholder="p. ej. Camiseta azul · Marca" maxLength={80} />
-            </div>
-          </FormSection>
+        {hasPhotos && (
+          <div className="garment-form-fields">
+            <AnalysisCard
+              analyzing={analyzing}
+              photoCount={photos.length}
+              suggestion={analysisSuggestion}
+              labelHasBrand={Boolean(labelReading?.brand)}
+              error={analysisError}
+              disabled={saving}
+              onAlternative={(candidate) => {
+                setCategory(candidate.category)
+                setSubcategory(candidate.subcategory)
+                setName(candidate.subcategory)
+                edited('category')
+                edited('subcategory')
+              }}
+              onAnalyze={() => void analyzeImage()}
+            />
 
-          <FormSection title="Aspecto">
-            <ChipsField label="Colores" values={colors} onChange={(values) => { setColors(values); edited('colors') }} options={colorOptions} placeholder="p. ej. Azul marino" suggested={suggested.has('colors')} />
-            <div className="form-field full">
-              <FieldHeading htmlFor={`${fieldId}-pattern`} label="Estampado" suggested={suggested.has('pattern')} />
-              <select id={`${fieldId}-pattern`} value={pattern} onChange={(event) => { setPattern(event.target.value); edited('pattern') }}>
-                <option value="">Sin especificar</option>
-                {patterns.map((value) => <option key={value}>{value}</option>)}
-              </select>
-            </div>
-          </FormSection>
+            <FormSection title="La prenda">
+              <div className="form-field full form-field-title">
+                <FieldHeading htmlFor={`${fieldId}-name`} label="Nombre" hint={nameManuallyEdited ? undefined : 'Se propone solo; cámbialo si quieres'} />
+                <input id={`${fieldId}-name`} value={name} onChange={(event) => { setName(event.target.value); setNameManuallyEdited(true) }} placeholder="p. ej. Camiseta azul · Marca" maxLength={80} />
+              </div>
+              <div className="form-field">
+                <FieldHeading htmlFor={`${fieldId}-category`} label="Categoría" suggested={suggested.has('category')} />
+                <select id={`${fieldId}-category`} value={category} onChange={(event) => { setCategory(event.target.value as GarmentCategory); edited('category') }}>
+                  {garmentCategories.map((value) => <option key={value}>{value}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <FieldHeading htmlFor={`${fieldId}-subcategory`} label="Subcategoría" suggested={suggested.has('subcategory')} />
+                <input id={`${fieldId}-subcategory`} list={`${fieldId}-subcategories`} value={subcategory} onChange={(event) => { setSubcategory(event.target.value); edited('subcategory') }} placeholder="p. ej. Camiseta" maxLength={50} />
+                <datalist id={`${fieldId}-subcategories`}>{subcategoryOptions.map((value) => <option key={value} value={value} />)}</datalist>
+              </div>
+              <ChipsField label="Colores" values={colors} onChange={(values) => { setColors(values); edited('colors') }} options={colorOptions} placeholder="Elige abajo o escribe uno" suggested={suggested.has('colors')} swatch={colorSwatch} />
+              <div className="form-field full">
+                <ColorPalette values={colors} onChange={(values) => { setColors(values); edited('colors') }} disabled={saving} />
+              </div>
+              <div className="form-field full">
+                <FieldHeading htmlFor={`${fieldId}-pattern`} label="Estampado" suggested={suggested.has('pattern')} />
+                <select id={`${fieldId}-pattern`} value={pattern} onChange={(event) => { setPattern(event.target.value); edited('pattern') }}>
+                  <option value="">Sin especificar</option>
+                  {patterns.map((value) => <option key={value}>{value}</option>)}
+                </select>
+              </div>
+            </FormSection>
 
-          <FormSection title="Etiqueta">
-            <div className="form-field">
-              <FieldHeading htmlFor={`${fieldId}-brand`} label="Marca" suggested={suggested.has('brand')} />
-              <input id={`${fieldId}-brand`} value={brand} onChange={(event) => { setBrand(event.target.value); edited('brand') }} maxLength={50} />
-            </div>
-            <div className="form-field">
-              <FieldHeading htmlFor={`${fieldId}-size`} label="Talla" suggested={suggested.has('size')} />
-              <input id={`${fieldId}-size`} value={size} onChange={(event) => { setSize(event.target.value); edited('size') }} placeholder="p. ej. M, 42, W32 L34" maxLength={30} />
-            </div>
-            <div className="form-field full">
-              <FieldHeading htmlFor={`${fieldId}-composition`} label="Composición" hint="Opcional" suggested={suggested.has('composition')} />
-              <input id={`${fieldId}-composition`} value={composition} onChange={(event) => { setComposition(event.target.value); edited('composition') }} placeholder="p. ej. 95 % algodón, 5 % elastano" maxLength={120} />
-            </div>
-          </FormSection>
+            <div>
+              <FormFold title="Etiqueta" summary={labelSummary || 'Marca, talla y composición'} defaultOpen>
+                <LabelPhotoSlot
+                  photo={labelPhoto}
+                  reading={readingLabel}
+                  read={Boolean(labelReading)}
+                  findings={readFromLabel}
+                  error={labelError}
+                  disabled={saving}
+                  onSelect={selectLabelPhoto}
+                  onRead={(photo) => void readLabel(photo)}
+                  onRemove={removeLabelPhoto}
+                />
+                <div className="form-field">
+                  <FieldHeading htmlFor={`${fieldId}-brand`} label="Marca" suggested={suggested.has('brand')} />
+                  <input id={`${fieldId}-brand`} value={brand} onChange={(event) => { setBrand(event.target.value); edited('brand') }} maxLength={50} />
+                </div>
+                <div className="form-field">
+                  <FieldHeading htmlFor={`${fieldId}-size`} label="Talla" suggested={suggested.has('size')} />
+                  <input id={`${fieldId}-size`} value={size} onChange={(event) => { setSize(event.target.value); edited('size') }} placeholder="p. ej. M, 42, 38 US" maxLength={30} />
+                </div>
+                <div className="form-field full">
+                  <FieldHeading htmlFor={`${fieldId}-composition`} label="Composición" suggested={suggested.has('composition')} />
+                  <input id={`${fieldId}-composition`} value={composition} onChange={(event) => { setComposition(event.target.value); edited('composition') }} placeholder="p. ej. 95 % algodón, 5 % elastano" maxLength={120} />
+                </div>
+              </FormFold>
 
-          <FormSection title="Uso">
-            <fieldset className="form-field full choice-field">
-              <legend>Temporadas{suggested.has('seasons') && <SuggestedBadge />}</legend>
-              <div className="choice-row">{seasons.map((season) => <label key={season} className={`choice-chip ${selectedSeasons.includes(season) ? 'selected' : ''}`}><input type="checkbox" checked={selectedSeasons.includes(season)} onChange={() => toggleSeason(season)} />{season}</label>)}</div>
-            </fieldset>
-            <fieldset className="form-field full choice-field">
-              <legend>Estilo{suggested.has('dressLevels') && <SuggestedBadge />}<small>Marca todos los que encajen</small></legend>
-              <div className="choice-row">{dressLevels.map((level) => <label key={level} className={`choice-chip ${levels.includes(level) ? 'selected' : ''}`} title={dressLevelHints[level]}><input type="checkbox" checked={levels.includes(level)} onChange={() => toggleLevel(level)} />{level}</label>)}</div>
-            </fieldset>
-            <ChipsField label="Estética" values={styles} onChange={(values) => { setStyles(values); touchUsage('styles') }} options={styleOptions} placeholder="Opcional, p. ej. Minimalista" suggested={suggested.has('styles')} />
-          </FormSection>
+              <FormFold title="Uso" summary={usageSummary || 'Temporadas, estilo y estética'}>
+                <fieldset className="form-field full choice-field">
+                  <legend>Temporadas{suggested.has('seasons') && <SuggestedBadge />}</legend>
+                  <div className="choice-row">{seasons.map((season) => <label key={season} className={`choice-chip ${selectedSeasons.includes(season) ? 'selected' : ''}`}><input type="checkbox" checked={selectedSeasons.includes(season)} onChange={() => toggleSeason(season)} />{season}</label>)}</div>
+                </fieldset>
+                <fieldset className="form-field full choice-field">
+                  <legend>Estilo{suggested.has('dressLevels') && <SuggestedBadge />}<small>Marca todos los que encajen</small></legend>
+                  <div className="choice-row">{dressLevels.map((level) => <label key={level} className={`choice-chip ${levels.includes(level) ? 'selected' : ''}`} title={dressLevelHints[level]}><input type="checkbox" checked={levels.includes(level)} onChange={() => toggleLevel(level)} />{level}</label>)}</div>
+                </fieldset>
+                <ChipsField label="Estética" values={styles} onChange={(values) => { setStyles(values); touchUsage('styles') }} options={styleOptions} placeholder="Opcional, p. ej. Minimalista" suggested={suggested.has('styles')} />
+              </FormFold>
 
-          <div className="form-field full form-notes">
-            <FieldHeading htmlFor={`${fieldId}-notes`} label="Notas" hint="Opcional" />
-            <textarea id={`${fieldId}-notes`} value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} maxLength={500} />
+              <FormFold title="Notas" summary={notes ? notes.slice(0, 60) : 'Opcional'}>
+                <div className="form-field full">
+                  <label className="visually-hidden" htmlFor={`${fieldId}-notes`}>Notas</label>
+                  <textarea id={`${fieldId}-notes`} value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} maxLength={500} placeholder="Dónde la compraste, cómo lavarla…" />
+                </div>
+              </FormFold>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       {formError && <p className="form-error" role="alert">{formError}</p>}
-      <footer className="form-footer">
-        <button className="button button-outline" type="button" onClick={onCancel} disabled={saving}>Cancelar</button>
-        <button className="button button-dark" type="submit" disabled={saving}>{saving ? 'Guardando…' : submitLabel ?? (garment ? 'Guardar cambios' : 'Guardar prenda')}</button>
-      </footer>
+      {hasPhotos && (
+        <footer className="form-footer">
+          <span className="form-footer-name">{name.trim() || subcategory || category}</span>
+          <button className="button button-outline" type="button" onClick={onCancel} disabled={saving}>Cancelar</button>
+          <button className="button button-dark" type="submit" disabled={saving}>{saving ? 'Guardando…' : submitLabel ?? (garment ? 'Guardar cambios' : 'Guardar prenda')}</button>
+        </footer>
+      )}
     </form>
   )
 }

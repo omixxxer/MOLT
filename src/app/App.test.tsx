@@ -14,22 +14,6 @@ vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
   MODEL_DOWNLOAD_SIZE: 'test model'
 }))
 
-vi.mock('../components/Masonry.jsx', () => ({
-  default: ({
-    items,
-    onItemClick
-  }: {
-    items: Array<{ id: string; img: string; title: string }>
-    onItemClick: (item: { id: string; img: string; title: string }) => void
-  }) => (
-    <div role="list">
-      {items.map((item) => (
-        <button key={item.id} type="button" onClick={() => onItemClick(item)}>{item.title}</button>
-      ))}
-    </div>
-  )
-}))
-
 vi.mock('../components/PatternWaves.jsx', () => ({ default: () => null }))
 
 // Reading and writing backups is tested in wardrobeBackup.test.ts with real Blobs; here only the flow.
@@ -105,6 +89,7 @@ describe('wardrobe flow', () => {
       modelId: 'wargoninnovation/wargon-clothing-classifier',
       modelVersion: 'test-revision',
       calibrated: false,
+      segmentations: [],
       analyzedAt: '2026-10-20T12:00:00.000Z'
     })
     const user = userEvent.setup()
@@ -150,10 +135,12 @@ describe('wardrobe flow', () => {
     render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
-    await user.type(await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca'), 'Camisa favorita')
-    const upload = screen.getByLabelText('Seleccionar fotografía de la prenda')
+    // Before the first photo there is only the place to add it: the fields come with something to review.
+    const upload = await screen.findByLabelText('Seleccionar fotografía de la prenda')
+    expect(screen.queryByPlaceholderText('p. ej. Camiseta azul · Marca')).not.toBeInTheDocument()
     const image = new File(['image-bytes'], 'camisa.png', { type: 'image/png' })
     await user.upload(upload, image)
+    await user.type(await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca'), 'Camisa favorita')
     await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
 
     expect(await screen.findByRole('button', { name: 'Camisa favorita' })).toBeInTheDocument()
@@ -201,6 +188,7 @@ describe('wardrobe flow', () => {
       modelId: 'wargoninnovation/wargon-clothing-classifier',
       modelVersion: 'test-revision',
       calibrated: true,
+      segmentations: [],
       analyzedAt: '2026-10-20T12:00:00.000Z'
     })
     const user = userEvent.setup()
@@ -251,6 +239,7 @@ describe('wardrobe flow', () => {
       modelId: 'vesta/dinov2-small-heads',
       modelVersion: 'heads-test',
       calibrated: true,
+      segmentations: [],
       analyzedAt: '2026-10-30T12:00:00.000Z'
     })
     vi.mocked(readGarmentLabel).mockResolvedValue({
@@ -283,31 +272,84 @@ describe('wardrobe flow', () => {
     expect(saved?.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', composition: 'paddle-ocr' })
   })
 
-  it('filters the visible catalogue by category', async () => {
-    await database.garments.add({
-      id: 'top-1',
-      name: 'Camisa',
+  it('replaces typed brand, size and composition with what a new label photo reads', async () => {
+    vi.mocked(analyzeGarmentImage).mockResolvedValue({
       category: 'Parte superior',
-      subcategory: '',
+      subcategory: 'Camiseta',
+      colors: ['Negro'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9, subcategory: 0.8, colors: 0.7 },
+      unknownAttributes: [],
+      modelId: 'vesta/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      segmentations: [],
+      analyzedAt: '2026-10-30T12:00:00.000Z'
+    })
+    vi.mocked(readGarmentLabel)
+      .mockResolvedValueOnce({ lines: [{ text: 'XL', score: 0.95 }], brand: { brand: 'Nike', score: 0.95, text: 'NIKE' } })
+      .mockResolvedValueOnce({ lines: [{ text: '-XXL-', score: 0.95 }], composition: { value: '100 % algodón', text: '100% COTTON', score: 0.9 } })
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['tee'], 'camiseta.png', { type: 'image/png' }))
+    await user.type(screen.getByLabelText('Marca'), 'Zara')
+    await user.type(screen.getByLabelText('Talla'), 'S')
+    await user.type(screen.getByLabelText('Composición'), '50 % lino')
+
+    await user.upload(screen.getByLabelText('Seleccionar foto de la etiqueta'), new File(['label 1'], 'etiqueta.png', { type: 'image/png' }))
+    await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('XL'))
+    expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
+    expect(screen.getByLabelText('Composición')).toHaveValue('50 % lino') // not read on this label
+
+    await user.upload(screen.getByLabelText('Cambiar foto de la etiqueta'), new File(['label 2'], 'etiqueta-2.png', { type: 'image/png' }))
+    await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('XXL'))
+    expect(screen.getByLabelText('Composición')).toHaveValue('100 % algodón')
+    expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
+  })
+
+  it('filters the visible catalogue by category and search', async () => {
+    const garment = {
       colors: [],
       thumbnail: new Blob(['thumbnail']),
       width: 120,
       height: 180,
       seasons: [],
       styles: [],
-      dressLevels: ['Diario'],
-      role: 'Top',
+      dressLevels: ['Diario' as const],
       image: new Blob(['image']),
       confirmedAttributes: [],
       suggestedAttributes: [],
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z'
-    })
+    }
+    await database.garments.bulkAdd([
+      { ...garment, id: 'top-1', name: 'Camisa', category: 'Parte superior', subcategory: '', role: 'Top' },
+      { ...garment, id: 'bottom-1', name: 'Vaqueros', category: 'Parte inferior', subcategory: '', role: 'Bottom' }
+    ])
     const user = userEvent.setup()
     render(<App />)
 
     await screen.findByRole('button', { name: 'Camisa' })
-    await user.selectOptions(screen.getByLabelText('Filtrar por categoría'), 'Parte inferior')
+    // Only the categories in the wardrobe are offered, with how many garments each has.
+    expect(screen.queryByRole('button', { name: /Calzado/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Parte inferior 1' }))
+    expect(screen.queryByRole('button', { name: 'Camisa' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Vaqueros' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Todas 2' }))
+    await user.type(screen.getByLabelText('Buscar prendas'), 'zzz')
     expect(await screen.findByText('No encontramos esa prenda.')).toBeInTheDocument()
+  })
+
+  it('offers the three ways of adding garments as tabs', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.click(screen.getByRole('button', { name: 'Varias prendas' }))
+    expect(await screen.findByRole('heading', { name: /añadir varias prendas/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Varias prendas' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Desde un look' }))
+    expect(await screen.findByRole('heading', { name: /desde un look/i })).toBeInTheDocument()
   })
 })
