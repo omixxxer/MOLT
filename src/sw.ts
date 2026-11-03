@@ -37,7 +37,7 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denyl
 registerRoute(
   ({ url }) => /\.(?:wasm|mjs)$/.test(url.pathname),
   new CacheFirst({
-    cacheName: 'vesta-inference-runtime',
+    cacheName: 'molt-inference-runtime',
     plugins: [new ExpirationPlugin({ maxEntries: 3, maxAgeSeconds: 60 * 60 * 24 * 365 }), isolation]
   })
 )

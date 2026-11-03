@@ -1,3 +1,5 @@
+import { Image02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useState } from 'react'
 import { analyzeGarmentImage, type ClothingAnalysisSuggestion } from '../ai/clothingAnalyzer'
 import { cutOutGarments, cutoutColors } from '../ai/cutout'
@@ -159,12 +161,11 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
 
   return (
     <div className="look-import">
-      <label className="photo-upload look-upload">
-        <span className="upload-placeholder">
-          <span aria-hidden="true">＋</span>
-          <strong>{found ? 'Elegir otra foto' : 'Elige una foto de cuerpo entero'}</strong>
-          <small>De frente, con buena luz. La foto completa no se guarda: solo el recorte de cada prenda.</small>
-        </span>
+      <label className="photo-drop">
+        <span className="photo-drop-icon" aria-hidden="true"><HugeiconsIcon icon={Image02Icon} size={26} /></span>
+        <strong>{found ? 'Elegir otra foto' : 'Elige una foto de cuerpo entero'}</strong>
+        <small>De frente, con buena luz. La foto completa no se guarda: solo el recorte de cada prenda.</small>
+        <span className="button button-dark">Elegir foto</span>
         <input
           type="file"
           accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"

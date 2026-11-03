@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Add01Icon, Camera01Icon, Image02Icon, Tag01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { taxonomy } from '../ml/taxonomy'
 import BatchCard from './batchImport/BatchCard'
 import {
   addPhotos,
@@ -33,7 +32,7 @@ function minutes(milliseconds: number): string {
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 /**
- * Many garments at once: choose all the photos, VESTA analyses them one by one, groups the photos of each garment
+ * Many garments at once: choose all the photos, Molt analyses them one by one, groups the photos of each garment
  * (taken seconds apart, same type and colour) with its label, and cuts out the main photo. Nothing is saved until
  * the review; the analysis goes on if the user leaves this screen.
  */
@@ -151,7 +150,7 @@ export default function BatchImport({ onDone }: BatchImportProps) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <ol className="batch-steps">
           <li><strong>Fotografía prenda a prenda</strong><p>Delante, detrás y la etiqueta, seguidas. Después, pasa a la siguiente.</p></li>
-          <li><strong>VESTA las ordena</strong><p>Junta las fotos de cada prenda, lee la etiqueta y quita el fondo.</p></li>
+          <li><strong>Molt las ordena</strong><p>Junta las fotos de cada prenda, lee la etiqueta y quita el fondo.</p></li>
           <li><strong>Revisa y guarda</strong><p>Corrige solo lo que esté mal. Nada se guarda hasta que tú lo decidas.</p></li>
         </ol>
         <p className="batch-privacy"><span className="privacy-indicator" />Las fotos se procesan aquí y no salen de tu dispositivo.</p>
@@ -189,11 +188,6 @@ export default function BatchImport({ onDone }: BatchImportProps) {
         <button type="button" className="batch-notice" onClick={retryFailed}>{plural(failed, 'foto no se pudo analizar', 'fotos no se pudieron analizar')}: reintentar</button>
       )}
 
-      {taxonomy.categories.map((category) => (
-        <datalist key={category.id} id={`batch-subcategories-${category.id}`}>
-          {taxonomy.subcategories.filter((entry) => entry.category === category.id).map((entry) => <option key={entry.id} value={entry.label} />)}
-        </datalist>
-      ))}
       {onlyDoubtful && !shown.length
         ? <p className="batch-none">{batch.running ? 'Por ahora, nada dudoso.' : 'Nada dudoso: puedes guardar.'}</p>
         : (

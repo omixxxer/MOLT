@@ -12,7 +12,7 @@ const suggestion: ClothingAnalysisSuggestion = {
   alternatives: [],
   confidenceByAttribute: { category: 0.9 },
   unknownAttributes: [],
-  modelId: 'vesta',
+  modelId: 'molt',
   modelVersion: 'heads-v4',
   calibrated: true,
   segmentations: [],
@@ -34,7 +34,7 @@ describe('analysis record', () => {
     expect(record).toMatchObject({
       calibrated: true,
       suggestions: { brand: 'Zara', size: 'M', composition: '100 % algodón' }, // the label wins over the photo
-      sourcesByAttribute: { category: 'vesta-dinov2', brand: 'paddle-ocr', size: 'paddle-ocr', colors: 'local-pixels' },
+      sourcesByAttribute: { category: 'molt-dinov2', brand: 'paddle-ocr', size: 'paddle-ocr', colors: 'local-pixels' },
       correctedAttributes: ['subcategory', 'size'] // colours compare without case
     })
   })

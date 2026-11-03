@@ -26,22 +26,19 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}']
       },
       registerType: 'autoUpdate',
-      includeAssets: ['wardrobe-icon.svg'],
+      includeAssets: ['icons/favicon-48.png', 'icons/apple-touch-icon-180.png'],
       manifest: {
-        name: 'VESTA — Armario virtual',
-        short_name: 'VESTA',
+        name: 'Molt — Armario virtual',
+        short_name: 'Molt',
         description: 'Tu armario virtual, guardado en tu dispositivo.',
         theme_color: '#F5F5EF',
         background_color: '#F5F5EF',
         display: 'standalone',
         start_url: '/',
         icons: [
-          {
-            src: '/wardrobe-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any'
-          }
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ],
         lang: 'es'
       }

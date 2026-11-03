@@ -66,6 +66,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   const [brand, setBrand] = useState(garment?.brand ?? '')
   const [size, setSize] = useState(garment?.size ?? '')
   const [composition, setComposition] = useState(garment?.composition ?? '')
+  const [price, setPrice] = useState(garment?.price === undefined ? '' : String(garment.price).replace('.', ','))
   const [notes, setNotes] = useState(garment?.notes ?? '')
   const [selectedSeasons, setSelectedSeasons] = useState<Season[]>(garment?.seasons ?? [])
   const [styles, setStyles] = useState<string[]>(garment?.styles ?? [])
@@ -356,6 +357,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         brand: brand.trim() || undefined,
         size: size.trim() || undefined,
         composition: composition.trim() || undefined,
+        price: Number(price.replace(',', '.')) > 0 ? Number(price.replace(',', '.')) : undefined,
         notes: notes.trim() || undefined,
         seasons: selectedSeasons,
         styles,
@@ -489,6 +491,10 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
                 <div className="form-field full">
                   <FieldHeading htmlFor={`${fieldId}-composition`} label="Composición" suggested={suggested.has('composition')} />
                   <input id={`${fieldId}-composition`} value={composition} onChange={(event) => { setComposition(event.target.value); edited('composition') }} placeholder="p. ej. 95 % algodón, 5 % elastano" maxLength={120} />
+                </div>
+                <div className="form-field">
+                  <FieldHeading htmlFor={`${fieldId}-price`} label="Precio (€, opcional)" />
+                  <input id={`${fieldId}-price`} inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value.replace(/[^\d.,]/g, ''))} placeholder="Para ver el coste por puesta" maxLength={9} />
                 </div>
               </FormFold>
 

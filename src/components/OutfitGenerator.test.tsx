@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { database } from '../db/database'
 import type { Garment } from '../types/domain'
 import OutfitGenerator from './OutfitGenerator'
 
-function makeGarment(id: string, role: Garment['role']): Garment {
+function makeGarment(id: string, role: Garment['role'], change: Partial<Garment> = {}): Garment {
   return {
     id,
     name: id,
@@ -23,82 +23,190 @@ function makeGarment(id: string, role: Garment['role']): Garment {
     confirmedAttributes: [],
     suggestedAttributes: [],
     createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...change
   }
 }
 
+const wardrobe = () => [
+  makeGarment('camisa', 'Top'),
+  makeGarment('polo', 'Top'),
+  makeGarment('vaqueros', 'Bottom'),
+  makeGarment('chinos', 'Bottom'),
+  makeGarment('zapatillas', 'Calzado')
+]
+
+function setup(garments = wardrobe(), extra: Partial<Parameters<typeof OutfitGenerator>[0]> = {}) {
+  const onAvailabilityChange = vi.fn().mockResolvedValue(undefined)
+  render(<OutfitGenerator garments={garments} onAvailabilityChange={onAvailabilityChange} {...extra} />)
+  return { user: userEvent.setup(), onAvailabilityChange }
+}
+
+/** The garments on the board, read from the photos of its pieces. */
+function onBoard() {
+  return within(screen.getByRole('region', { name: 'Outfit' })).queryAllByRole('img').map((image) => image.getAttribute('alt'))
+}
+
+async function boardReady() {
+  await waitFor(() => expect(onBoard().length).toBeGreaterThan(1))
+}
+
+beforeEach(() => localStorage.clear())
+
 afterEach(async () => {
   await database.open()
-  await Promise.all([
-    database.garments.clear(),
-    database.outfits.clear(),
-    database.preferences.clear(),
-    database.outfitFeedback.clear()
-  ])
+  await Promise.all([database.outfits.clear(), database.preferences.clear(), database.outfitFeedback.clear()])
+  localStorage.clear()
+  vi.restoreAllMocks()
 })
 
 describe('OutfitGenerator', () => {
-  it('generates only wardrobe photos and persists saved outfits and feedback locally', async () => {
-    await database.open()
-    const garments = [makeGarment('shirt', 'Top'), makeGarment('trousers', 'Bottom')]
-    await database.garments.bulkAdd(garments)
-    const user = userEvent.setup()
-    const props = { garments, onAvailabilityChange: vi.fn().mockResolvedValue(undefined) }
-    const rendered = render(<OutfitGenerator {...props} />)
+  it('asks for the wardrobe first when it is empty', async () => {
+    const onAddGarments = vi.fn()
+    const { user } = setup([], { onAddGarments })
+    await user.click(await screen.findByRole('button', { name: 'Añadir prendas' }))
+    expect(onAddGarments).toHaveBeenCalled()
+    expect(screen.queryByRole('tab', { name: 'Mis outfits' })).not.toBeInTheDocument()
+  })
 
-    await user.click(screen.getByRole('button', { name: 'Generar outfits' }))
-    // The score (a rolling Counter) uses the Spanish decimal comma.
-    expect(await screen.findByRole('heading', { name: /Diario · \d+(?:,\d+)?\s?\/100/ })).toBeInTheDocument()
-    expect((await screen.findAllByRole('img')).map((image) => image.getAttribute('alt'))).toEqual(['shirt', 'trousers'])
+  it('opens with an outfit already made, with shoes, and says why', async () => {
+    setup()
+    await boardReady()
+    const shown = onBoard()
+    expect(shown).toContain('zapatillas')
+    expect(shown.some((name) => name === 'camisa' || name === 'polo')).toBe(true)
+    expect(shown.some((name) => name === 'vaqueros' || name === 'chinos')).toBe(true)
+    expect(screen.getByText(/encaje/i)).toBeInTheDocument()
+  })
+
+  it('keeps a fixed piece when asking for another combination', async () => {
+    const { user } = setup()
+    await boardReady()
+    const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
+    await user.click(screen.getByRole('button', { name: `Fijar ${top}` }))
+    expect(screen.getByRole('button', { name: `Soltar ${top}` })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Otra con lo fijado' }))
+    expect(onBoard()).toContain(top)
+  })
+
+  it('changes one piece without touching the others', async () => {
+    const { user } = setup()
+    await boardReady()
+    const before = onBoard()
+    const top = before.find((name) => name === 'camisa' || name === 'polo')!
+    await user.click(screen.getByRole('button', { name: `Cambiar ${top}` }))
+    const after = onBoard()
+    expect(after).not.toContain(top)
+    expect(after.filter((name) => name !== 'camisa' && name !== 'polo')).toEqual(before.filter((name) => name !== top))
+  })
+
+  it('chooses a garment by hand, which stays fixed, and sends others to the wash from the picker', async () => {
+    const { user, onAvailabilityChange } = setup()
+    await boardReady()
+    const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
+    const other = top === 'camisa' ? 'polo' : 'camisa'
+    await user.click(screen.getByRole('button', { name: new RegExp(`^Elegir parte de arriba: ahora, ${top}`) }))
+    const picker = screen.getByRole('dialog', { name: 'Elige parte de arriba' })
+    await user.click(within(picker).getByRole('button', { name: `Marcar ${other} como en la lavadora` }))
+    expect(onAvailabilityChange).toHaveBeenCalledWith(expect.objectContaining({ id: other, availability: 'laundry' }))
+    await user.click(within(picker).getByRole('button', { name: other }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onBoard()).toContain(other)
+    expect(screen.getByRole('button', { name: `Soltar ${other}` })).toBeInTheDocument()
+  })
+
+  it('brings back a garment from the wash in the picker', async () => {
+    const garments = [...wardrobe(), makeGarment('lavada', 'Top', { availability: 'laundry' })]
+    const { user, onAvailabilityChange } = setup(garments)
+    await boardReady()
+    expect(onBoard()).not.toContain('lavada')
+    const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
+    await user.click(screen.getByRole('button', { name: new RegExp(`^Elegir parte de arriba: ahora, ${top}`) }))
+    await user.click(screen.getByRole('button', { name: 'Marcar lavada como disponible' }))
+    expect(onAvailabilityChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'lavada', availability: 'available' }))
+  })
+
+  it('saves and wears the same outfit as a single record, with feedback', async () => {
+    const { user } = setup()
+    await boardReady()
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(await screen.findByRole('button', { name: 'Guardado' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Me lo pongo hoy' }))
+    expect(await screen.findByRole('button', { name: 'Puesto hoy' })).toBeDisabled()
+
+    const outfits = await database.outfits.toArray()
+    expect(outfits).toHaveLength(1)
+    expect(outfits[0]).toEqual(expect.objectContaining({ favorite: true, wornAt: expect.any(String) }))
+    expect((await database.outfitFeedback.toArray()).map((event) => event.type).sort()).toEqual(['saved', 'worn'])
+  })
+
+  it('does not propose a discarded combination again', async () => {
+    const { user } = setup()
+    await boardReady()
+    const discarded = [...onBoard()].sort().join()
+    await user.click(screen.getByRole('button', { name: 'No me convence' }))
+    await screen.findByText(/no volveremos a proponer/)
+    expect([...onBoard()].sort().join()).not.toBe(discarded)
+    expect(await database.outfitFeedback.toArray()).toEqual([expect.objectContaining({ type: 'dislike' })])
+  })
+
+  it('starts empty and completes the outfit around what was chosen', async () => {
+    const { user } = setup()
+    await boardReady()
+    await user.click(screen.getByRole('button', { name: 'Empezar de cero' }))
+    expect(within(screen.getByRole('region', { name: 'Outfit' })).queryAllByRole('img')).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Elegir parte de abajo' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'chinos' }))
+    expect(onBoard()).toEqual(['chinos'])
+    await user.click(screen.getByRole('button', { name: 'Completar el outfit' }))
+    const shown = onBoard()
+    expect(shown).toContain('chinos')
+    expect(shown.some((name) => name === 'camisa' || name === 'polo')).toBe(true)
+  })
+
+  it('starts around the garment it comes from', async () => {
+    setup(wardrobe(), { startGarmentId: { id: 'polo', nonce: 1 } })
+    await boardReady()
+    expect(onBoard()).toContain('polo')
+    expect(screen.getByRole('button', { name: 'Soltar polo' })).toBeInTheDocument()
+  })
+
+  it('tells what is missing when no outfit can be made', async () => {
+    setup([makeGarment('camisa', 'Top')])
+    expect(await screen.findByRole('status')).toHaveTextContent(/una de abajo/)
+  })
+
+  it('keeps the board while looking at the saved outfits, which can be renamed, opened and deleted', async () => {
+    const { user } = setup()
+    await boardReady()
+    const shown = onBoard()
+    await user.click(screen.getByRole('tab', { name: 'Mis outfits' }))
+    expect(await screen.findByText('Aún no hay outfits.')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Crear' }))
+    expect(onBoard()).toEqual(shown)
 
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
-    await waitFor(async () => {
-      expect(await database.outfits.toArray()).toEqual([
-        expect.objectContaining({ garmentIds: ['shirt', 'trousers'], favorite: true })
-      ])
-      expect(await database.outfitFeedback.toArray()).toEqual([
-        expect.objectContaining({ type: 'saved', garmentIds: ['shirt', 'trousers'] })
-      ])
-    })
-    expect((await database.outfits.toArray()).filter((outfit) => outfit.favorite)).toHaveLength(1)
-    await user.click(screen.getByRole('tab', { name: 'Guardados' }))
-    expect(screen.getByRole('heading', { name: 'Outfits guardados' })).toBeInTheDocument()
-    expect(screen.getByText(/GENERADO Y GUARDADO · \d+(?:\.\d+)?\/100/)).toBeInTheDocument()
-    rendered.unmount()
-    render(<OutfitGenerator {...props} />)
-    await user.click(await screen.findByRole('tab', { name: 'Guardados' }))
-    expect(await screen.findByRole('heading', { name: 'Outfits guardados' })).toBeInTheDocument()
+    await screen.findByRole('button', { name: 'Guardado' })
+    await user.click(screen.getByRole('tab', { name: 'Mis outfits' }))
+    const name = await screen.findByRole('textbox', { name: 'Nombre del outfit' })
+    await user.clear(name)
+    await user.type(name, 'Oficina')
+    await user.tab()
+    await waitFor(async () => expect((await database.outfits.toArray())[0]?.name).toBe('Oficina'))
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar' }))
+    expect(onBoard().sort()).toEqual([...shown].sort())
+
+    await user.click(screen.getByRole('tab', { name: 'Mis outfits' }))
+    await user.click(await screen.findByRole('button', { name: 'Eliminar Oficina' }))
+    await user.click(await screen.findByRole('button', { name: 'Eliminar outfit' }))
+    await waitFor(async () => expect(await database.outfits.count()).toBe(0))
   })
 
-  it('creates a personal outfit from selected garments and persists it', async () => {
-    await database.open()
-    const garments = [makeGarment('shirt', 'Top'), makeGarment('trousers', 'Bottom')]
-    const user = userEvent.setup()
-    render(<OutfitGenerator garments={garments} onAvailabilityChange={vi.fn().mockResolvedValue(undefined)} />)
-
-    await user.click(screen.getByRole('tab', { name: 'Crear outfit' }))
-    await user.type(screen.getByLabelText('Nombre del outfit'), 'Mi conjunto')
-    await user.click(screen.getByLabelText('shirt'))
-    await user.click(screen.getByLabelText('trousers'))
-    await user.click(screen.getByRole('button', { name: 'Guardar outfit' }))
-
-    await waitFor(async () => expect(await database.outfits.toArray()).toEqual([
-      expect.objectContaining({ name: 'Mi conjunto', kind: 'manual', garmentIds: ['shirt', 'trousers'] })
-    ]))
-    expect(screen.getByRole('heading', { name: 'Outfits guardados' })).toBeInTheDocument()
-    expect(screen.getByText('Mi conjunto')).toBeInTheDocument()
-  })
-
-  it('persists and resets personal preference settings', async () => {
-    await database.open()
-    const user = userEvent.setup()
-    render(<OutfitGenerator garments={[]} onAvailabilityChange={vi.fn().mockResolvedValue(undefined)} />)
-    await user.click(screen.getByText('Preferencias personales'))
-    await user.type(screen.getByLabelText('Colores preferidos (separados por coma)'), 'Verde')
-    await user.click(screen.getByRole('button', { name: 'Guardar preferencias' }))
-    await waitFor(async () => expect(await database.preferences.get('current')).toMatchObject({ preferredColors: ['Verde'] }))
-
-    await user.click(screen.getByRole('button', { name: 'Restablecer' }))
-    await waitFor(async () => expect(await database.preferences.get('current')).toMatchObject({ preferredColors: [], preferredStyles: [] }))
+  it('remembers preferences as they are chosen', async () => {
+    const { user } = setup()
+    await boardReady()
+    await user.selectOptions(screen.getByLabelText('Estilo preferido'), 'Formal')
+    await waitFor(async () => expect((await database.preferences.get('current'))?.preferredDressLevel).toBe('Formal'))
   })
 })

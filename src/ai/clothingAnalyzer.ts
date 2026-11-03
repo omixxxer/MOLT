@@ -8,7 +8,7 @@ import { fetchDescription, fetchModelFile, loadOrt } from './onnxRuntime'
 import { readText, type TextLine } from './textReader'
 
 // Own model trained in ml/ (DINOv2-small + heads); exported with python -m vesta_ml.export.
-export const CLOTHING_MODEL_ID = 'vesta/dinov2-small-heads'
+export const CLOTHING_MODEL_ID = 'molt/dinov2-small-heads'
 export const MODEL_DOWNLOAD_SIZE = 'aprox. 52 MB (clasificador de 25,7 MB, lector de texto de 12,9 MB y recorte de 13,8 MB)'
 const MODEL_BASE = `${import.meta.env.BASE_URL}models/vesta/`
 

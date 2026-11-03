@@ -103,9 +103,18 @@ describe('wardrobe backup', () => {
     const other = createZip([{ name: 'export.json', data: encoder.encode('{}') }])
     await expect(readWardrobeBackup(other)).rejects.toThrow('no es una copia del armario')
     const newer = createZip([{ name: 'backup.json', data: encoder.encode(JSON.stringify({
-      format: 'vesta-wardrobe-backup', version: 99, databaseVersion: 1, garments: []
+      format: 'molt-wardrobe-backup', version: 99, databaseVersion: 1, garments: []
     })) }])
     await expect(readWardrobeBackup(newer)).rejects.toThrow('versión más reciente')
+  })
+})
+
+describe('backups made before the app was renamed', () => {
+  it('still reads them', async () => {
+    const legacy = createZip([{ name: 'backup.json', data: new TextEncoder().encode(JSON.stringify({
+      format: 'vesta-wardrobe-backup', version: 1, databaseVersion: 6, exportedAt: '2026-11-02T15:38:48.420Z', garments: [], outfits: []
+    })) }])
+    expect((await readWardrobeBackup(legacy)).exportedAt).toBe('2026-11-02T15:38:48.420Z')
   })
 })
 

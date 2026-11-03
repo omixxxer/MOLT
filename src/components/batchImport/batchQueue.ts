@@ -110,7 +110,8 @@ export function reviewReasons(garment: BatchGarment): string[] {
   if (!confidence) return []
   const reasons: string[] = []
   const typeEdited = garment.subcategory !== undefined || garment.category !== mainSuggestion(garment)?.category
-  if (!typeEdited && ((confidence.category ?? 1) < SURE_CATEGORY || (confidence.subcategory ?? 1) < SURE_SUBCATEGORY)) reasons.push('Comprueba el tipo')
+  if (!garmentSubcategory(garment).trim()) reasons.push('Elige el tipo')
+  else if (!typeEdited && ((confidence.category ?? 1) < SURE_CATEGORY || (confidence.subcategory ?? 1) < SURE_SUBCATEGORY)) reasons.push('Comprueba el tipo')
   if (!garment.colors.length) reasons.push('Falta el color')
   return reasons
 }

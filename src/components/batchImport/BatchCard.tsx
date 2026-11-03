@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert02Icon, Link01Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../../ai/colors'
-import { categoryIdForLabel } from '../../ml/taxonomy'
+import { categoryIdForLabel, taxonomy } from '../../ml/taxonomy'
 import { garmentCategories, type GarmentCategory } from '../../types/domain'
 import ColorPalette from '../ColorPalette'
 import GarmentPhoto from '../GarmentPhoto'
@@ -21,6 +21,8 @@ import {
   type BatchPhoto
 } from './batchQueue'
 
+const OTHER = 'other'
+
 interface BatchCardProps {
   garment: BatchGarment
   photos: Map<string, BatchPhoto>
@@ -36,6 +38,7 @@ interface BatchCardProps {
 export default function BatchCard({ garment, photos, canMerge, disabled }: BatchCardProps) {
   const [selected, setSelected] = useState<string>()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [writingOther, setWritingOther] = useState(false)
   const main = garment.photoIds[0] ? photos.get(garment.photoIds[0]) : undefined
 
   if (!main) {
@@ -48,6 +51,10 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
   }
 
   const subcategory = garmentSubcategory(garment)
+  const categoryId = categoryIdForLabel(garment.category as GarmentCategory)
+  const options = taxonomy.subcategories.filter((entry) => entry.category === categoryId).map((entry) => entry.label)
+  // A type outside the list (written by the user) is shown in the text field.
+  const typing = writingOther || (subcategory !== '' && !options.includes(subcategory))
   const label = garmentLabel(garment)
   const read = [label?.brand?.brand ?? mainSuggestion(garment)?.brand?.brand, garmentSize(garment)?.value, label?.composition?.value].filter(Boolean).join(' · ')
   const reasons = reviewReasons(garment)
@@ -114,21 +121,41 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
         {reasons.length > 0 && (
           <p className="batch-reason"><HugeiconsIcon icon={Alert02Icon} size={13} />{reasons.join(' · ')}</p>
         )}
-        <input
+        <select
           className="batch-title"
           aria-label="Tipo de prenda"
-          placeholder="Tipo de prenda"
-          list={`batch-subcategories-${categoryIdForLabel(garment.category as GarmentCategory)}`}
-          value={subcategory}
-          onChange={(event) => editGarment(garment.id, { subcategory: event.target.value })}
-          maxLength={50}
+          value={typing ? OTHER : subcategory}
+          onChange={(event) => {
+            const other = event.target.value === OTHER
+            setWritingOther(other)
+            editGarment(garment.id, { subcategory: other ? '' : event.target.value })
+          }}
           disabled={disabled}
-        />
+        >
+          <option value="" disabled>Elige el tipo</option>
+          {options.map((option) => <option key={option}>{option}</option>)}
+          <option value={OTHER}>Otro…</option>
+        </select>
+        {typing && (
+          <input
+            className="batch-other"
+            aria-label="Escribe el tipo de prenda"
+            placeholder="Escribe el tipo"
+            value={subcategory}
+            onChange={(event) => editGarment(garment.id, { subcategory: event.target.value })}
+            maxLength={50}
+            autoFocus={writingOther}
+            disabled={disabled}
+          />
+        )}
         <select
           className="batch-category"
           aria-label="Categoría"
           value={garment.category}
-          onChange={(event) => editGarment(garment.id, { category: event.target.value as GarmentCategory, subcategory: '' })}
+          onChange={(event) => {
+            setWritingOther(false)
+            editGarment(garment.id, { category: event.target.value as GarmentCategory, subcategory: '' })
+          }}
           disabled={disabled}
         >
           {garmentCategories.map((value) => <option key={value}>{value}</option>)}

@@ -24,7 +24,7 @@ function suggestion(file: Blob): ClothingAnalysisSuggestion {
     alternatives: [],
     confidenceByAttribute: { category: 0.9 },
     unknownAttributes: [],
-    modelId: 'vesta/dinov2-small-heads',
+    modelId: 'molt/dinov2-small-heads',
     modelVersion: 'heads-test',
     calibrated: true,
     segmentations: [{ classes: [], grid: 16, probabilities: new Float32Array(0) }],
