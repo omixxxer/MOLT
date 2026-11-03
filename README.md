@@ -93,7 +93,7 @@ Formato de la copia (`molt-wardrobe-backup`, versión 1; se siguen leyendo las `
 - Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
 - Los modelos (clasificador y lector de texto) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
 - Conexiones externas, solo cuando las usas: **Open-Meteo** al consultar el tiempo (recibe la ciudad y sus coordenadas, nunca el inventario ni las fotos) y **Google Drive** si guardas o restauras allí la copia (recibe la copia completa, fotos incluidas, en tu propia cuenta).
-- La política CSP solo permite conexiones al propio origen, a Open-Meteo y a la API de Google (`www.googleapis.com`). La app no carga scripts de Google: el inicio de sesión ocurre en una ventana aparte.
+- La política CSP solo permite conexiones al propio origen, a Open-Meteo (previsión, búsqueda de lugares e histórico) y a la API de Google (`www.googleapis.com`). La app no carga scripts de Google: el inicio de sesión ocurre en una ventana aparte.
 - La PWA precachea la interfaz, pero no los modelos ni los datos personales. Los modelos se guardan en Cache Storage tras la primera descarga, para funcionar sin conexión.
 
 Esto describe el diseño del código; no es una auditoría de tráfico.
@@ -111,6 +111,24 @@ npm test           # pruebas (Vitest, jsdom, fake-indexeddb)
 npm run build      # comprobación de TypeScript y compilación con Vite
 npm run preview    # previsualizar la compilación
 ```
+
+## Despliegue en Cloudflare Pages
+
+La app es estática, así que basta con conectar el repositorio. En el panel de Cloudflare, **Workers & Pages → Create application → Pages → Connect to Git**, elige este repositorio y configura:
+
+| Campo | Valor |
+|---|---|
+| Production branch | `main` |
+| Framework preset | Ninguno |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+Cada `push` a `main` publica una versión nueva, y cada otra rama, una vista previa con su propia dirección.
+
+- **Cabeceras:** [`public/_headers`](public/_headers) da el aislamiento que ONNX Runtime necesita para usar varios hilos. Comprueba en la consola del navegador que `crossOriginIsolated` es `true`.
+- **Tamaño:** Cloudflare admite 25 MiB por archivo. `model_quantized.onnx` ocupa 24,55 MiB; un modelo reentrenado que pase de ese límite hará fallar el despliegue.
+- **Google Drive:** sin `VITE_GOOGLE_CLIENT_ID` en las variables de entorno del proyecto, la instalación funciona con la copia en ZIP y sin Drive. Para activarlo, añade esa variable, vuelve a desplegar y sigue los pasos de «Copia en Google Drive» con la dirección pública. Cloudflare redirige las rutas `.html` a la misma ruta sin extensión, así que hay que comprobar el inicio de sesión de Google tras activarlo.
+- **Open-Meteo:** su API gratuita solo cubre el uso no comercial.
 
 ## Arquitectura
 
