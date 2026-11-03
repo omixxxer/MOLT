@@ -26,7 +26,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}']
       },
       registerType: 'autoUpdate',
-      includeAssets: ['wardrobe-icon.svg'],
+      includeAssets: ['icons/favicon-48.png', 'icons/apple-touch-icon-180.png'],
       manifest: {
         name: 'Molt — Armario virtual',
         short_name: 'Molt',
@@ -36,12 +36,9 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         icons: [
-          {
-            src: '/wardrobe-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any'
-          }
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ],
         lang: 'es'
       }

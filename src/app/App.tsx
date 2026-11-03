@@ -3,11 +3,12 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
 import GarmentCard from '../components/GarmentCard'
+import MoltMark from '../components/MoltMark'
 import PillNav from '../components/PillNav.jsx'
 import WardrobeData from '../components/WardrobeData'
 import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment } from '../types/domain'
-import { Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
+import { ClickSpark, Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
 type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
 
@@ -174,9 +175,9 @@ function App() {
         contrast={0.8}
         scale={1}
         direction={20}
-        color="#D8D8C9"
+        color="#9AA58E"
         backgroundColor="#F5F5EF"
-        opacity={0.34}
+        opacity={0.5}
         speed={0.12}
         fade="none"
         interactive={false}
@@ -184,9 +185,11 @@ function App() {
         style={undefined}
       />
       </Suspense>
+      <ClickSpark sparkColor="#9786BC" sparkSize={9} sparkRadius={20} sparkCount={7} sparkWidth={1.5} duration={380} style={{ height: 'auto' }}>
       <div className="app-shell">
         <header className="app-header">
           <a className="wordmark" href="#inicio" onClick={() => setPage('home')} aria-label="Molt, ir al inicio">
+            <MoltMark />
             Molt<span aria-hidden="true">.</span>
           </a>
           <span className="privacy-note"><span className="privacy-indicator" />{localStorageMessage}</span>
@@ -358,6 +361,7 @@ function App() {
           className="molt-pill-nav"
         />
       </div>
+      </ClickSpark>
 
       {selectedGarment && (
         <Suspense fallback={null}>
