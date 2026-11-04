@@ -175,9 +175,9 @@ function App() {
         contrast={0.8}
         scale={1.6}
         direction={35}
-        color="#9AA58E"
-        backgroundColor="#F5F5EF"
-        opacity={0.5}
+        color="#8A79B2"
+        backgroundColor="#F8F6FB"
+        opacity={0.36}
         speed={0.25}
         fade="none"
         interactive
@@ -351,10 +351,10 @@ function App() {
           itemStyle="pill"
           hoverEffect="fill"
           indicator="pill"
-          barColor="#30352F"
-          textColor="#F5F5EF"
-          highlightColor="#9AA58E"
-          highlightTextColor="#30352F"
+          barColor="#2D2838"
+          textColor="#F8F6FB"
+          highlightColor="#B3A6D3"
+          highlightTextColor="#2D2838"
           collapse="never"
           intro={false}
           ariaLabel="Navegación principal"

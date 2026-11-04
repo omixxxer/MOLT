@@ -31,8 +31,8 @@ export default defineConfig({
         name: 'Molt — Armario virtual',
         short_name: 'Molt',
         description: 'Tu armario virtual, guardado en tu dispositivo.',
-        theme_color: '#F5F5EF',
-        background_color: '#F5F5EF',
+        theme_color: '#F8F6FB',
+        background_color: '#F8F6FB',
         display: 'standalone',
         start_url: '/',
         icons: [
