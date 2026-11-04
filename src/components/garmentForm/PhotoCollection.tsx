@@ -1,6 +1,7 @@
 import { useState, type DragEvent } from 'react'
 import { Add01Icon, Cancel01Icon, Image02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { MAX_PHOTO_MB } from '../../db/photoLimits'
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
 import TakePhoto from '../TakePhoto'
@@ -69,7 +70,7 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
           <TakePhoto label="Hacer foto" ariaLabel="Hacer una foto de la prenda" disabled={disabled} onTake={onAdd} />
           <label className="button button-dark photo-drop-choose">Elegir fotos{fileInput}</label>
         </div>
-        <small>Hasta {max} fotos · JPG, PNG o WebP · 8 MB cada una</small>
+        <small>Hasta {max} fotos · JPG, PNG o WebP · {MAX_PHOTO_MB} MB cada una</small>
       </div>
     )
   }

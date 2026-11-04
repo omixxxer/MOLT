@@ -12,6 +12,7 @@ import {
   timeLeft,
   useBatch
 } from './batchImport/batchQueue'
+import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
 import GarmentPhoto from './GarmentPhoto'
 import { LatticeLoader } from './reactBits'
 
@@ -20,7 +21,6 @@ interface BatchImportProps {
   onDone: (added: number) => void
 }
 
-const maxPhotoSize = 12 * 1024 * 1024
 const accepted = ['image/jpeg', 'image/png', 'image/webp']
 const acceptAttribute = '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp'
 
@@ -74,9 +74,9 @@ export default function BatchImport({ onDone }: BatchImportProps) {
   function choose(files: FileList | null) {
     setError('')
     const chosen = [...(files ?? [])]
-    const valid = chosen.filter((file) => accepted.includes(file.type) && file.size > 0 && file.size <= maxPhotoSize)
+    const valid = chosen.filter((file) => accepted.includes(file.type) && file.size > 0 && file.size <= MAX_PHOTO_BYTES)
     const rejected = chosen.length - valid.length
-    if (rejected) setError(`${plural(rejected, 'archivo no se ha añadido', 'archivos no se han añadido')}: solo fotos JPG, PNG o WebP de 12 MB o menos.`)
+    if (rejected) setError(`${plural(rejected, 'archivo no se ha añadido', 'archivos no se han añadido')}: solo fotos JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
     if (valid.length) void addPhotos(valid)
   }
 
