@@ -11,6 +11,7 @@ import { cutOutGarments, cutoutColors } from '../ai/cutout'
 import type { SegmentationMap } from '../ai/segmentation'
 import { suggestUsage } from '../ai/usageRules'
 import { createThumbnail, reducePhoto } from '../db/imageProcessing'
+import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
 import { taxonomy } from '../ml/taxonomy'
 import {
   dressLevels,
@@ -37,7 +38,6 @@ const dressLevelHints: Record<DressLevel, string> = {
   Formal: 'Boda, evento, traje'
 }
 const maxPhotos = 4
-const maxPhotoSize = 8 * 1024 * 1024
 const colorOptions = taxonomy.attributes.colors.values.map((value) => value.label)
 const patternOptions = taxonomy.attributes.pattern.values.map((value) => value.label)
 // How dressed up a garment is goes in «Estilo» (dress levels); these are aesthetics.
@@ -149,23 +149,18 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
     setFormError('')
     const selectedFiles = Array.from(files ?? [])
     if (!selectedFiles.length) return
-    if (selectedFiles.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
-      setFormError('Selecciona una imagen JPG, PNG o WebP válida.')
-      return
+    // One unusable photo does not lose the others chosen with it.
+    const validFiles = selectedFiles.filter((file) => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size > 0 && file.size <= MAX_PHOTO_BYTES)
+    const rejected = selectedFiles.length - validFiles.length
+    if (rejected) {
+      setFormError(`${rejected === 1 ? '1 archivo no se ha añadido' : `${rejected} archivos no se han añadido`}: solo fotos JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
     }
-    if (selectedFiles.some((file) => file.size === 0)) {
-      setFormError('No se pueden analizar imágenes vacías.')
-      return
-    }
-    if (selectedFiles.some((file) => file.size > maxPhotoSize)) {
-      setFormError('Cada imagen debe ocupar 8 MB o menos.')
-      return
-    }
-    if (photos.length + selectedFiles.length > maxPhotos) {
+    if (!validFiles.length) return
+    if (photos.length + validFiles.length > maxPhotos) {
       setFormError(`Puedes guardar hasta ${maxPhotos} fotos por prenda. Quita alguna antes de añadir más.`)
       return
     }
-    const nextPhotos = [...photos, ...selectedFiles]
+    const nextPhotos = [...photos, ...validFiles]
     setPhotos(nextPhotos)
     setImageChanged(true)
     setAnalysisSuggestion(undefined)
@@ -249,8 +244,8 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   function selectLabelPhoto(file: File | undefined) {
     setLabelError('')
     if (!file) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size === 0 || file.size > maxPhotoSize) {
-      setLabelError('La foto de la etiqueta debe ser JPG, PNG o WebP de 8 MB o menos.')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size === 0 || file.size > MAX_PHOTO_BYTES) {
+      setLabelError(`La foto de la etiqueta debe ser JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
       return
     }
     setLabelPhoto(file)

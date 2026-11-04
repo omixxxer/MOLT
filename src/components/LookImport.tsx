@@ -7,6 +7,7 @@ import { suggestUsage } from '../ai/usageRules'
 import { database } from '../db/database'
 import { garmentRepository } from '../db/garmentRepository'
 import { createThumbnail } from '../db/imageProcessing'
+import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
 import { garmentCategories, roleByCategory, type Garment, type GarmentCategory, type Outfit } from '../types/domain'
 import { analysisRecord } from './garmentForm/analysisRecord'
 import { createSuggestedGarmentName } from './garmentForm/garmentName'
@@ -30,8 +31,6 @@ interface FoundGarment {
   subcategory: string
 }
 
-const maxPhotoSize = 12 * 1024 * 1024
-
 /**
  * Adds the garments of a full-body photo at once: the segmentation head finds them, SlimSAM cuts each one out,
  * the classifier names it, and the user picks which to keep. The look can be saved as an outfit worn today.
@@ -48,8 +47,8 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
     setError('')
     setFound(undefined)
     if (!file) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > maxPhotoSize) {
-      setError('Elige una foto JPG, PNG o WebP de 12 MB o menos.')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > MAX_PHOTO_BYTES) {
+      setError(`Elige una foto JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
       return
     }
     try {

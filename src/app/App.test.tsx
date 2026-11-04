@@ -296,6 +296,22 @@ describe('wardrobe flow', () => {
     expect(saved?.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', composition: 'paddle-ocr' })
   })
 
+  it('keeps the usable photos when one of those chosen is too large', async () => {
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+
+    const tooLarge = new File(['big'], 'grande.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(tooLarge, 'size', { value: 26 * 1024 * 1024 })
+    const allowed = new File(['ok'], 'buena.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(allowed, 'size', { value: 24 * 1024 * 1024 })
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), [tooLarge, allowed])
+
+    expect(await screen.findByText(/1 archivo no se ha añadido.*25 MB o menos/)).toBeInTheDocument()
+    await waitFor(() => expect(vi.mocked(analyzeGarmentImage)).toHaveBeenCalled())
+    expect(vi.mocked(analyzeGarmentImage).mock.lastCall?.[0]).toEqual([allowed])
+  })
+
   it('replaces typed brand, size and composition with what a new label photo reads', async () => {
     vi.mocked(analyzeGarmentImage).mockResolvedValue({
       category: 'Parte superior',
