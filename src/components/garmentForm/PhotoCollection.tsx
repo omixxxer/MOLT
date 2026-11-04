@@ -3,6 +3,7 @@ import { Add01Icon, Cancel01Icon, Image02Icon } from '@hugeicons/core-free-icons
 import { HugeiconsIcon } from '@hugeicons/react'
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
+import TakePhoto from '../TakePhoto'
 
 interface PhotoCollectionProps {
   photos: Blob[]
@@ -60,14 +61,16 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
 
   if (!photo) {
     return (
-      <label className="photo-drop" {...dropHandlers} {...(dragging ? { 'data-dragging': '' } : {})}>
+      <div className="photo-drop" {...dropHandlers} {...(dragging ? { 'data-dragging': '' } : {})}>
         <span className="photo-drop-icon" aria-hidden="true"><HugeiconsIcon icon={Image02Icon} size={26} /></span>
         <strong>Añade una foto de la prenda</strong>
         <small>Molt sugiere el tipo, el color y el estampado, y le quita el fondo.</small>
-        <span className="button button-dark">Elegir fotos</span>
+        <div className="photo-drop-actions">
+          <TakePhoto label="Hacer foto" ariaLabel="Hacer una foto de la prenda" disabled={disabled} onTake={onAdd} />
+          <label className="button button-dark photo-drop-choose">Elegir fotos{fileInput}</label>
+        </div>
         <small>Hasta {max} fotos · JPG, PNG o WebP · 8 MB cada una</small>
-        {fileInput}
-      </label>
+      </div>
     )
   }
 
@@ -103,6 +106,7 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
             {fileInput}
           </label>
         )}
+        {photos.length < max && <TakePhoto ariaLabel="Hacer otra foto de la prenda" className="photo-thumb photo-thumb-add" disabled={disabled} onTake={onAdd} />}
       </div>
     </div>
   )
