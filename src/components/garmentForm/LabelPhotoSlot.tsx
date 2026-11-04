@@ -1,5 +1,6 @@
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
+import TakePhoto from '../TakePhoto'
 
 /** [field, value used, text as read] for each field the label gave. */
 export type LabelFinding = readonly [string, string | undefined, string | undefined]
@@ -72,6 +73,7 @@ export default function LabelPhotoSlot({ photo, reading, read, findings, error, 
           />
         </label>
       )}
+      {!photo && <TakePhoto label="Hacer foto de la etiqueta" ariaLabel="Hacer una foto de la etiqueta" className="button button-outline label-take-photo" onTake={(files) => onSelect(files?.[0])} />}
       {!photo && error && <p className="form-error" role="alert">{error}</p>}
     </section>
   )

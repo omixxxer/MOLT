@@ -11,6 +11,7 @@ Armario virtual *local-first*: catalogas tus prendas con una foto, generas outfi
 - Hasta 4 fotos por prenda (JPG, PNG o WebP de hasta 8 MB), con portada elegible y miniaturas locales de 640 px como máximo.
 - **Fotos reducidas al guardar:** se guardan a 2048 px por lado como máximo, en JPEG al 85 % (las transparencias, sobre blanco). Una foto de móvil de 12 MP pasa de ~3 MB a ~0,3 MB, así que 1.000 prendas ocupan unos 0,7 GB en lugar de unos 4,6 GB. Las fotos que ya miden 2048 px o menos y pesan menos de 1 MB se guardan tal cual. El análisis se hace antes, con la foto original. Las fotos guardadas antes de este cambio no se reducen.
 - **Código único por prenda** según su tipo, como `SDC-002` (sudadera con capucha nº 2) o `VAQ-001`, para distinguir prendas parecidas. No cambia al editar la prenda y no se reutiliza al borrarla.
+- **Hacer la foto en el momento:** en móviles y tabletas, «Hacer foto» abre la cámara del dispositivo, para la prenda, la etiqueta o un look. La foto se usa igual que una elegida del carrete.
 - **Añadir prenda:** pestañas para una prenda, varias o desde un look. Con una prenda, primero solo se pide la foto; después se ven la foto en grande, lo que Molt cree que es, los datos principales y, plegados con su resumen, «Uso» y «Notas».
 - Detalle de cada prenda con sus fotos, la foto de la etiqueta, los atributos y la procedencia del análisis; edición y borrado.
 

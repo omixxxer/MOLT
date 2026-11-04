@@ -12,6 +12,7 @@ import { analysisRecord } from './garmentForm/analysisRecord'
 import { createSuggestedGarmentName } from './garmentForm/garmentName'
 import GarmentPhoto from './GarmentPhoto'
 import { LatticeLoader } from './reactBits'
+import TakePhoto from './TakePhoto'
 
 interface LookImportProps {
   /** After saving: how many garments were added. */
@@ -163,22 +164,27 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
 
   return (
     <div className="look-import">
-      <label className="photo-drop">
+      <div className="photo-drop">
         <span className="photo-drop-icon" aria-hidden="true"><HugeiconsIcon icon={Image02Icon} size={26} /></span>
         <strong>{found ? 'Elegir otra foto' : 'Elige una foto de cuerpo entero'}</strong>
         <small>De frente, con buena luz. La foto completa no se guarda: solo el recorte de cada prenda.</small>
-        <span className="button button-dark">Elegir foto</span>
-        <input
-          type="file"
-          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-          onChange={(event) => {
-            void choose(event.currentTarget.files?.[0])
-            event.currentTarget.value = ''
-          }}
-          aria-label="Seleccionar foto de cuerpo entero"
-          disabled={Boolean(status) || saving}
-        />
-      </label>
+        <div className="photo-drop-actions">
+          <TakePhoto label="Hacer foto" ariaLabel="Hacer una foto de cuerpo entero" disabled={Boolean(status) || saving} onTake={(files) => void choose(files?.[0])} />
+          <label className="button button-dark photo-drop-choose">
+            Elegir foto
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              onChange={(event) => {
+                void choose(event.currentTarget.files?.[0])
+                event.currentTarget.value = ''
+              }}
+              aria-label="Seleccionar foto de cuerpo entero"
+              disabled={Boolean(status) || saving}
+            />
+          </label>
+        </div>
+      </div>
 
       {status && <div className="look-status"><LatticeLoader label={status} fontSize={12} /></div>}
       {error && <p className="form-error" role="alert">{error}</p>}
