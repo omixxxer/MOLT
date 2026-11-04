@@ -5,36 +5,36 @@ import './PillNav.css';
 
 const THEMES = {
   dark: {
-    '--pn-surface': 'rgba(48, 53, 47, 0.96)',
-    '--pn-solid': '#30352F',
-    '--pn-edge': 'rgba(216, 216, 201, 0.42)',
+    '--pn-surface': 'rgba(45, 40, 56, 0.96)',
+    '--pn-solid': '#2D2838',
+    '--pn-edge': 'rgba(220, 214, 232, 0.42)',
     '--pn-rim': 'transparent',
     '--pn-shadow': 'none',
-    '--pn-text': 'rgba(245, 245, 239, 0.76)',
-    '--pn-strong': '#F5F5EF',
-    '--pn-pill': '#9AA58E',
-    '--pn-pill-ink': '#30352F',
+    '--pn-text': 'rgba(248, 246, 251, 0.76)',
+    '--pn-strong': '#F8F6FB',
+    '--pn-pill': '#B3A6D3',
+    '--pn-pill-ink': '#2D2838',
     '--pn-pill-shadow': 'none',
-    '--pn-dot': '#9AA58E',
-    '--pn-ring': '#D8D8C9',
-    '--pn-row-hover': 'rgba(216, 216, 201, 0.18)',
+    '--pn-dot': '#B3A6D3',
+    '--pn-ring': '#DCD6E8',
+    '--pn-row-hover': 'rgba(220, 214, 232, 0.18)',
     '--pn-tile': 'transparent',
     '--pn-tile-rim': 'none'
   },
   light: {
-    '--pn-surface': 'rgba(48, 53, 47, 0.96)',
-    '--pn-solid': '#30352F',
-    '--pn-edge': 'rgba(216, 216, 201, 0.42)',
+    '--pn-surface': 'rgba(45, 40, 56, 0.96)',
+    '--pn-solid': '#2D2838',
+    '--pn-edge': 'rgba(220, 214, 232, 0.42)',
     '--pn-rim': 'transparent',
     '--pn-shadow': 'none',
-    '--pn-text': 'rgba(245, 245, 239, 0.76)',
-    '--pn-strong': '#F5F5EF',
-    '--pn-pill': '#9AA58E',
-    '--pn-pill-ink': '#30352F',
+    '--pn-text': 'rgba(248, 246, 251, 0.76)',
+    '--pn-strong': '#F8F6FB',
+    '--pn-pill': '#B3A6D3',
+    '--pn-pill-ink': '#2D2838',
     '--pn-pill-shadow': 'none',
-    '--pn-dot': '#9AA58E',
-    '--pn-ring': '#D8D8C9',
-    '--pn-row-hover': 'rgba(216, 216, 201, 0.18)',
+    '--pn-dot': '#B3A6D3',
+    '--pn-ring': '#DCD6E8',
+    '--pn-row-hover': 'rgba(220, 214, 232, 0.18)',
     '--pn-tile': 'transparent',
     '--pn-tile-rim': 'none'
   }
@@ -127,7 +127,7 @@ const contrastInk = color => {
     return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   };
   const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-  return luminance > 0.36 ? '#30352F' : '#F5F5EF';
+  return luminance > 0.36 ? '#2D2838' : '#F8F6FB';
 };
 
 const readVar = (element, name) => parseFloat(getComputedStyle(element).getPropertyValue(name)) || 0;

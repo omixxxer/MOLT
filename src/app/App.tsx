@@ -164,23 +164,23 @@ function App() {
       <Suspense fallback={null}>
       <PatternWaves
         className="app-background"
-        preset="lines"
-        pattern="line"
-        wave="silk"
-        spacing={22}
-        markSize={0.34}
-        depth={0.55}
+        preset="pond"
+        pattern="dot"
+        wave="ripple"
+        spacing={13}
+        markSize={0.75}
+        depth={0.4}
         light={undefined}
-        shine={0.5}
+        shine={0.3}
         contrast={0.8}
-        scale={1}
-        direction={20}
-        color="#9AA58E"
-        backgroundColor="#F5F5EF"
-        opacity={0.5}
-        speed={0.12}
+        scale={1.6}
+        direction={35}
+        color="#8A79B2"
+        backgroundColor="#F8F6FB"
+        opacity={0.36}
+        speed={0.25}
         fade="none"
-        interactive={false}
+        interactive
         paused={reducedMotion}
         style={undefined}
       />
@@ -351,10 +351,10 @@ function App() {
           itemStyle="pill"
           hoverEffect="fill"
           indicator="pill"
-          barColor="#30352F"
-          textColor="#F5F5EF"
-          highlightColor="#9AA58E"
-          highlightTextColor="#30352F"
+          barColor="#2D2838"
+          textColor="#F8F6FB"
+          highlightColor="#B3A6D3"
+          highlightTextColor="#2D2838"
           collapse="never"
           intro={false}
           ariaLabel="Navegación principal"
