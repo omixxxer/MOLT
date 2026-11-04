@@ -112,22 +112,14 @@ npm run build      # comprobación de TypeScript y compilación con Vite
 npm run preview    # previsualizar la compilación
 ```
 
-## Despliegue en Cloudflare Pages
+## Despliegue en Cloudflare Workers
 
-La app es estática, así que basta con conectar el repositorio. En el panel de Cloudflare, **Workers & Pages → Create application → Pages → Connect to Git**, elige este repositorio y configura:
-
-| Campo | Valor |
-|---|---|
-| Production branch | `main` |
-| Framework preset | Ninguno |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-
-Cada `push` a `main` publica una versión nueva, y cada otra rama, una vista previa con su propia dirección.
+La app está publicada en <https://molt.ximomartinez98.workers.dev> como archivos estáticos de un Worker. Para conectar el repositorio: en el panel de Cloudflare, **Workers & Pages → Create application → GitHub**, elige este repositorio, usa `main` como rama de producción, `npm run build` para compilar y `dist` como carpeta de archivos.
 
 - **Cabeceras:** [`public/_headers`](public/_headers) da el aislamiento que ONNX Runtime necesita para usar varios hilos. Comprueba en la consola del navegador que `crossOriginIsolated` es `true`.
 - **Tamaño:** Cloudflare admite 25 MiB por archivo. `model_quantized.onnx` ocupa 24,55 MiB; un modelo reentrenado que pase de ese límite hará fallar el despliegue.
-- **Google Drive:** sin `VITE_GOOGLE_CLIENT_ID` en las variables de entorno del proyecto, la instalación funciona con la copia en ZIP y sin Drive. Para activarlo, añade esa variable, vuelve a desplegar y sigue los pasos de «Copia en Google Drive» con la dirección pública. Cloudflare redirige las rutas `.html` a la misma ruta sin extensión, así que hay que comprobar el inicio de sesión de Google tras activarlo.
+- **Descarga:** Cloudflare no comprime los `.onnx`. El primer análisis descarga unos 42 MB (modelos y WebAssembly), y el primer recorte con SlimSAM, otros 14 MB. Después quedan en la caché del navegador.
+- **Google Drive:** sin `VITE_GOOGLE_CLIENT_ID` en las variables de compilación del proyecto, la instalación funciona con la copia en ZIP y sin Drive. Para activarlo, añade esa variable, vuelve a desplegar y sigue los pasos de «Copia en Google Drive» con la dirección pública. Cloudflare redirige `/oauth/google.html` a `/oauth/google`, así que hay que comprobar el inicio de sesión de Google tras activarlo.
 - **Open-Meteo:** su API gratuita solo cubre el uso no comercial.
 
 ## Arquitectura
@@ -187,7 +179,7 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
   - Un primer plano (la prenda ocupa toda la foto) no se recorta: no hay fondo que quitar. Una foto que ya viene sin fondo (PNG o WebP transparente) conserva su propio contorno.
   - Probado con las 26 fotos del armario de prueba: las de producto salen bien; las de una persona llevando la prenda conservan a la persona (cabeza, piernas) y las de fondo recargado (una mesa con objetos) o con degradado se quedan como la original.
 - **Modelos de quitar fondo evaluados y descartados (oct. 2026):** ISNet-ONNX de onnx-community es AGPL-3.0; BiRefNet-lite (MIT, 115 MB fp16) tarda 80–90 s por foto en CPU, se queda sin memoria a la segunda foto (sus convoluciones deformables) y no cabe en WebGPU (17 buffers por shader, el límite es 16). Para separar la ropa de la persona hará falta un modelo de *human parsing* con licencia comercial.
-- **Hilos:** la app pide aislamiento entre orígenes (cabeceras COOP/COEP en `vite.config.ts` y [`public/_headers`](public/_headers); el service worker propio, [`src/sw.ts`](src/sw.ts), las añade a lo que sirve desde caché), así ONNX Runtime usa 4 hilos: el detector del OCR baja de 1,3 s a 0,7 s. En `npm run dev` los hilos no arrancan y se usa uno; se notan en `npm run build` + `npm run preview` y en producción. El hosting debe enviar esas cabeceras (Netlify y Cloudflare Pages leen `_headers`).
+- **Hilos:** la app pide aislamiento entre orígenes (cabeceras COOP/COEP en `vite.config.ts` y [`public/_headers`](public/_headers); el service worker propio, [`src/sw.ts`](src/sw.ts), las añade a lo que sirve desde caché), así ONNX Runtime usa 4 hilos: el detector del OCR baja de 1,3 s a 0,7 s. En `npm run dev` los hilos no arrancan y se usa uno; se notan en `npm run build` + `npm run preview` y en producción. El hosting debe enviar esas cabeceras (Cloudflare las lee de `_headers`, igual que Netlify).
 - **Color:** cada píxel de la prenda (máscara de la cabeza o, si existe, el recorte) se nombra con el color más cercano de la paleta en CIELAB ([`colors.ts`](src/ai/colors.ts)), con varios tonos por nombre (granate es rojo; caqui y camel, beige; oliva, verde; vaquero claro, azul). Se proponen los colores que cubren al menos un 15 % de la prenda. Sin cabeza de segmentación se usa la heurística anterior del borde.
 
 ### Reglas sin modelo

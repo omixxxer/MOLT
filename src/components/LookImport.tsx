@@ -159,6 +159,8 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
     }
   }
 
+  const chosenCount = found?.filter((entry) => entry.include).length ?? 0
+
   return (
     <div className="look-import">
       <label className="photo-drop">
@@ -183,7 +185,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
 
       {found && found.length > 0 && (
         <>
-          <p className="look-intro">Se han encontrado {found.length} {found.length === 1 ? 'prenda' : 'prendas'}. Revisa el tipo y marca las que quieras añadir.</p>
+          <p className="look-intro">{found.length === 1 ? 'Se ha encontrado 1 prenda' : `Se han encontrado ${found.length} prendas`}. Revisa el tipo y marca las que quieras añadir.</p>
           <ul className="look-garments">
             {found.map((entry) => (
               <li key={entry.id} className={entry.include ? '' : 'excluded'}>
@@ -211,7 +213,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
         <button className="button button-outline" type="button" onClick={onCancel} disabled={saving}>Cancelar</button>
         {found && found.length > 0 && (
           <button className="button button-dark" type="button" onClick={() => void save()} disabled={saving || Boolean(status)}>
-            {saving ? 'Guardando…' : `Añadir ${found.filter((entry) => entry.include).length} prendas`}
+            {saving ? 'Guardando…' : `Añadir ${chosenCount} ${chosenCount === 1 ? 'prenda' : 'prendas'}`}
           </button>
         )}
       </footer>
