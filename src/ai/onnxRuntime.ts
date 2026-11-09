@@ -3,6 +3,7 @@ import wasmModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url'
 
 // Shared by the garment classifier and the text reader: one WebAssembly runtime, one model cache.
 const MODEL_CACHE = 'molt-model'
+const DOWNLOAD_STALL_TIMEOUT = 30_000
 
 export type Ort = typeof import('onnxruntime-web/wasm')
 
@@ -36,10 +37,43 @@ export async function fetchModelFile(url: string): Promise<ArrayBuffer> {
   const cache = await openCache()
   const cached = await cache?.match(url)
   if (cached) return cached.arrayBuffer()
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`No se pudo descargar el modelo (${response.status}).`)
-  await cache?.put(url, response.clone()).catch(() => undefined)
-  return response.arrayBuffer()
+  const model = await download(url)
+  await cache?.put(url, new Response(model.slice(0))).catch(() => undefined)
+  return model
+}
+
+/** Without an overall limit, as a slow connection may need minutes: it only gives up when bytes stop arriving. */
+async function download(url: string): Promise<ArrayBuffer> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const keepAlive = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => controller.abort(), DOWNLOAD_STALL_TIMEOUT)
+  }
+  try {
+    keepAlive()
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error(`No se pudo descargar el modelo (${response.status}).`)
+    if (!response.body) return await response.arrayBuffer()
+    const chunks: Uint8Array[] = []
+    const reader = response.body.getReader()
+    for (let part = await reader.read(); !part.done; part = await reader.read()) {
+      keepAlive()
+      chunks.push(part.value)
+    }
+    const model = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0))
+    let offset = 0
+    for (const chunk of chunks) {
+      model.set(chunk, offset)
+      offset += chunk.length
+    }
+    return model.buffer
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('La descarga del modelo se ha parado. Comprueba la conexión e inténtalo de nuevo.')
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Small descriptions are fetched fresh when possible, so a new export is noticed; the cache covers offline use. */

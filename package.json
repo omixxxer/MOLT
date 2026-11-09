@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/check-asset-size.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

@@ -8,6 +8,7 @@ import { database } from '../db/database'
 import { garmentRepository } from '../db/garmentRepository'
 import { createThumbnail } from '../db/imageProcessing'
 import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
+import { isStorageFull, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import { garmentCategories, roleByCategory, type Garment, type GarmentCategory, type Outfit } from '../types/domain'
 import { analysisRecord } from './garmentForm/analysisRecord'
 import { createSuggestedGarmentName } from './garmentForm/garmentName'
@@ -153,7 +154,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
       onDone(ids.length)
     } catch (failure) {
       console.error('No se pudieron guardar las prendas del look:', failure)
-      setError('No se pudieron guardar las prendas. Comprueba el espacio disponible e inténtalo de nuevo.')
+      setError(isStorageFull(failure) ? STORAGE_FULL_MESSAGE : 'No se pudieron guardar las prendas. Comprueba el espacio disponible e inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }

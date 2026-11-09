@@ -13,6 +13,7 @@ import {
   useBatch
 } from './batchImport/batchQueue'
 import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
+import { isStorageFull, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import GarmentPhoto from './GarmentPhoto'
 import { LatticeLoader } from './reactBits'
 
@@ -90,7 +91,7 @@ export default function BatchImport({ onDone }: BatchImportProps) {
       onDone(added)
     } catch (failure) {
       console.error('No se pudieron guardar las prendas del lote:', failure)
-      setError('No se pudieron guardar todas las prendas. Las ya guardadas están en el armario; comprueba el espacio disponible.')
+      setError(isStorageFull(failure) ? `${STORAGE_FULL_MESSAGE} Las prendas guardadas antes de llenarse están en el armario.` : 'No se pudieron guardar todas las prendas. Las ya guardadas están en el armario; comprueba el espacio disponible.')
     } finally {
       setSaving(false)
     }

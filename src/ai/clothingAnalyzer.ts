@@ -4,6 +4,7 @@ import { findBrand, type BrandMatch } from './brands'
 import { garmentColors } from './colors'
 import { findComposition, findSize, type LabelValue } from './labelParser'
 import { garmentRegions, regionMask, type SegmentationMap } from './segmentation'
+import { withAiTimeout } from './aiTimeout'
 import { fetchDescription, fetchModelFile, loadOrt } from './onnxRuntime'
 import { readText, type TextLine } from './textReader'
 
@@ -196,12 +197,12 @@ async function loadClassifier(): Promise<Classifier> {
       const [ort, description] = await Promise.all([loadOrt(), loadDescription()])
       // Cached by name and size, so a new export is downloaded again.
       const model = await fetchModelFile(`${MODEL_BASE}${description.file}?v=${description.name}-${description.bytes}`)
-      const session = await ort.InferenceSession.create(model, { executionProviders: ['wasm'] })
+      const session = await withAiTimeout(() => ort.InferenceSession.create(model, { executionProviders: ['wasm'] }))
       const heads = description.heads.filter((head) => !head.multiLabel)
       const size = description.preprocessing.inputSize
       return async (image) => {
         const pixels = await preprocess(image, description.preprocessing)
-        const outputs = await session.run({ [description.input]: new ort.Tensor('float32', pixels, [1, 3, size, size]) })
+        const outputs = await withAiTimeout(() => session.run({ [description.input]: new ort.Tensor('float32', pixels, [1, 3, size, size]) }))
         const probabilities: HeadProbabilities = {}
         for (const head of heads) {
           const output = outputs[head.name]
