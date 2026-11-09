@@ -12,6 +12,7 @@ import type { SegmentationMap } from '../ai/segmentation'
 import { suggestUsage } from '../ai/usageRules'
 import { createThumbnail, reducePhoto } from '../db/imageProcessing'
 import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
+import { isStorageFull, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import { taxonomy } from '../ml/taxonomy'
 import {
   dressLevels,
@@ -375,8 +376,8 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         createdAt: garment?.createdAt ?? new Date(timestamp).toISOString(),
         updatedAt: new Date(timestamp).toISOString()
       })
-    } catch {
-      setFormError('No se pudo guardar la prenda. Comprueba la imagen y el espacio disponible e inténtalo de nuevo.')
+    } catch (error) {
+      setFormError(isStorageFull(error) ? STORAGE_FULL_MESSAGE : 'No se pudo guardar la prenda. Comprueba la imagen y el espacio disponible e inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }

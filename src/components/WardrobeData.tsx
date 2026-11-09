@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DriveRestore } from '../cloud/driveSync'
 import type { DriveSync } from '../cloud/useDriveSync'
+import { backupReminderSnoozedUntil, isStorageFull, lastFileBackup, recordFileBackup, shouldRemindBackup, snoozeBackupReminder, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import type { ImportMode, WardrobeBackup } from '../db/wardrobeBackup'
 import type { Garment } from '../types/domain'
 import { askConfirm } from './confirmDialog'
@@ -40,6 +41,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState<{ backup: WardrobeBackup; name: string; remote?: DriveRestore['remote'] }>()
+  const [backupNoticeHidden, setBackupNoticeHidden] = useState(false)
 
   function closeMenu() {
     if (menu.current) menu.current.open = false
@@ -69,6 +71,8 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
       // Loaded on demand: the ZIP code is only needed for these actions.
       const { createWardrobeBackup } = await import('../db/wardrobeBackup')
       download(await createWardrobeBackup(), `molt-armario-${today()}.zip`)
+      recordFileBackup()
+      setBackupNoticeHidden(true)
       setMessage(`Copia descargada con ${plural(garments.length, 'prenda', 'prendas')}, sus fotos, outfits y preferencias. Contiene tus fotos: guárdala en un sitio seguro.`)
     } catch (error) {
       console.error('No se pudo exportar el armario:', error)
@@ -135,7 +139,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
       setMessage(`Copia importada: ${parts.join(', ')}.${summary.recoded ? ` ${plural(summary.recoded, 'prenda ha recibido', 'prendas han recibido')} un código nuevo porque el suyo ya estaba en uso.` : ''}`)
     } catch (error) {
       console.error('No se pudo importar la copia:', error)
-      setMessage('No se pudo importar la copia; tu armario no ha cambiado.')
+      setMessage(isStorageFull(error) ? STORAGE_FULL_MESSAGE : 'No se pudo importar la copia; tu armario no ha cambiado.')
     } finally {
       setBusy('')
     }
@@ -210,9 +214,27 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     </>
   )
 
+  const backups = [lastFileBackup(), drive.settings.lastSavedAt].filter((date): date is string => Boolean(date)).sort()
+  const lastBackupAt = backups.at(-1)
+  const remindBackup = !backupNoticeHidden && !pending && !busy
+    && shouldRemindBackup({ garments, lastBackupAt, snoozedUntil: backupReminderSnoozedUntil(), now: new Date() })
+
   const status = drive.status
   const notices = (
     <>
+      {remindBackup && (
+        <section className="import-panel" aria-label="Recordatorio de copia">
+          <p>
+            {lastBackupAt
+              ? `Tu armario ha cambiado desde la última copia (${time(lastBackupAt)}).`
+              : `Tus ${garments.length} prendas solo están en este navegador. Si se borran sus datos, se pierden: guarda una copia.`}
+          </p>
+          <div className="import-panel-actions">
+            <button className="button button-dark" type="button" onClick={() => void exportBackup()}>Hacer copia ahora</button>
+            <button className="button button-outline" type="button" onClick={() => { snoozeBackupReminder(); setBackupNoticeHidden(true) }}>Más tarde</button>
+          </div>
+        </section>
+      )}
       {drive.configured && status.kind !== 'idle' && (
         <div className={`drive-status ${status.kind === 'error' ? 'drive-status-error' : ''}`} role="status">
           {status.kind === 'saving' && <p>Guardando en Google Drive… {Math.round(status.progress * 100)} %</p>}

@@ -99,7 +99,7 @@ Formato de la copia (`molt-wardrobe-backup`, versión 1; se siguen leyendo las `
 
 Esto describe el diseño del código; no es una auditoría de tráfico.
 
-**Pérdida de datos:** limpiar los datos del sitio, usar otro navegador o perfil, o la purga automática de algunos navegadores (Safari) borra o separa el armario. Haz copias periódicas con **Datos → Exportar copia del armario**. IndexedDB no cifra los datos, y la copia tampoco va cifrada.
+**Pérdida de datos:** limpiar los datos del sitio, usar otro navegador o perfil, o la purga automática de algunos navegadores (Safari) borra o separa el armario. Con prendas guardadas, Molt pide al navegador almacenamiento persistente (el navegador puede negarlo) y, a partir de 5 prendas, recuerda hacer una copia si no hay ninguna o si la última tiene más de 14 días y el armario ha cambiado. Haz copias periódicas con **Datos → Exportar copia del armario**. IndexedDB no cifra los datos, y la copia tampoco va cifrada.
 
 ## Puesta en marcha
 
@@ -118,7 +118,8 @@ npm run preview    # previsualizar la compilación
 La app está publicada en <https://molt.ximomartinez98.workers.dev> como archivos estáticos de un Worker. Para conectar el repositorio: en el panel de Cloudflare, **Workers & Pages → Create application → GitHub**, elige este repositorio, usa `main` como rama de producción, `npm run build` para compilar y `dist` como carpeta de archivos.
 
 - **Cabeceras:** [`public/_headers`](public/_headers) da el aislamiento que ONNX Runtime necesita para usar varios hilos. Comprueba en la consola del navegador que `crossOriginIsolated` es `true`.
-- **Tamaño:** Cloudflare admite 25 MiB por archivo. `model_quantized.onnx` ocupa 24,55 MiB; un modelo reentrenado que pase de ese límite hará fallar el despliegue.
+- **Tamaño:** Cloudflare admite 25 MiB por archivo. `model_quantized.onnx` ocupa 24,55 MiB; `npm run build` falla con un aviso claro si un archivo pasa de ese límite ([`check-asset-size.mjs`](scripts/check-asset-size.mjs)).
+- **Comprobaciones:** [GitHub Actions](.github/workflows/ci.yml) ejecuta las pruebas y la compilación en cada PR y en `main`.
 - **Descarga:** Cloudflare no comprime los `.onnx`. El primer análisis descarga unos 42 MB (modelos y WebAssembly), y el primer recorte con SlimSAM, otros 14 MB. Después quedan en la caché del navegador.
 - **Google Drive:** sin `VITE_GOOGLE_CLIENT_ID` en las variables de compilación del proyecto, la instalación funciona con la copia en ZIP y sin Drive. Para activarlo, añade esa variable, vuelve a desplegar y sigue los pasos de «Copia en Google Drive» con la dirección pública. Cloudflare redirige `/oauth/google.html` a `/oauth/google`, así que hay que comprobar el inicio de sesión de Google tras activarlo.
 - **Open-Meteo:** su API gratuita solo cubre el uso no comercial.
@@ -185,6 +186,9 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
 
 ### Reglas sin modelo
 - **Uso:** [`src/ai/usageRules.ts`](src/ai/usageRules.ts) sugiere temporadas, estilo y estética según el tipo de prenda (plumífero → otoño e invierno; manga corta → primavera y verano; lana → sin verano; blazer → Arreglado y Formal…).
+
+### Tiempos límite
+Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`aiTimeout.ts`](src/ai/aiTimeout.ts)). ONNX Runtime no puede cancelar una pasada, así que tras un tiempo agotado los análisis fallan al momento y se pide volver a abrir la app. La descarga de un modelo no tiene límite total: solo se corta si pasan 30 s sin recibir datos.
 
 ### Límites conocidos
 - El test procede de las mismas fuentes que el entrenamiento; con fotos propias solo hay 29 de referencia.

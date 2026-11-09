@@ -2,7 +2,9 @@ import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
+import { requestPersistentStorage } from '../db/storageHealth'
 import GarmentCard from '../components/GarmentCard'
+import ErrorBoundary from '../components/ErrorBoundary'
 import MoltMark from '../components/MoltMark'
 import PillNav from '../components/PillNav.jsx'
 import WardrobeData from '../components/WardrobeData'
@@ -98,6 +100,12 @@ function App() {
       .catch(() => setError('No se pudo abrir el armario. Comprueba el almacenamiento de este navegador.'))
       .finally(() => setLoading(false))
   }, [refreshGarments])
+
+  // Only once there is something to protect: some browsers ask the user, and an empty app has no reason to.
+  const hasGarments = garments.length > 0
+  useEffect(() => {
+    if (hasGarments) void requestPersistentStorage()
+  }, [hasGarments])
 
   const visibleGarments = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('es')
@@ -197,6 +205,8 @@ function App() {
 
         <main className="screen-content">
           {error && <div className="alert" role="alert">{error}</div>}
+          {/* One per page: a failed screen leaves the navigation working, and going to another page recovers. */}
+          <ErrorBoundary key={page}>
           {page === 'home' && (
             <Suspense fallback={<ScreenLoader />}>
               <HomeScreen garments={garments} loading={loading} onNavigate={setPage} onOpenGarment={setSelectedGarment} />
@@ -333,6 +343,7 @@ function App() {
             </Suspense>
           )}
           {page === 'packing' && <Suspense fallback={<ScreenLoader />}><TripPlanner garments={garments} onAvailabilityChange={updateAvailability} onAddGarments={() => setPage('batch')} /></Suspense>}
+          </ErrorBoundary>
         </main>
 
         {/* Content scrolling under the bottom navigation blurs softly instead of being cut; gone at the end of the page. */}

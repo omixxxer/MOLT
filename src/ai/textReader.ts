@@ -1,3 +1,4 @@
+import { withAiTimeout } from './aiTimeout'
 import { fetchDescription, fetchModelFile, loadOrt } from './onnxRuntime'
 
 // PaddleOCR PP-OCRv5 mobile (Apache-2.0): a text detector and a Latin-script recognizer, run on the device.
@@ -260,8 +261,8 @@ async function loadReader(): Promise<TextReader> {
       ])
       const options = { executionProviders: ['wasm'] }
       const [detection, recognition] = await Promise.all([
-        ort.InferenceSession.create(detectorModel, options),
-        ort.InferenceSession.create(recognizerModel, options)
+        withAiTimeout(() => ort.InferenceSession.create(detectorModel, options)),
+        withAiTimeout(() => ort.InferenceSession.create(recognizerModel, options))
       ])
 
       /** The text of a tilted rectangle (photo pixels), turned upright and read; `angle` is the reading direction. */
@@ -274,7 +275,7 @@ async function loadReader(): Promise<TextReader> {
         context.translate(-centerX, -centerY)
         context.drawImage(bitmap, 0, 0)
         const data = toTensorData(context.getImageData(0, 0, lineWidth, recognizer.height).data, lineWidth, recognizer.height, [0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-        const output = await recognition.run({ [recognition.inputNames[0]!]: new ort.Tensor('float32', data, [1, 3, recognizer.height, lineWidth]) })
+        const output = await withAiTimeout(() => recognition.run({ [recognition.inputNames[0]!]: new ort.Tensor('float32', data, [1, 3, recognizer.height, lineWidth]) }))
         const logits = output[recognition.outputNames[0]!]!
         const [, steps, classes] = logits.dims
         return ctcDecode(logits.data as Float32Array, steps!, classes!, description.characters)
@@ -291,7 +292,7 @@ async function loadReader(): Promise<TextReader> {
         const { context } = canvasOf(width, height)
         context.drawImage(bitmap, region.left, region.top, regionWidth, regionHeight, 0, 0, width, height)
         const input = toTensorData(context.getImageData(0, 0, width, height).data, width, height, detector.mean, detector.std)
-        const detected = await detection.run({ [detection.inputNames[0]!]: new ort.Tensor('float32', input, [1, 3, height, width]) })
+        const detected = await withAiTimeout(() => detection.run({ [detection.inputNames[0]!]: new ort.Tensor('float32', input, [1, 3, height, width]) }))
         const map = detected[detection.outputNames[0]!]!
         const boxes = detectTextBoxes(map.data as Float32Array, width, height, detector)
           .sort((left, right) => right.length * right.thickness - left.length * left.thickness)

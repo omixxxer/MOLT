@@ -1,3 +1,4 @@
+import { withAiTimeout } from './aiTimeout'
 import { fetchModelFile, loadOrt, type Ort } from './onnxRuntime'
 import type { Prompt } from './segmentation'
 
@@ -23,8 +24,10 @@ let sessionsPromise: Promise<Sessions> | undefined
 function loadSessions(): Promise<Sessions> {
   sessionsPromise ??= (async () => {
     const ort = await loadOrt()
-    const [encoder, decoder] = await Promise.all(['encoder', 'decoder'].map(async (name) =>
-      ort.InferenceSession.create(await fetchModelFile(`${BASE}${name}.onnx?v=slimsam-77-q`), { executionProviders: ['wasm'] })))
+    const [encoder, decoder] = await Promise.all(['encoder', 'decoder'].map(async (name) => {
+      const model = await fetchModelFile(`${BASE}${name}.onnx?v=slimsam-77-q`)
+      return withAiTimeout(() => ort.InferenceSession.create(model, { executionProviders: ['wasm'] }))
+    }))
     return { ort, encoder: encoder!, decoder: decoder! }
   })().catch((error: unknown) => {
     sessionsPromise = undefined
@@ -76,7 +79,7 @@ export async function encodeImage(image: Blob): Promise<EncodedImage> {
         }
       }
     }
-    const output = await encoder.run({ pixel_values: new ort.Tensor('float32', pixels, [1, 3, SIZE, SIZE]) })
+    const output = await withAiTimeout(() => encoder.run({ pixel_values: new ort.Tensor('float32', pixels, [1, 3, SIZE, SIZE]) }))
     const keep = (tensor: (typeof output)[string] | undefined) => {
       if (!tensor) throw new Error('El modelo de recorte no devolvió la imagen codificada.')
       return { data: Float32Array.from(tensor.data as Float32Array), dims: tensor.dims }
@@ -92,12 +95,12 @@ export async function outline(encoded: EncodedImage, prompt: Prompt): Promise<Ou
   const { ort, decoder } = await loadSessions()
   const count = prompt.points.length
   const points = new Float32Array(prompt.points.flatMap(([x, y]) => [x * encoded.scale, y * encoded.scale]))
-  const output = await decoder.run({
+  const output = await withAiTimeout(() => decoder.run({
     input_points: new ort.Tensor('float32', points, [1, 1, count, 2]),
     input_labels: new ort.Tensor('int64', BigInt64Array.from(prompt.labels.map((label) => BigInt(label))), [1, 1, count]),
     image_embeddings: new ort.Tensor('float32', encoded.embeddings.data.slice(), encoded.embeddings.dims),
     image_positional_embeddings: new ort.Tensor('float32', encoded.positions.data.slice(), encoded.positions.dims)
-  })
+  }))
   const scores = output.iou_scores!.data as Float32Array
   const masks = output.pred_masks!.data as Float32Array
   return [0, 1, 2].map((index) => ({
