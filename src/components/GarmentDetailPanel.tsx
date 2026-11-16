@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Garment } from '../types/domain'
+import type { Garment, GarmentWithPhotos } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
 import GarmentForm from './GarmentForm'
+import { useGarmentWithPhotos } from './useGarmentImages'
 
 interface GarmentDetailPanelProps {
   garment: Garment
   onClose: () => void
-  onSave: (garment: Garment) => Promise<void>
+  onSave: (garment: GarmentWithPhotos) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }
 
@@ -19,9 +20,14 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
   const [isEditing, setIsEditing] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
-  const photos = [garment.image, ...(garment.additionalImages ?? [])]
+  // The original photos are only read here, when the detail opens; the wardrobe list never carries them.
+  const { photos: stored, failed: photosFailed } = useGarmentWithPhotos(garment)
+  const photos = stored ? [stored.image, ...(stored.additionalImages ?? [])] : []
   // The label photo is shown last, apart from the garment photos.
-  const viewable = garment.labelImage ? [...photos, garment.labelImage] : photos
+  const viewable = stored?.labelImage ? [...photos, stored.labelImage] : photos
+  const photosStatus = !stored && (
+    <p className="loading-state" role="status">{photosFailed ? 'No se pudieron leer las fotografías de esta prenda.' : 'Cargando fotografías…'}</p>
+  )
   const selectedPhoto = viewable[selectedPhotoIndex] ?? photos[0]
 
   useEffect(() => {
@@ -87,18 +93,21 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
         {isEditing ? (
           <>
             <h2 className="detail-heading" id="detail-title">Editar prenda</h2>
-            <GarmentForm
+            {photosStatus}
+            {stored && <GarmentForm
               garment={garment}
+              stored={stored}
               onSave={async (updated) => {
                 await onSave(updated)
                 setIsEditing(false)
               }}
               onCancel={() => setIsEditing(false)}
-            />
+            />}
           </>
         ) : (
           <>
             <h2 className="detail-heading" id="detail-title">{garment.name.trim() || garment.subcategory || garment.category}</h2>
+            {photosStatus}
             {selectedPhoto && (
               <>
                 <GarmentPhoto image={selectedPhoto} className="detail-photo" alt={garment.name || garment.category} />

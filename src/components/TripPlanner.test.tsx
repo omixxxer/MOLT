@@ -15,8 +15,6 @@ function garment(id: string, role: Garment['role']): Garment {
     styles: [],
     dressLevels: ['Diario'],
     role,
-    image: new Blob(['image']),
-    thumbnail: new Blob(['thumbnail']),
     width: 100,
     height: 100,
     confirmedAttributes: [],

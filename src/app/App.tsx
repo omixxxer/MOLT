@@ -4,7 +4,8 @@ import Masonry from '../components/Masonry.jsx'
 import PillNav from '../components/PillNav.jsx'
 import WardrobeData from '../components/WardrobeData'
 import { useDriveSync } from '../cloud/useDriveSync'
-import { garmentCategories, type Garment } from '../types/domain'
+import { garmentCategories, type Garment, type GarmentWithPhotos } from '../types/domain'
+import { useThumbnailUrls } from '../components/useGarmentImages'
 import { Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
 type Page = 'wardrobe' | 'add' | 'outfits' | 'packing'
@@ -60,7 +61,6 @@ function getGarmentLabel(garment: Garment) {
 function App() {
   const [page, setPage] = useState<Page>('wardrobe')
   const [garments, setGarments] = useState<Garment[]>([])
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([])
   const [displayCount, setDisplayCount] = useState(40)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -103,47 +103,41 @@ function App() {
     })
   }, [categoryFilter, garments, search])
 
-  const visibleGalleryItems = useMemo(() => {
-    const visibleIds = new Set(visibleGarments.map((garment) => garment.id))
-    return galleryItems.filter((item) => visibleIds.has(item.garmentId))
-  }, [galleryItems, visibleGarments])
+  // Only the thumbnails of the garments the gallery shows are read; the hook revokes their URLs when they leave.
+  const shownGarments = useMemo(() => visibleGarments.slice(0, displayCount), [displayCount, visibleGarments])
+  const thumbnailUrls = useThumbnailUrls(shownGarments)
 
-  useEffect(() => {
-    const urls: string[] = []
-    const items = visibleGarments.slice(0, displayCount).map((garment) => {
-      const img = URL.createObjectURL(garment.thumbnail ?? garment.image)
-      urls.push(img)
-      const label = getGarmentLabel(garment)
-      const details = [garment.code, garment.category, ...garment.colors].filter(Boolean).join(' · ')
-      return {
-        id: garment.id,
-        garmentId: garment.id,
-        img,
-        width: garment.width,
-        height: garment.height,
-        alt: label,
-        title: label,
-        description: details
-      }
-    })
-    setGalleryItems(items)
-    return () => urls.forEach((url) => URL.revokeObjectURL(url))
-  }, [displayCount, visibleGarments])
+  const visibleGalleryItems = useMemo(() => shownGarments.flatMap((garment): GalleryItem[] => {
+    const img = thumbnailUrls.get(garment.id)
+    if (!img) return []
+    const label = getGarmentLabel(garment)
+    return [{
+      id: garment.id,
+      garmentId: garment.id,
+      img,
+      width: garment.width,
+      height: garment.height,
+      alt: label,
+      title: label,
+      description: [garment.code, garment.category, ...garment.colors].filter(Boolean).join(' · ')
+    }]
+  }), [shownGarments, thumbnailUrls])
 
   const closeDetail = useCallback(() => setSelectedGarment(null), [])
 
-  const createGarment = useCallback(async (garment: Garment) => {
+  const createGarment = useCallback(async (garment: GarmentWithPhotos) => {
     setError('')
     await garmentRepository.create(garment)
     await refreshGarments()
     setPage('wardrobe')
   }, [refreshGarments])
 
-  const updateGarment = useCallback(async (garment: Garment) => {
+  const updateGarment = useCallback(async (garment: GarmentWithPhotos) => {
     setError('')
     await garmentRepository.update(garment)
-    await refreshGarments()
-    setSelectedGarment(garment)
+    const list = await refreshGarments()
+    // The stored data, not the form's object, so the state keeps no photo.
+    setSelectedGarment(list.find((entry) => entry.id === garment.id) ?? null)
   }, [refreshGarments])
 
   const removeGarment = useCallback(async (id: string) => {

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Garment, Outfit } from '../types/domain'
 import { createOutfitRecord, generateOutfitCandidates } from '../outfits/outfitGenerator'
 import { getCityForecast, type DailyWeather } from '../weather/openMeteo'
-import GarmentPhoto from './GarmentPhoto'
+import { GarmentThumbnail } from './GarmentPhoto'
 
 interface TripDay {
   weather: DailyWeather
@@ -112,7 +112,7 @@ export default function TripPlanner({ garments }: { garments: Garment[] }) {
                 {outfit.length ? (
                   <div className="outfit-garments">{outfit.map((garment) => (
                     <figure key={garment.id}>
-                      <GarmentPhoto image={garment.thumbnail ?? garment.image} alt={label(garment)} />
+                      <GarmentThumbnail garment={garment} alt={label(garment)} />
                       <figcaption>{label(garment)}</figcaption>
                     </figure>
                   ))}</div>
@@ -134,7 +134,7 @@ export default function TripPlanner({ garments }: { garments: Garment[] }) {
                     ? [...current, garment.id]
                     : current.filter((id) => id !== garment.id))}
                 />
-                <GarmentPhoto image={garment.thumbnail ?? garment.image} alt="" />
+                <GarmentThumbnail garment={garment} alt="" />
                 <span>{label(garment)}</span>
               </label>
             ))}

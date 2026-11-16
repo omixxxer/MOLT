@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import { database } from '../db/database'
 import { dressLevels, type DressLevel, type Garment, type Outfit, type UserPreferences } from '../types/domain'
-import GarmentPhoto from './GarmentPhoto'
+import { GarmentThumbnail } from './GarmentPhoto'
 import { Counter, LatticeLoader, SpotlightCard } from './reactBits'
 import { getCityForecast } from '../weather/openMeteo'
 import {
@@ -346,7 +346,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
             <header><div><p className="eyebrow">RECOMENDACIÓN {index + 1}</p><h2>{occasion} · <Counter value={entry.outfit.score} locale="es" fontSize="1em" fade={0.15} />/100</h2></div></header>
             <div className="outfit-garments">
               {entry.candidate.garments.map((garment) => (
-                <figure key={garment.id}><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>
+                <figure key={garment.id}><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>
               ))}
             </div>
             <p className="outfit-explanation">Recomendado por {entry.candidate.explanation.join(' · ')}.</p>
@@ -395,7 +395,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
                 <p className="eyebrow">{outfit.kind === 'manual' ? 'CREADO POR TI' : 'GENERADO Y GUARDADO'} · {outfit.score}/100</p>
                 <h3>{outfit.name || outfit.occasion}</h3>
                 {outfitGarments.length === outfit.garmentIds.length
-                  ? <div className="outfit-garments">{outfitGarments.map((garment) => <figure key={garment.id}><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>)}</div>
+                  ? <div className="outfit-garments">{outfitGarments.map((garment) => <figure key={garment.id}><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>)}</div>
                   : <p>Algunas prendas de este outfit ya no están en el armario.</p>}
                 <p className="outfit-explanation">{outfit.wornAt ? 'Utilizado' : 'Guardado'} · {new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(outfit.wornAt ?? outfit.createdAt))}</p>
               </article>

@@ -47,6 +47,7 @@ export interface GarmentAnalysis {
   correctedAttributes: string[]
 }
 
+/** A garment's data without its photos, which live in their own stores and are read only when shown. */
 export interface Garment {
   id: string
   /** Short readable code given when the garment is created (e.g. SUD-002); never changes. */
@@ -67,11 +68,7 @@ export interface Garment {
   dressLevels: DressLevel[]
   role: GarmentRole
   availability?: GarmentAvailability
-  image: Blob
-  additionalImages?: Blob[]
-  /** Close-up of the care label, only read for brand, size and composition; not a garment photo. */
-  labelImage?: Blob
-  thumbnail: Blob
+  /** Size of the thumbnail, so the gallery can lay out before the image loads. */
   width: number
   height: number
   confirmedAttributes: string[]
@@ -80,6 +77,17 @@ export interface Garment {
   createdAt: string
   updatedAt: string
 }
+
+/** The original photos of a garment (reduced when saved), read only by the detail, the form and the exports. */
+export interface GarmentPhotos {
+  image: Blob
+  additionalImages?: Blob[]
+  /** Close-up of the care label, only read for brand, size and composition; not a garment photo. */
+  labelImage?: Blob
+}
+
+/** A garment with every image, as the form saves it and the backup carries it. */
+export type GarmentWithPhotos = Garment & GarmentPhotos & { thumbnail: Blob }
 
 export interface Outfit {
   id: string

@@ -16,8 +16,6 @@ function makeGarment(id: string, role: Garment['role']): Garment {
     styles: [],
     dressLevels: ['Diario'],
     role,
-    image: new Blob(['photo'], { type: 'image/png' }),
-    thumbnail: new Blob(['thumbnail'], { type: 'image/png' }),
     width: 100,
     height: 100,
     confirmedAttributes: [],
@@ -31,6 +29,7 @@ afterEach(async () => {
   await database.open()
   await Promise.all([
     database.garments.clear(),
+    database.garmentThumbnails.clear(),
     database.outfits.clear(),
     database.preferences.clear(),
     database.outfitFeedback.clear()
@@ -42,6 +41,8 @@ describe('OutfitGenerator', () => {
     await database.open()
     const garments = [makeGarment('shirt', 'Top'), makeGarment('trousers', 'Bottom')]
     await database.garments.bulkAdd(garments)
+    // Thumbnails are read from their own store when an outfit is shown.
+    await database.garmentThumbnails.bulkAdd(garments.map((garment) => ({ garmentId: garment.id, thumbnail: new Blob(['thumbnail'], { type: 'image/png' }) })))
     const user = userEvent.setup()
     const props = { garments, onAvailabilityChange: vi.fn().mockResolvedValue(undefined) }
     const rendered = render(<OutfitGenerator {...props} />)

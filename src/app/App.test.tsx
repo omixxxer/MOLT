@@ -49,7 +49,7 @@ vi.mock('../db/imageProcessing', () => ({
 }))
 
 afterEach(async () => {
-  await database.garments.clear()
+  await Promise.all([database.garments.clear(), database.garmentPhotos.clear(), database.garmentThumbnails.clear()])
   vi.mocked(analyzeGarmentImage).mockReset()
   vi.restoreAllMocks()
 })
@@ -58,9 +58,10 @@ describe('wardrobe flow', () => {
   it('imports a backup, letting the user merge it with the current wardrobe', async () => {
     await database.garments.add({
       id: 'local', name: 'Camisa', category: 'Parte superior', subcategory: 'Camisa', colors: [], seasons: [], styles: [],
-      dressLevels: [], role: 'Top', image: new Blob(['image']), thumbnail: new Blob(['thumbnail']), width: 10, height: 10,
+      dressLevels: [], role: 'Top', width: 10, height: 10,
       confirmedAttributes: [], suggestedAttributes: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z'
     })
+    await database.garmentThumbnails.add({ garmentId: 'local', thumbnail: new Blob(['thumbnail']) })
     vi.mocked(readWardrobeBackup).mockResolvedValue({
       exportedAt: '2026-10-30T12:00:00.000Z', garments: [], outfits: [], preferences: [], outfitFeedback: [], trendPacks: [],
       garmentCodeCounters: []
@@ -163,13 +164,19 @@ describe('wardrobe flow', () => {
       width: 120,
       height: 180
     })
+    // The photo and the thumbnail are saved apart from the garment's data.
+    expect(savedGarment).not.toHaveProperty('image')
+    expect(savedGarment).not.toHaveProperty('thumbnail')
+    expect(await database.garmentPhotos.get(savedGarment!.id)).toHaveProperty('image')
+    expect(await database.garmentThumbnails.get(savedGarment!.id)).toHaveProperty('thumbnail')
 
     await user.click(screen.getByRole('button', { name: 'Camisa favorita' }))
     expect(await screen.findByRole('dialog')).toBeInTheDocument() // the detail panel loads on demand
     expect(screen.getByText('Categoría')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Editar' }))
-    const editInput = screen.getByPlaceholderText('p. ej. Camiseta azul · Marca')
+    // The form appears once the stored photos have been read.
+    const editInput = await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca')
     await user.clear(editInput)
     await user.type(editInput, 'Camisa actualizada')
     await user.upload(
@@ -186,6 +193,8 @@ describe('wardrobe flow', () => {
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(await database.garments.count()).toBe(0)
+    expect(await database.garmentPhotos.count()).toBe(0)
+    expect(await database.garmentThumbnails.count()).toBe(0)
     expect(screen.getByText('Tu armario empieza aquí.')).toBeInTheDocument()
     expect(window.confirm).toHaveBeenCalledWith('¿Eliminar esta prenda? No se puede deshacer')
   })
@@ -227,7 +236,7 @@ describe('wardrobe flow', () => {
 
     expect(await screen.findByRole('button', { name: 'Camisa blanca y azul · Zara' })).toBeInTheDocument()
     const [saved] = await database.garments.toArray()
-    expect(saved?.additionalImages).toHaveLength(1)
+    expect((await database.garmentPhotos.get(saved!.id))?.additionalImages).toHaveLength(1)
     expect(saved?.analysis?.calibrated).toBe(true)
     expect(saved?.analysis?.suggestions.alternatives).toEqual([
       { category: 'Parte superior', subcategory: 'Camisa', score: 0.24 }
@@ -278,8 +287,9 @@ describe('wardrobe flow', () => {
     await waitFor(async () => expect(await database.garments.count()).toBe(1))
     const [saved] = await database.garments.toArray()
     expect(saved).toMatchObject({ brand: 'Nike', size: '42', composition: '100 % piel', code: 'ZAP-001' })
-    expect(saved?.labelImage).toBeDefined()
-    expect(saved?.additionalImages).toBeUndefined()
+    const savedPhotos = await database.garmentPhotos.get(saved!.id)
+    expect(savedPhotos?.labelImage).toBeDefined()
+    expect(savedPhotos?.additionalImages).toBeUndefined()
     expect(saved?.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', composition: 'paddle-ocr' })
   })
 
@@ -290,19 +300,18 @@ describe('wardrobe flow', () => {
       category: 'Parte superior',
       subcategory: '',
       colors: [],
-      thumbnail: new Blob(['thumbnail']),
       width: 120,
       height: 180,
       seasons: [],
       styles: [],
       dressLevels: ['Diario'],
       role: 'Top',
-      image: new Blob(['image']),
       confirmedAttributes: [],
       suggestedAttributes: [],
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z'
     })
+    await database.garmentThumbnails.add({ garmentId: 'top-1', thumbnail: new Blob(['thumbnail']) })
     const user = userEvent.setup()
     render(<App />)
 
