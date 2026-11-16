@@ -84,7 +84,7 @@ describe('garmentRepository', () => {
     expect(list).toHaveLength(2)
     expect(list.some(hasBlob)).toBe(false)
     expect(hasBlob(await garmentRepository.get('a'))).toBe(false)
-    for (const key of ['image', 'additionalImages', 'labelImage', 'thumbnail']) expect(list[0]).not.toHaveProperty(key)
+    for (const key of ['image', 'additionalImages', 'labelImage', 'cutout', 'thumbnail']) expect(list[0]).not.toHaveProperty(key)
 
     // Thumbnails only for the garments asked for (the ones the gallery shows).
     const thumbnails = await garmentRepository.thumbnails(['b', 'missing'])
@@ -103,8 +103,9 @@ describe('garmentRepository', () => {
   })
 
   it('keeps the stored photos when only the data changes and replaces them when the photos change', async () => {
-    await garmentRepository.create({ ...makeGarment('a'), labelImage: new Blob(['label']) })
+    await garmentRepository.create({ ...makeGarment('a'), labelImage: new Blob(['label']), cutout: new Blob(['cutout']) })
     const [listed] = await garmentRepository.list()
+    expect(listed?.hasCutout).toBe(true)
 
     // A change of availability sends the data alone.
     await garmentRepository.update({ ...listed!, availability: 'laundry' })
@@ -117,6 +118,8 @@ describe('garmentRepository', () => {
     const photos = await garmentRepository.photos('a')
     expect(await photos?.image.text()).toBe('new image')
     expect(photos?.labelImage).toBeUndefined()
+    expect(photos?.cutout).toBeUndefined()
+    expect((await garmentRepository.get('a'))?.hasCutout).toBeUndefined()
     expect(await (await garmentRepository.thumbnails(['a'])).get('a')?.text()).toBe('new thumbnail')
     expect(hasBlob(await garmentRepository.get('a'))).toBe(false)
   })

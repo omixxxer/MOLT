@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ctcDecode, detectTextBoxes } from './textReader'
+import { ctcDecode, detectTextBoxes, mergeLines, textArea } from './textReader'
 
 const settings = { threshold: 0.3, boxThreshold: 0.6, unclipRatio: 1.5 }
 
@@ -31,6 +31,40 @@ describe('text detection post-processing', () => {
   it('keeps separate words apart', () => {
     const probabilities = map(60, 20, [[2, 5, 20, 10, 0.9], [30, 5, 55, 10, 0.8]])
     expect(detectTextBoxes(probabilities, 60, 20, settings)).toHaveLength(2)
+  })
+
+  it('follows tilted text along its direction', () => {
+    // A 4 px thick line from (10, 10) down to (50, 50): 45°, about 57 px long.
+    const probabilities = new Float32Array(60 * 60)
+    for (let step = 0; step <= 40; step += 1) {
+      for (let across = -2; across < 2; across += 1) probabilities[(10 + step) * 60 + 10 + step + across] = 0.9
+    }
+    const [box] = detectTextBoxes(probabilities, 60, 60, settings)
+    expect(box!.angle).toBeCloseTo(Math.PI / 4, 1)
+    expect(box!.centerX).toBeCloseTo(29.5, 0)
+    expect(box!.centerY).toBeCloseTo(30, 0)
+    expect(box!.length).toBeGreaterThan(55)
+    expect(box!.thickness).toBeLessThan(15)
+  })
+
+  it('leaves a letter upright', () => {
+    const [box] = detectTextBoxes(map(30, 30, [[10, 8, 16, 18, 0.9]]), 30, 30, settings)
+    expect(box!.angle).toBe(0)
+  })
+})
+
+describe('second look at the label', () => {
+  const line = (text: string, left: number, top: number, right: number, bottom: number, score = 0.9) => ({ text, score, bounds: { left, top, right, bottom } })
+
+  it('takes the area with text, grown by half its size', () => {
+    expect(textArea([line('M', 100, 100, 120, 140), line('100% COTTON', 90, 150, 170, 170)], 1000, 800))
+      .toEqual({ left: 50, top: 60, right: 210, bottom: 210 })
+    expect(textArea([line('x', 0, 0, 10, 10, 0.2)], 100, 100)).toBeUndefined()
+  })
+
+  it('keeps the more confident reading of a line read twice and adds the new ones', () => {
+    const merged = mergeLines([line('EUR4l', 10, 10, 60, 30, 0.6)], [line('EUR 41', 12, 11, 61, 31, 0.9), line('UK 7', 10, 40, 50, 60)])
+    expect(merged.map((entry) => entry.text)).toEqual(['EUR 41', 'UK 7'])
   })
 })
 

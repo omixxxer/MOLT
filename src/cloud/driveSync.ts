@@ -6,7 +6,7 @@ import { downloadDriveBackup, findDriveBackup, uploadDriveBackup, type DriveBack
 // Saving the wardrobe to the user's Google Drive and restoring it. Per-device settings live in localStorage:
 // they say nothing about the wardrobe beyond when it was last saved.
 
-const SETTINGS_KEY = 'vesta-drive'
+const SETTINGS_KEY = 'molt-drive'
 
 export interface DriveSettings {
   autoSave: boolean
@@ -104,6 +104,6 @@ export interface DriveRestore {
 export async function readFromDrive(): Promise<DriveRestore> {
   const access = await token(true)
   const remote = await findDriveBackup(access)
-  if (!remote) throw new Error('Todavía no hay ninguna copia de VESTA en tu Google Drive.')
+  if (!remote) throw new Error('Todavía no hay ninguna copia de Molt en tu Google Drive.')
   return { backup: await readWardrobeBackup(await downloadDriveBackup(access, remote.id)), remote }
 }

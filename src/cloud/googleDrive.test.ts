@@ -41,7 +41,7 @@ describe('google drive', () => {
     const fetch = vi.fn(async (url: string, init: RequestInit) => {
       if (url.includes('uploadType=resumable')) {
         expect(init.method).toBe('POST')
-        expect(JSON.parse(init.body as string)).toMatchObject({ name: 'vesta-armario.zip', parents: ['appDataFolder'] })
+        expect(JSON.parse(init.body as string)).toMatchObject({ name: 'molt-armario.zip', parents: ['appDataFolder'] })
         return new Response(null, { status: 200, headers: { Location: 'https://upload.example/session' } })
       }
       const range = (init.headers as Record<string, string>)['Content-Range']!

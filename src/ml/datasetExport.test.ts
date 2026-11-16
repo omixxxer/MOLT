@@ -112,9 +112,7 @@ describe('training export', () => {
   })
 
   it('writes a valid zip with metadata, labels and every photo', async () => {
-    // Photos are asked for garment by garment; one without photos is left out of the export.
-    const loadPhotos = async (id: string) => id === 'g1' ? stored : undefined
-    const archive = await createTrainingExport([makeGarment(), makeGarment({ id: 'sin-fotos' })], loadPhotos, new Date('2026-10-28T00:00:00.000Z'))
+    const archive = await createTrainingExport([makeGarment(), makeGarment({ id: 'sin-fotos' })], async (id) => id === 'g1' ? stored : undefined, new Date('2026-10-28T00:00:00.000Z'))
     const entries = readStoredZip(await readBlob(archive))
     expect(entries.map((entry) => entry.name)).toEqual(['export.json', 'labels.jsonl', 'images/g1-0.jpg', 'images/g1-1.png'])
     for (const entry of entries) expect(entry.crc).toBe(crc32(entry.data))

@@ -1,5 +1,5 @@
 import { blobBytes, createZip, readZip, type ZipEntry } from '../ml/zip'
-import type { Garment, GarmentWithPhotos, Outfit, OutfitFeedback, TrendPack, UserPreferences } from '../types/domain'
+import type { Garment, GarmentWithPhotos, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { database } from './database'
 import { codeCounters, codePrefix, nextCode } from './garmentCodes'
 import { garmentTables, getGarmentWithPhotos, putGarmentWithPhotos } from './garmentRepository'
@@ -7,7 +7,9 @@ import { garmentTables, getGarmentWithPhotos, putGarmentWithPhotos } from './gar
 // A full copy of the wardrobe in one ZIP: backup.json holds every record, with the photos replaced by paths to
 // separate files, so the same layout can later be synced file by file (e.g. to the user's own Drive).
 
-export const BACKUP_FORMAT = 'vesta-wardrobe-backup'
+export const BACKUP_FORMAT = 'molt-wardrobe-backup'
+/** Backups made before the app was renamed. */
+const LEGACY_BACKUP_FORMAT = 'vesta-wardrobe-backup'
 export const BACKUP_VERSION = 1
 const MANIFEST = 'backup.json'
 
@@ -23,6 +25,7 @@ export type GarmentRecord = Garment & {
     thumbnail: PhotoReference
     additionalImages?: PhotoReference[]
     labelImage?: PhotoReference
+    cutout?: PhotoReference
   }
 }
 
@@ -38,6 +41,8 @@ interface BackupManifest {
   outfitFeedback: OutfitFeedback[]
   trendPacks: TrendPack[]
   garmentCodeCounters: Array<{ prefix: string; last: number }>
+  /** Missing in backups made before trips were kept. */
+  trips?: Trip[]
 }
 
 export interface WardrobeBackup {
@@ -48,6 +53,7 @@ export interface WardrobeBackup {
   outfitFeedback: OutfitFeedback[]
   trendPacks: TrendPack[]
   garmentCodeCounters: Array<{ prefix: string; last: number }>
+  trips?: Trip[]
 }
 
 export type ImportMode = 'replace' | 'merge'
@@ -77,7 +83,7 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
   for (const id of await database.garments.toCollection().primaryKeys()) {
     const garment = await getGarmentWithPhotos(id)
     if (!garment) continue
-    const { image, thumbnail, additionalImages, labelImage, ...fields } = garment
+    const { image, thumbnail, additionalImages, labelImage, cutout, ...fields } = garment
     garments.push({
       ...fields,
       photos: {
@@ -86,7 +92,8 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
         ...(additionalImages?.length
           ? { additionalImages: await Promise.all(additionalImages.map((photo, index) => addPhoto(id, `photo-${index + 1}`, photo))) }
           : {}),
-        ...(labelImage ? { labelImage: await addPhoto(id, 'label', labelImage) } : {})
+        ...(labelImage ? { labelImage: await addPhoto(id, 'label', labelImage) } : {}),
+        ...(cutout ? { cutout: await addPhoto(id, 'cutout', cutout) } : {})
       }
     })
   }
@@ -101,7 +108,8 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
     preferences: await database.preferences.toArray(),
     outfitFeedback: await database.outfitFeedback.toArray(),
     trendPacks: await database.trendPacks.toArray(),
-    garmentCodeCounters: await database.garmentCodeCounters.toArray()
+    garmentCodeCounters: await database.garmentCodeCounters.toArray(),
+    trips: await database.trips.toArray()
   }
   return createZip([{ name: MANIFEST, data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) }, ...files])
 }
@@ -112,20 +120,20 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
   try {
     entries = await readZip(file)
   } catch {
-    throw new Error('El archivo no es una copia del armario de VESTA o está dañado.')
+    throw new Error('El archivo no es una copia del armario de Molt o está dañado.')
   }
   const manifestBytes = entries.get(MANIFEST)
   let manifest: BackupManifest
   try {
     manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as BackupManifest
   } catch {
-    throw new Error('El archivo no es una copia del armario de VESTA o está dañado.')
+    throw new Error('El archivo no es una copia del armario de Molt o está dañado.')
   }
-  if (!manifestBytes || manifest.format !== BACKUP_FORMAT || !Array.isArray(manifest.garments)) {
-    throw new Error('El archivo no es una copia del armario de VESTA.')
+  if (!manifestBytes || (manifest.format !== BACKUP_FORMAT && manifest.format !== LEGACY_BACKUP_FORMAT) || !Array.isArray(manifest.garments)) {
+    throw new Error('El archivo no es una copia del armario de Molt.')
   }
   if (manifest.version > BACKUP_VERSION || manifest.databaseVersion > database.verno) {
-    throw new Error('La copia se hizo con una versión más reciente de VESTA. Actualiza la app para importarla.')
+    throw new Error('La copia se hizo con una versión más reciente de Molt. Actualiza la app para importarla.')
   }
 
   const photo = (reference: PhotoReference): Blob => {
@@ -138,7 +146,8 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
     image: photo(photos.image),
     thumbnail: photo(photos.thumbnail),
     ...(photos.additionalImages ? { additionalImages: photos.additionalImages.map(photo) } : {}),
-    ...(photos.labelImage ? { labelImage: photo(photos.labelImage) } : {})
+    ...(photos.labelImage ? { labelImage: photo(photos.labelImage) } : {}),
+    ...(photos.cutout ? { cutout: photo(photos.cutout) } : {})
   }))
   return {
     exportedAt: manifest.exportedAt,
@@ -147,7 +156,8 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
     preferences: manifest.preferences ?? [],
     outfitFeedback: manifest.outfitFeedback ?? [],
     trendPacks: manifest.trendPacks ?? [],
-    garmentCodeCounters: manifest.garmentCodeCounters ?? []
+    garmentCodeCounters: manifest.garmentCodeCounters ?? [],
+    trips: manifest.trips ?? []
   }
 }
 
@@ -157,7 +167,8 @@ const tables = () => [
   database.outfits,
   database.preferences,
   database.outfitFeedback,
-  database.trendPacks
+  database.trendPacks,
+  database.trips
 ]
 
 /**
@@ -174,10 +185,14 @@ export async function importWardrobeBackup(backup: WardrobeBackup, mode: ImportM
       await database.preferences.bulkAdd(backup.preferences)
       await database.outfitFeedback.bulkAdd(backup.outfitFeedback)
       await database.trendPacks.bulkAdd(backup.trendPacks)
+      await database.trips.bulkAdd(backup.trips ?? [])
       await database.garmentCodeCounters.bulkPut(mergeCounters(backup.garmentCodeCounters, backup.garments.flatMap((garment) => garment.code ?? [])))
       return { ...summary, added: backup.garments.length, outfits: backup.outfits.length }
     }
 
+    for (const trip of backup.trips ?? []) {
+      if (!await database.trips.get(trip.id)) await database.trips.add(trip)
+    }
     const backupCodes = backup.garments.flatMap((garment) => garment.code ?? [])
     for (const garment of backup.garments) {
       const existing = await database.garments.get(garment.id)

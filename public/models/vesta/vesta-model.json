@@ -150,6 +150,32 @@
       }
     }
   },
+  "segmentation": {
+    "name": "seg-v1",
+    "output": "segmentation",
+    "classes": [
+      "background",
+      "top",
+      "bottom",
+      "one-piece",
+      "outerwear",
+      "footwear",
+      "accessory"
+    ],
+    "grid": 16,
+    "val": {
+      "mIoU": 0.5096687527554862,
+      "iou": {
+        "background": 0.9505941213258287,
+        "top": 0.5754241173773499,
+        "bottom": 0.5146596858638743,
+        "one-piece": 0.5727489564698867,
+        "outerwear": 0.5739238927011853,
+        "footwear": 0.15591397849462366,
+        "accessory": 0.2244165170556553
+      }
+    }
+  },
   "file": "model_quantized.onnx",
-  "bytes": 25603629
+  "bytes": 25739503
 }

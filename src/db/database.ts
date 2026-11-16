@@ -1,9 +1,12 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, UserPreferences } from '../types/domain'
+import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { assignMissingCodes, codeCounters } from './garmentCodes'
 
 const levelOfFormality: Record<LegacyFormality, DressLevel> = { Casual: 'Diario', 'Smart casual': 'Arreglado', Formal: 'Formal' }
 const occasionOfFormality: Record<string, string> = { Casual: 'Diario', 'Smart casual': 'Arreglado' }
+
+const DATABASE_NAME = 'molt-wardrobe'
+const LEGACY_DATABASE_NAME = 'vesta-wardrobe'
 
 export class WardrobeDatabase extends Dexie {
   garments!: EntityTable<Garment, 'id'>
@@ -13,13 +16,14 @@ export class WardrobeDatabase extends Dexie {
   outfitFeedback!: EntityTable<OutfitFeedback, 'id'>
   /** Highest number given per code prefix, so a deleted garment's code is never given to another one. */
   garmentCodeCounters!: EntityTable<{ prefix: string; last: number }, 'prefix'>
+  trips!: EntityTable<Trip, 'id'>
   /** Original photos, one record per garment; never read by the wardrobe list. */
   garmentPhotos!: EntityTable<GarmentPhotos & { garmentId: string }, 'garmentId'>
   /** Thumbnails, read only for the garments on screen. */
   garmentThumbnails!: EntityTable<{ garmentId: string; thumbnail: Blob }, 'garmentId'>
 
-  /** The name only changes in tests and benchmarks, which use databases of their own. */
-  constructor(name = 'vesta-wardrobe') {
+  /** `legacyName`: a database from before the app was renamed, whose contents are brought here on opening. */
+  constructor(name = DATABASE_NAME, legacyName?: string) {
     super(name)
     this.version(1).stores({
       garments: 'id, category, name, updatedAt',
@@ -102,18 +106,10 @@ export class WardrobeDatabase extends Dexie {
           outfit.occasion = occasionOfFormality[outfit.occasion] ?? outfit.occasion
         })
       })
+    this.version(7).stores({ trips: 'id, startDate' })
     // Photos and thumbnails leave the garment record, so listing the wardrobe reads no image.
-    this.version(7)
-      .stores({
-        garments: 'id, category, name, updatedAt, &code',
-        outfits: 'id, createdAt, favorite, kind',
-        preferences: 'id',
-        trendPacks: 'id, version, publishedAt',
-        outfitFeedback: 'id, type, createdAt',
-        garmentCodeCounters: 'prefix',
-        garmentPhotos: 'garmentId',
-        garmentThumbnails: 'garmentId'
-      })
+    this.version(8)
+      .stores({ garmentPhotos: 'garmentId', garmentThumbnails: 'garmentId' })
       .upgrade(async (transaction) => {
         const garments = transaction.table('garments')
         const photos = transaction.table('garmentPhotos')
@@ -122,21 +118,53 @@ export class WardrobeDatabase extends Dexie {
         for (const id of await garments.toCollection().primaryKeys()) {
           const stored = await garments.get(id) as (Garment & Partial<GarmentPhotos> & { thumbnail?: Blob }) | undefined
           if (!stored) continue
-          const { image, additionalImages, labelImage, thumbnail, ...fields } = stored
+          const { image, additionalImages, labelImage, cutout, thumbnail, ...fields } = stored
           if (image) {
             await photos.put({
               garmentId: id,
               image,
               ...(additionalImages?.length ? { additionalImages } : {}),
-              ...(labelImage ? { labelImage } : {})
+              ...(labelImage ? { labelImage } : {}),
+              ...(cutout ? { cutout } : {})
             })
           }
           // Garments from the first versions may have no thumbnail; the photo is used in its place when read.
           if (thumbnail) await thumbnails.put({ garmentId: id, thumbnail })
-          await garments.put(fields)
+          await garments.put({ ...fields, ...(cutout ? { hasCutout: true } : {}) })
         }
       })
+    if (legacyName) this.on('ready', () => moveLegacyDatabase(this, legacyName))
   }
 }
 
-export const database = new WardrobeDatabase()
+/**
+ * Brings the wardrobe over from the old database. Everything is copied in one transaction, so a failure leaves nothing
+ * half done and the old one intact; the app then reports it could not open, rather than showing an empty wardrobe. The
+ * old database is deleted on a later launch, once the copy has been there and working.
+ */
+async function moveLegacyDatabase(target: WardrobeDatabase, legacyName: string) {
+  if (!await Dexie.exists(legacyName)) return
+  const hasData = async (database: WardrobeDatabase) => (await Promise.all(database.tables.map((table) => table.count()))).some(Boolean)
+  // Opened with the same schema, so an old version goes through its upgrades first.
+  const legacy = new WardrobeDatabase(legacyName)
+  try {
+    await legacy.open()
+    if (await hasData(target) || !await hasData(legacy)) {
+      legacy.close()
+      // Not waited for: another tab still using it must not keep this one from opening.
+      void Dexie.delete(legacyName).catch(() => undefined)
+      return
+    }
+    const contents = await Promise.all(legacy.tables.map(async (table) => ({ name: table.name, rows: await table.toArray() })))
+    await target.transaction('rw', target.tables, async () => {
+      for (const { name, rows } of contents) await target.table(name).bulkPut(rows)
+    })
+    for (const { name, rows } of contents) {
+      if (await target.table(name).count() !== rows.length) throw new Error(`La copia de ${name} no está completa.`)
+    }
+  } finally {
+    legacy.close()
+  }
+}
+
+export const database = new WardrobeDatabase(DATABASE_NAME, LEGACY_DATABASE_NAME)

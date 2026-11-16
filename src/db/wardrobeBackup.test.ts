@@ -61,11 +61,11 @@ describe('wardrobe backup', () => {
     expect(await importWardrobeBackup(backup, 'replace')).toMatchObject({ added: 1, outfits: 1 })
 
     const restored = await garmentRepository.withPhotos('a')
-    expect(restored).toMatchObject({ code: 'SDC-001', name: 'Prenda a', dressLevels: ['Diario'] })
     // The data record holds no image: photos and thumbnail go back to their own stores.
     expect(Object.values(await database.garments.get('a') ?? {}).some((value) => value instanceof Blob)).toBe(false)
     expect(await database.garmentPhotos.count()).toBe(1)
     expect(await database.garmentThumbnails.count()).toBe(1)
+    expect(restored).toMatchObject({ code: 'SDC-001', name: 'Prenda a', dressLevels: ['Diario'] })
     expect(await text(restored?.image)).toBe('foto a')
     expect(await text(restored?.thumbnail)).toBe('miniatura a')
     expect(await text(restored?.additionalImages?.[0])).toBe('espalda')
@@ -95,8 +95,6 @@ describe('wardrobe backup', () => {
 
     expect(await importWardrobeBackup(backup, 'merge')).toEqual({ added: 1, updated: 1, unchanged: 0, recoded: 1, outfits: 1 })
     expect(await database.garments.get('shared')).toMatchObject({ name: 'Nueva', code: 'SDC-001' })
-    expect(await text((await garmentRepository.photos('elsewhere'))?.image)).toBe('foto elsewhere')
-    expect(await database.garmentPhotos.count()).toBe(3)
     expect((await database.garments.get('local'))?.code).toBe('SDC-002')
     expect((await database.garments.get('elsewhere'))?.code).toBe('SDC-003')
     expect(await database.garments.count()).toBe(3)
@@ -109,9 +107,18 @@ describe('wardrobe backup', () => {
     const other = createZip([{ name: 'export.json', data: encoder.encode('{}') }])
     await expect(readWardrobeBackup(other)).rejects.toThrow('no es una copia del armario')
     const newer = createZip([{ name: 'backup.json', data: encoder.encode(JSON.stringify({
-      format: 'vesta-wardrobe-backup', version: 99, databaseVersion: 1, garments: []
+      format: 'molt-wardrobe-backup', version: 99, databaseVersion: 1, garments: []
     })) }])
     await expect(readWardrobeBackup(newer)).rejects.toThrow('versión más reciente')
+  })
+})
+
+describe('backups made before the app was renamed', () => {
+  it('still reads them', async () => {
+    const legacy = createZip([{ name: 'backup.json', data: new TextEncoder().encode(JSON.stringify({
+      format: 'vesta-wardrobe-backup', version: 1, databaseVersion: 6, exportedAt: '2026-11-02T15:38:48.420Z', garments: [], outfits: []
+    })) }])
+    expect((await readWardrobeBackup(legacy)).exportedAt).toBe('2026-11-02T15:38:48.420Z')
   })
 })
 

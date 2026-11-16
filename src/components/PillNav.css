@@ -10,7 +10,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.vesta-pill-nav {
+.molt-pill-nav {
   position: fixed;
   z-index: 20;
   bottom: calc(16px + env(safe-area-inset-bottom));

@@ -18,13 +18,14 @@ export const garmentTables = () => [database.garments, database.garmentPhotos, d
 
 /** Writes a garment and its images, each in its store; call inside a transaction over garmentTables(). */
 export async function putGarmentWithPhotos(garment: GarmentWithPhotos): Promise<void> {
-  const { image, additionalImages, labelImage, thumbnail, ...fields } = garment
-  await database.garments.put(fields)
+  const { image, additionalImages, labelImage, cutout, thumbnail, hasCutout: _hasCutout, ...fields } = garment
+  await database.garments.put({ ...fields, ...(cutout ? { hasCutout: true } : {}) })
   await database.garmentPhotos.put({
     garmentId: garment.id,
     image,
     ...(additionalImages?.length ? { additionalImages } : {}),
-    ...(labelImage ? { labelImage } : {})
+    ...(labelImage ? { labelImage } : {}),
+    ...(cutout ? { cutout } : {})
   })
   await database.garmentThumbnails.put({ garmentId: garment.id, thumbnail })
 }
@@ -42,7 +43,7 @@ export async function getGarmentWithPhotos(id: string): Promise<GarmentWithPhoto
     database.garments.get(id), photosOf(id), database.garmentThumbnails.get(id)
   ])
   if (!garment || !photos) return undefined
-  return { ...garment, ...photos, thumbnail: thumbnail?.thumbnail ?? photos.image }
+  return { ...garment, ...photos, thumbnail: thumbnail?.thumbnail ?? photos.cutout ?? photos.image }
 }
 
 export const garmentRepository = {

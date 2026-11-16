@@ -74,9 +74,9 @@ export function analysisRecord({ suggestion, labelReading, labelSize, imageChang
     },
     confidenceByAttribute: suggestion.confidenceByAttribute,
     sourcesByAttribute: {
-      category: 'vesta-dinov2',
-      subcategory: 'vesta-dinov2',
-      ...(suggestion.pattern ? { pattern: 'vesta-dinov2' as const } : {}),
+      category: 'molt-dinov2',
+      subcategory: 'molt-dinov2',
+      ...(suggestion.pattern ? { pattern: 'molt-dinov2' as const } : {}),
       ...(labelBrand ?? suggestion.brand ? { brand: 'paddle-ocr' as const } : {}),
       ...(labelSize ? { size: 'paddle-ocr' as const } : {}),
       ...(labelReading?.composition ? { composition: 'paddle-ocr' as const } : {}),

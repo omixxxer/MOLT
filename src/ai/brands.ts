@@ -28,6 +28,7 @@ export const BRANDS: Brand[] = [
   { name: 'Saucony' },
   { name: 'Mizuno' },
   { name: 'Brooks', whole: true },
+  { name: 'Fear of God', aliases: ['Fear of God Essentials'] },
   { name: 'On Running', aliases: ['On Cloud'] },
   { name: 'Diadora' },
   { name: 'Kappa' },

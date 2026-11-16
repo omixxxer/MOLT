@@ -1,4 +1,4 @@
-// Measures the first read of the wardrobe before and after photos left the garment records (database version 7).
+// Measures the first read of the wardrobe before and after photos left the garment records (database version 8).
 // Runs in a browser against a database of its own; see storage.html.
 import Dexie from 'dexie'
 import { WardrobeDatabase } from '../src/db/database'
@@ -52,21 +52,22 @@ function randomBlob(bytes: number, type: string): Blob {
   return new Blob(chunks as BlobPart[], { type })
 }
 
-function openVersion6(name: string) {
+function openVersion7(name: string) {
   const legacy = new Dexie(name)
-  legacy.version(6).stores({
+  legacy.version(7).stores({
     garments: 'id, category, name, updatedAt, &code',
     outfits: 'id, createdAt, favorite, kind',
     preferences: 'id',
     trendPacks: 'id, version, publishedAt',
     outfitFeedback: 'id, type, createdAt',
-    garmentCodeCounters: 'prefix'
+    garmentCodeCounters: 'prefix',
+    trips: 'id, startDate'
   })
   return legacy
 }
 
 async function seed(name: string, count: number) {
-  const legacy = openVersion6(name)
+  const legacy = openVersion7(name)
   const categories = ['Parte superior', 'Parte inferior', 'Abrigo', 'Calzado']
   for (let start = 0; start < count; start += 25) {
     const batch = Array.from({ length: Math.min(25, count - start) }, (_, offset) => {
@@ -148,16 +149,16 @@ async function measure(
 }
 
 export async function runStorageBench(count: number, report: (message: string) => void = () => undefined): Promise<StorageResult> {
-  const name = `vesta-bench-${count}`
+  const name = `molt-bench-${count}`
   await Dexie.delete(name)
-  report(`Creando ${count} prendas en la versión 6…`)
+  report(`Creando ${count} prendas en la versión 7…`)
   const seedStart = performance.now()
   await seed(name, count)
   const seedMs = performance.now() - seedStart
 
   report('Midiendo la lectura con las imágenes dentro de cada prenda…')
   const before = await measure(
-    () => openVersion6(name),
+    () => openVersion7(name),
     async (_database, list) => (list as Array<{ id: string; thumbnail: Blob }>).map((garment) => garment.thumbnail)
   )
 

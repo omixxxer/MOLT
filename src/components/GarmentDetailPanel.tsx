@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { europeanEquivalent } from '../ai/labelParser'
+import { categoryIdForLabel } from '../ml/taxonomy'
+import { askConfirm } from './confirmDialog'
 import type { Garment, GarmentWithPhotos } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
 import GarmentForm from './GarmentForm'
@@ -9,26 +12,32 @@ interface GarmentDetailPanelProps {
   onClose: () => void
   onSave: (garment: GarmentWithPhotos) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  /** To the outfits screen, to build an outfit around this garment. */
+  onCreateOutfit?: (garment: Garment) => void
 }
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(date))
 }
 
-export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete }: GarmentDetailPanelProps) {
+export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete, onCreateOutfit }: GarmentDetailPanelProps) {
   const panelRef = useRef<HTMLElement>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
+  // A US or UK size is kept as written; its approximate European size is shown next to it.
+  const european = garment.size ? europeanEquivalent(garment.size, categoryIdForLabel(garment.category)) : undefined
   // The original photos are only read here, when the detail opens; the wardrobe list never carries them.
   const { photos: stored, failed: photosFailed } = useGarmentWithPhotos(garment)
   const photos = stored ? [stored.image, ...(stored.additionalImages ?? [])] : []
-  // The label photo is shown last, apart from the garment photos.
-  const viewable = stored?.labelImage ? [...photos, stored.labelImage] : photos
+  // The cut-out first (as in the gallery), then the photos, and the label photo last, apart from them.
+  const first = stored?.cutout ? 1 : 0
+  const viewable = [...(stored?.cutout ? [stored.cutout] : []), ...photos, ...(stored?.labelImage ? [stored.labelImage] : [])]
   const photosStatus = !stored && (
     <p className="loading-state" role="status">{photosFailed ? 'No se pudieron leer las fotografías de esta prenda.' : 'Cargando fotografías…'}</p>
   )
   const selectedPhoto = viewable[selectedPhotoIndex] ?? photos[0]
+  const thumbLabel = (index: number) => index < first ? 'Ver sin fondo' : index >= first + photos.length ? 'Ver etiqueta' : `Ver foto ${index - first + 1}`
 
   useEffect(() => {
     setSelectedPhotoIndex(0)
@@ -73,7 +82,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
   }, [onClose])
 
   async function confirmDelete() {
-    if (!window.confirm('¿Eliminar esta prenda? No se puede deshacer')) return
+    if (!await askConfirm('¿Eliminar esta prenda? No se puede deshacer.', 'Eliminar prenda')) return
     setDeleteError('')
     try {
       await onDelete(garment.id)
@@ -115,11 +124,11 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                   <div className="detail-photo-list" aria-label="Fotos de la prenda">
                     {viewable.map((photo, index) => (
                       <button
-                        className={`${index === selectedPhotoIndex ? 'selected' : ''} ${index >= photos.length ? 'label-thumb' : ''}`}
+                        className={`${index === selectedPhotoIndex ? 'selected' : ''} ${index >= first + photos.length ? 'label-thumb' : ''}`}
                         type="button"
                         key={index}
                         onClick={() => setSelectedPhotoIndex(index)}
-                        aria-label={index >= photos.length ? 'Ver etiqueta' : `Ver foto ${index + 1}`}
+                        aria-label={thumbLabel(index)}
                         aria-pressed={index === selectedPhotoIndex}
                       >
                         <GarmentPhoto image={photo} alt="" />
@@ -134,8 +143,9 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
               <div><dt>Colores</dt><dd>{garment.colors.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estampado</dt><dd>{garment.pattern || 'Sin especificar'}</dd></div>
               <div><dt>Marca</dt><dd>{garment.brand || 'Sin especificar'}</dd></div>
-              <div><dt>Talla</dt><dd>{garment.size || 'Sin especificar'}</dd></div>
+              <div><dt>Talla</dt><dd>{garment.size ? (european ? `${garment.size} (≈ ${european} EU)` : garment.size) : 'Sin especificar'}</dd></div>
               {garment.composition && <div><dt>Composición</dt><dd>{garment.composition}</dd></div>}
+              {garment.price !== undefined && <div><dt>Precio</dt><dd>{new Intl.NumberFormat('es', { style: 'currency', currency: 'EUR' }).format(garment.price)}</dd></div>}
               <div><dt>Temporadas</dt><dd>{garment.seasons.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estilo</dt><dd>{garment.dressLevels.join(', ') || 'Sin especificar'}</dd></div>
               <div><dt>Estética</dt><dd>{garment.styles.join(', ') || 'Sin especificar'}</dd></div>
@@ -143,9 +153,9 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                 <div className="property-notes">
                   <dt>Procedencia del análisis</dt>
                   <dd>
-                    Sugerencias locales de {garment.analysis.modelId} ({garment.analysis.modelVersion.slice(0, 8)}).
-                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'vesta-dinov2'
-                      ? 'modelo propio de VESTA (DINOv2)'
+                    Sugerencias locales de {garment.analysis.modelId.replace(/^vesta\//, 'molt/')} ({garment.analysis.modelVersion.slice(0, 8)}).
+                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'molt-dinov2' || garment.analysis.sourcesByAttribute.category === 'vesta-dinov2'
+                      ? 'modelo propio de Molt (DINOv2)'
                       : garment.analysis.sourcesByAttribute.category === 'clip-zero-shot'
                         ? 'CLIP zero-shot'
                         : garment.analysis.sourcesByAttribute.category === 'wargon-vit'
@@ -164,6 +174,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
             {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
             <footer className="detail-actions">
               <button className="button button-danger" type="button" onClick={() => void confirmDelete()}>Eliminar</button>
+              {onCreateOutfit && <button className="button button-outline" type="button" onClick={() => onCreateOutfit(garment)}>Crear outfit con esta prenda</button>}
               <button className="button button-dark" type="button" onClick={() => setIsEditing(true)}>Editar</button>
             </footer>
           </>

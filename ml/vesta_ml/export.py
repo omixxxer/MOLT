@@ -3,7 +3,8 @@
 Un único grafo: imagen preprocesada (1×3×224×224, letterbox y normalización ya hechos) → DINOv2 → CLS + media de
 parches → cabezas → logits de cada cabeza. Se cuantiza a int8 (pesos) y se guarda en public/models/vesta/ junto a
 vesta-model.json (valores de cada cabeza, preprocesado y reglas), que la app lee para interpretar las salidas.
-Con --check compara PyTorch, ONNX fp32 y ONNX int8 en imágenes de test. Si existe calibration.json (vesta_ml.calibrate),
+Con --check compara PyTorch, ONNX fp32 y ONNX int8 en imágenes de test. Con --segmentation seg-v1 añade la salida
+«segmentation» (16 × 16 parches × clase, de vesta_ml.segment), que sale de la misma pasada del backbone. Si existe calibration.json (vesta_ml.calibrate),
 cada cabeza lleva su temperatura.
 """
 
@@ -31,20 +32,28 @@ FORMAT = "vesta-model"
 
 
 class ExportedModel(torch.nn.Module):
-    def __init__(self, backbone: torch.nn.Module, heads: torch.nn.Module, names: list[str]):
+    def __init__(self, backbone: torch.nn.Module, heads: torch.nn.Module, names: list[str],
+                 segmentation: torch.nn.Module | None = None):
         super().__init__()
-        self.backbone, self.heads, self.names = backbone, heads, names
+        self.backbone, self.heads, self.names, self.segmentation = backbone, heads, names, segmentation
+
+    @property
+    def output_names(self) -> list[str]:
+        return self.names + (["segmentation"] if self.segmentation is not None else [])
 
     def forward(self, pixel_values: torch.Tensor) -> tuple[torch.Tensor, ...]:
         hidden = self.backbone(pixel_values=pixel_values).last_hidden_state
         features = torch.cat([hidden[:, 0], hidden[:, 1:].mean(dim=1)], dim=1)
         outputs = self.heads(features)
-        return tuple(outputs[name] for name in self.names)
+        logits = tuple(outputs[name] for name in self.names)
+        if self.segmentation is None:
+            return logits
+        return logits + (self.segmentation(hidden[:, 1:], hidden[:, 0]),)
 
 
 def export(model: ExportedModel, path: Path) -> None:
     example = torch.zeros(1, 3, 224, 224)
-    torch.onnx.export(model, (example,), str(path), input_names=["pixel_values"], output_names=model.names,
+    torch.onnx.export(model, (example,), str(path), input_names=["pixel_values"], output_names=model.output_names,
                       opset_version=18, dynamo=True, external_data=False)
 
 
@@ -75,7 +84,7 @@ def check(model: ExportedModel, paths: dict[str, Path], records: list[dict], roo
         with torch.inference_mode():
             reference = [output.numpy() for output in model(torch.from_numpy(pixels))]
         for name, session in sessions.items():
-            outputs = session.run(model.names, {"pixel_values": pixels})
+            outputs = session.run(model.output_names, {"pixel_values": pixels})
             for head, expected, actual in zip(model.names, reference, outputs):
                 agree[name][head] += int(expected.argmax() == actual.argmax())
                 gap[name] = max(gap[name], float(np.abs(expected - actual).max()))
@@ -89,12 +98,17 @@ def main() -> None:
     parser.add_argument("model", help="Nombre del directorio en models/")
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--check", type=int, default=300, help="Imágenes de test para comparar (0 para no comparar)")
+    parser.add_argument("--segmentation", help="Cabeza de segmentación de models/ (vesta_ml.segment), p. ej. seg-v1")
     arguments = parser.parse_args()
 
     root = data_dir()
     specs, heads, metadata = load_heads(root, arguments.model)
     names = [spec.name for spec in specs]
-    model = ExportedModel(load_backbone(), heads, names).eval()
+    segmentation, seg_metadata = (None, None)
+    if arguments.segmentation:
+        from .segment import load_seg_head
+        segmentation, seg_metadata = load_seg_head(root, arguments.segmentation)
+    model = ExportedModel(load_backbone(), heads, names, segmentation).eval()
 
     work = root / "models" / arguments.model / "onnx"
     work.mkdir(parents=True, exist_ok=True)
@@ -123,6 +137,8 @@ def main() -> None:
         "heads": [{"name": spec.name, "multiLabel": spec.multi_label, "values": spec.values,
                    **({"temperature": temperatures[spec.name]} if spec.name in temperatures else {})} for spec in specs],
         "rules": metadata["rules"],
+        **({"segmentation": {"name": arguments.segmentation, "output": "segmentation", "classes": seg_metadata["classes"],
+                             "grid": seg_metadata["grid"], "val": seg_metadata["val"]}} if seg_metadata else {}),
         "file": MODEL_FILE,
         "bytes": quantized.stat().st_size,
     }

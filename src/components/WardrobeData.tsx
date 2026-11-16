@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DriveRestore } from '../cloud/driveSync'
 import type { DriveSync } from '../cloud/useDriveSync'
+import { backupReminderSnoozedUntil, isStorageFull, lastFileBackup, recordFileBackup, shouldRemindBackup, snoozeBackupReminder, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import { garmentRepository } from '../db/garmentRepository'
 import type { ImportMode, WardrobeBackup } from '../db/wardrobeBackup'
 import type { Garment } from '../types/domain'
+import { askConfirm } from './confirmDialog'
 
 interface WardrobeDataProps {
   garments: Garment[]
@@ -40,6 +42,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState<{ backup: WardrobeBackup; name: string; remote?: DriveRestore['remote'] }>()
+  const [backupNoticeHidden, setBackupNoticeHidden] = useState(false)
 
   function closeMenu() {
     if (menu.current) menu.current.open = false
@@ -68,7 +71,9 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     try {
       // Loaded on demand: the ZIP code is only needed for these actions.
       const { createWardrobeBackup } = await import('../db/wardrobeBackup')
-      download(await createWardrobeBackup(), `vesta-armario-${today()}.zip`)
+      download(await createWardrobeBackup(), `molt-armario-${today()}.zip`)
+      recordFileBackup()
+      setBackupNoticeHidden(true)
       setMessage(`Copia descargada con ${plural(garments.length, 'prenda', 'prendas')}, sus fotos, outfits y preferencias. Contiene tus fotos: guárdala en un sitio seguro.`)
     } catch (error) {
       console.error('No se pudo exportar el armario:', error)
@@ -107,8 +112,8 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     }
   }
 
-  function overwriteDrive() {
-    if (window.confirm('¿Sobrescribir la copia de Google Drive con este armario? Los cambios hechos desde el otro dispositivo se perderán (Drive guarda versiones anteriores durante un tiempo).')) {
+  async function overwriteDrive() {
+    if (await askConfirm('¿Sobrescribir la copia de Google Drive con este armario? Los cambios hechos desde el otro dispositivo se perderán (Drive guarda versiones anteriores durante un tiempo).', 'Sobrescribir')) {
       void drive.save({ interactive: true, overwrite: true })
     }
   }
@@ -116,7 +121,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
   async function importBackup(mode: ImportMode) {
     if (!pending) return
     if (mode === 'replace' && garments.length > 0
-      && !window.confirm(`¿Reemplazar tu armario? Se borrarán tus ${plural(garments.length, 'prenda', 'prendas')} actuales, sus outfits y preferencias, y se cargará la copia. No se puede deshacer.`)) {
+      && !await askConfirm(`¿Reemplazar tu armario? Se borrarán tus ${plural(garments.length, 'prenda', 'prendas')} actuales, sus outfits y preferencias, y se cargará la copia. No se puede deshacer.`, 'Reemplazar')) {
       return
     }
     setBusy('Importando…')
@@ -135,7 +140,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
       setMessage(`Copia importada: ${parts.join(', ')}.${summary.recoded ? ` ${plural(summary.recoded, 'prenda ha recibido', 'prendas han recibido')} un código nuevo porque el suyo ya estaba en uso.` : ''}`)
     } catch (error) {
       console.error('No se pudo importar la copia:', error)
-      setMessage('No se pudo importar la copia; tu armario no ha cambiado.')
+      setMessage(isStorageFull(error) ? STORAGE_FULL_MESSAGE : 'No se pudo importar la copia; tu armario no ha cambiado.')
     } finally {
       setBusy('')
     }
@@ -147,7 +152,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     setMessage('')
     try {
       const { createTrainingExport } = await import('../ml/datasetExport')
-      download(await createTrainingExport(garments, garmentRepository.photos), `vesta-dataset-${today()}.zip`)
+      download(await createTrainingExport(garments, garmentRepository.photos), `molt-dataset-${today()}.zip`)
       setMessage(`Exportadas ${plural(garments.length, 'prenda', 'prendas')} con sus fotos y etiquetas. El archivo se genera en este dispositivo; no incluye nombres, marcas, tallas ni notas.`)
     } catch (error) {
       console.error('No se pudo exportar el dataset:', error)
@@ -170,14 +175,14 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
           </button>
           <button type="button" onClick={() => { closeMenu(); fileInput.current?.click() }} disabled={Boolean(busy)}>
             Importar copia
-            <small>Desde un ZIP exportado por VESTA</small>
+            <small>Desde un ZIP exportado por Molt</small>
           </button>
           {drive.configured ? (
             <>
               <p className="data-menu-heading">Google Drive</p>
               <button type="button" onClick={() => { closeMenu(); void drive.save({ interactive: true }) }} disabled={Boolean(busy) || drive.status.kind === 'saving'}>
                 Guardar en Google Drive
-                <small>{drive.settings.lastSavedAt ? `Última copia desde aquí: ${time(drive.settings.lastSavedAt)}` : 'En una carpeta privada de VESTA en tu Drive'}</small>
+                <small>{drive.settings.lastSavedAt ? `Última copia desde aquí: ${time(drive.settings.lastSavedAt)}` : 'En una carpeta privada de Molt en tu Drive'}</small>
               </button>
               <button type="button" onClick={() => void readFromDrive()} disabled={Boolean(busy) || drive.status.kind === 'saving'}>
                 Restaurar desde Google Drive
@@ -191,7 +196,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
           ) : (
             <p className="data-menu-note">Google Drive no está configurado en esta instalación.</p>
           )}
-          <p className="data-menu-heading">Modelo de VESTA</p>
+          <p className="data-menu-heading">Modelo de Molt</p>
           <button type="button" onClick={() => void exportTrainingData()} disabled={Boolean(busy) || garments.length === 0}>
             Exportar datos de entrenamiento
             <small>Fotos y etiquetas, sin nombres, marcas ni notas</small>
@@ -210,9 +215,27 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     </>
   )
 
+  const backups = [lastFileBackup(), drive.settings.lastSavedAt].filter((date): date is string => Boolean(date)).sort()
+  const lastBackupAt = backups.at(-1)
+  const remindBackup = !backupNoticeHidden && !pending && !busy
+    && shouldRemindBackup({ garments, lastBackupAt, snoozedUntil: backupReminderSnoozedUntil(), now: new Date() })
+
   const status = drive.status
   const notices = (
     <>
+      {remindBackup && (
+        <section className="import-panel" aria-label="Recordatorio de copia">
+          <p>
+            {lastBackupAt
+              ? `Tu armario ha cambiado desde la última copia (${time(lastBackupAt)}).`
+              : `Tus ${garments.length} prendas solo están en este navegador. Si se borran sus datos, se pierden: guarda una copia.`}
+          </p>
+          <div className="import-panel-actions">
+            <button className="button button-dark" type="button" onClick={() => void exportBackup()}>Hacer copia ahora</button>
+            <button className="button button-outline" type="button" onClick={() => { snoozeBackupReminder(); setBackupNoticeHidden(true) }}>Más tarde</button>
+          </div>
+        </section>
+      )}
       {drive.configured && status.kind !== 'idle' && (
         <div className={`drive-status ${status.kind === 'error' ? 'drive-status-error' : ''}`} role="status">
           {status.kind === 'saving' && <p>Guardando en Google Drive… {Math.round(status.progress * 100)} %</p>}

@@ -1,55 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
 import type { Garment, GarmentWithPhotos } from '../types/domain'
 
-interface LoadedThumbnail {
-  /** updatedAt of the garment when its thumbnail was read, to read it again after an edit. */
-  version: string
-  url: string
-}
+// Thumbnails asked for in the same tick (a screen showing 40 cards) are read in one request to the database.
+let waiting: Map<string, Array<(thumbnail: Blob | undefined) => void>> | undefined
 
-/**
- * Object URLs of the thumbnails of the given garments, by garment id. Only thumbnails not loaded yet are read from
- * the database; a URL is revoked when its garment leaves the list or changes, and all of them on unmount.
- */
-export function useThumbnailUrls(garments: Garment[]): ReadonlyMap<string, string> {
-  const loaded = useRef(new Map<string, LoadedThumbnail>())
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(() => new Map())
-
-  useEffect(() => {
-    let cancelled = false
-    const missing = garments.filter((garment) => loaded.current.get(garment.id)?.version !== garment.updatedAt)
-
-    function show(thumbnails: Map<string, Blob>) {
-      const previous = loaded.current
-      const next = new Map<string, LoadedThumbnail>()
-      for (const garment of garments) {
-        const current = previous.get(garment.id)
-        const thumbnail = thumbnails.get(garment.id)
-        if (current?.version === garment.updatedAt) next.set(garment.id, current)
-        else if (thumbnail) next.set(garment.id, { version: garment.updatedAt, url: URL.createObjectURL(thumbnail) })
-      }
-      loaded.current = next
-      setUrls(new Map([...next].map(([id, entry]) => [id, entry.url])))
-      for (const [id, entry] of previous) if (next.get(id) !== entry) URL.revokeObjectURL(entry.url)
+function readThumbnail(garmentId: string): Promise<Blob | undefined> {
+  return new Promise((resolve) => {
+    if (!waiting) {
+      const batch = waiting = new Map()
+      queueMicrotask(() => {
+        waiting = undefined
+        void garmentRepository.thumbnails([...batch.keys()])
+          .catch(() => new Map<string, Blob>())
+          .then((thumbnails) => {
+            for (const [id, resolvers] of batch) for (const done of resolvers) done(thumbnails.get(id))
+          })
+      })
     }
-
-    if (!missing.length) {
-      show(new Map())
-      return
-    }
-    void garmentRepository.thumbnails(missing.map((garment) => garment.id))
-      .catch(() => new Map<string, Blob>())
-      .then((thumbnails) => { if (!cancelled) show(thumbnails) })
-    return () => { cancelled = true }
-  }, [garments])
-
-  useEffect(() => () => {
-    for (const entry of loaded.current.values()) URL.revokeObjectURL(entry.url)
-    loaded.current = new Map()
-  }, [])
-
-  return urls
+    waiting.set(garmentId, [...(waiting.get(garmentId) ?? []), resolve])
+  })
 }
 
 /** The thumbnail of one garment, read when the component mounts and again after the garment is edited. */
@@ -58,27 +28,25 @@ export function useGarmentThumbnail(garment: Pick<Garment, 'id' | 'updatedAt'>):
 
   useEffect(() => {
     let cancelled = false
-    void garmentRepository.thumbnails([garment.id])
-      .then((thumbnails) => { if (!cancelled) setThumbnail(thumbnails.get(garment.id)) })
-      .catch(() => { if (!cancelled) setThumbnail(undefined) })
+    void readThumbnail(garment.id).then((blob) => { if (!cancelled) setThumbnail(blob) })
     return () => { cancelled = true }
   }, [garment.id, garment.updatedAt])
 
   return thumbnail
 }
 
-/** The garment with its original photos, read when the detail opens; undefined while loading. */
+/** The garment with its original photos, read when the detail opens; `photos` is undefined while loading. */
 export function useGarmentWithPhotos(garment: Pick<Garment, 'id' | 'updatedAt'>): { photos?: GarmentWithPhotos; failed: boolean } {
   const [state, setState] = useState<{ photos?: GarmentWithPhotos; failed: boolean }>({ failed: false })
 
   useEffect(() => {
     let cancelled = false
-    setState({ failed: false })
     void garmentRepository.withPhotos(garment.id)
       .then((photos) => { if (!cancelled) setState({ photos, failed: !photos }) })
       .catch(() => { if (!cancelled) setState({ failed: true }) })
     return () => { cancelled = true }
   }, [garment.id, garment.updatedAt])
 
-  return state
+  // Photos read for another garment or an earlier version are not shown.
+  return state.photos && (state.photos.id !== garment.id) ? { failed: false } : state
 }

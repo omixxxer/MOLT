@@ -1,3 +1,5 @@
+import type { DailyWeather, Place } from '../weather/openMeteo'
+
 export const garmentCategories = [
   'Parte superior',
   'Parte inferior',
@@ -14,6 +16,15 @@ export type DressLevel = (typeof dressLevels)[number]
 /** Single formality saved before database version 6, converted to dress levels by the upgrade. */
 export type LegacyFormality = 'Casual' | 'Smart casual' | 'Formal'
 export type GarmentRole = 'Top' | 'Bottom' | 'Una pieza' | 'Capa' | 'Calzado' | 'Accesorio'
+/** The part a garment plays in an outfit, from its category. */
+export const roleByCategory: Record<GarmentCategory, GarmentRole> = {
+  'Parte superior': 'Top',
+  'Parte inferior': 'Bottom',
+  'Vestido / mono': 'Una pieza',
+  Abrigo: 'Capa',
+  Calzado: 'Calzado',
+  Accesorio: 'Accesorio'
+}
 export type Season = 'Primavera' | 'Verano' | 'Otoño' | 'Invierno'
 export type GarmentAvailability = 'available' | 'laundry' | 'unavailable'
 export type OutfitFeedbackType = 'like' | 'dislike' | 'saved' | 'worn' | 'included' | 'excluded'
@@ -42,7 +53,7 @@ export interface GarmentAnalysis {
   }
   confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand', number>>
   // wargon-vit and clip-zero-shot only appear in garments analysed by earlier versions of the app.
-  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand' | 'size' | 'composition', 'vesta-dinov2' | 'paddle-ocr' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
+  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand' | 'size' | 'composition', 'molt-dinov2' | 'vesta-dinov2' | 'paddle-ocr' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
   unknownAttributes: string[]
   correctedAttributes: string[]
 }
@@ -61,6 +72,8 @@ export interface Garment {
   size?: string
   /** Free text, e.g. "95 % algodón, 5 % elastano". */
   composition?: string
+  /** What it cost, in euros; for the cost per wearing. */
+  price?: number
   notes?: string
   seasons: Season[]
   styles: string[]
@@ -68,6 +81,8 @@ export interface Garment {
   dressLevels: DressLevel[]
   role: GarmentRole
   availability?: GarmentAvailability
+  /** Whether a cut-out of the main photo is stored (the thumbnail then has a transparent background). */
+  hasCutout?: boolean
   /** Size of the thumbnail, so the gallery can lay out before the image loads. */
   width: number
   height: number
@@ -84,9 +99,11 @@ export interface GarmentPhotos {
   additionalImages?: Blob[]
   /** Close-up of the care label, only read for brand, size and composition; not a garment photo. */
   labelImage?: Blob
+  /** The main photo cut out on a transparent background (segmentation + SlimSAM); the thumbnail is made from it. */
+  cutout?: Blob
 }
 
-/** A garment with every image, as the form saves it and the backup carries it. */
+/** A garment with every image, as the forms save it and the backup carries it. */
 export type GarmentWithPhotos = Garment & GarmentPhotos & { thumbnail: Blob }
 
 export interface Outfit {
@@ -129,4 +146,37 @@ export interface TrendPack {
     name: string
     rules: Array<{ attribute: string; value: string; weight: number }>
   }>
+}
+
+export type PackingStyle = 'light' | 'balanced' | 'roomy'
+
+export interface TripDay {
+  date: string
+  weather: DailyWeather
+  occasion: string
+  garmentIds: string[]
+  /** Chosen or changed by the user: replanning leaves it alone. */
+  edited?: boolean
+}
+
+/** Something for the suitcase that is not in the wardrobe. */
+export interface TripExtra {
+  id: string
+  label: string
+  packed: boolean
+}
+
+export interface Trip {
+  id: string
+  place: Place
+  startDate: string
+  endDate: string
+  kind: string
+  style: PackingStyle
+  days: TripDay[]
+  packedIds: string[]
+  extras: TripExtra[]
+  fetchedAt?: string
+  createdAt: string
+  updatedAt: string
 }

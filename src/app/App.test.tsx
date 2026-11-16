@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -12,22 +12,6 @@ vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
   analyzeGarmentImage: vi.fn(),
   readGarmentLabel: vi.fn(),
   MODEL_DOWNLOAD_SIZE: 'test model'
-}))
-
-vi.mock('../components/Masonry.jsx', () => ({
-  default: ({
-    items,
-    onItemClick
-  }: {
-    items: Array<{ id: string; img: string; title: string }>
-    onItemClick: (item: { id: string; img: string; title: string }) => void
-  }) => (
-    <div role="list">
-      {items.map((item) => (
-        <button key={item.id} type="button" onClick={() => onItemClick(item)}>{item.title}</button>
-      ))}
-    </div>
-  )
 }))
 
 vi.mock('../components/PatternWaves.jsx', () => ({ default: () => null }))
@@ -48,8 +32,14 @@ vi.mock('../db/imageProcessing', () => ({
   })
 }))
 
+async function renderInWardrobe() {
+  render(<App />)
+  await userEvent.setup().click(await screen.findByRole('link', { name: /Armario/ }))
+}
+
 afterEach(async () => {
   await Promise.all([database.garments.clear(), database.garmentPhotos.clear(), database.garmentThumbnails.clear()])
+  localStorage.clear()
   vi.mocked(analyzeGarmentImage).mockReset()
   vi.restoreAllMocks()
 })
@@ -61,19 +51,18 @@ describe('wardrobe flow', () => {
       dressLevels: [], role: 'Top', width: 10, height: 10,
       confirmedAttributes: [], suggestedAttributes: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z'
     })
-    await database.garmentThumbnails.add({ garmentId: 'local', thumbnail: new Blob(['thumbnail']) })
     vi.mocked(readWardrobeBackup).mockResolvedValue({
       exportedAt: '2026-10-30T12:00:00.000Z', garments: [], outfits: [], preferences: [], outfitFeedback: [], trendPacks: [],
       garmentCodeCounters: []
     })
     vi.mocked(importWardrobeBackup).mockResolvedValue({ added: 2, updated: 1, unchanged: 0, recoded: 1, outfits: 3 })
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
     await screen.findByRole('button', { name: 'Camisa' })
 
     await user.click(screen.getByText('Datos'))
     expect(screen.getByRole('button', { name: /exportar copia del armario/i })).toBeEnabled()
-    await user.upload(screen.getByLabelText('Seleccionar copia del armario'), new File(['zip'], 'vesta-armario.zip', { type: 'application/zip' }))
+    await user.upload(screen.getByLabelText('Seleccionar copia del armario'), new File(['zip'], 'molt-armario.zip', { type: 'application/zip' }))
     expect(await screen.findByText(/copia del 30 de octubre de 2026/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Combinar con mi armario' }))
 
@@ -84,12 +73,14 @@ describe('wardrobe flow', () => {
 
   it('keeps adding garments inside the wardrobe flow, not in bottom navigation', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
 
     const navigation = screen.getByRole('navigation', { name: 'Navegación principal' })
     expect(navigation).toHaveTextContent('Armario')
     expect(navigation).toHaveTextContent('Outfits')
     expect(navigation).toHaveTextContent('Maleta')
+    expect(navigation).toHaveTextContent('Inicio')
+    expect(navigation).toHaveTextContent('Historial')
     expect(navigation).not.toHaveTextContent('Añadir')
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
     expect(screen.getByRole('heading', { name: /añadir prenda/i })).toBeInTheDocument()
@@ -106,10 +97,11 @@ describe('wardrobe flow', () => {
       modelId: 'wargoninnovation/wargon-clothing-classifier',
       modelVersion: 'test-revision',
       calibrated: false,
+      segmentations: [],
       analyzedAt: '2026-10-20T12:00:00.000Z'
     })
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
     await user.upload(
@@ -132,12 +124,14 @@ describe('wardrobe flow', () => {
     await user.type(nameInput, 'Top de entrenamiento')
     await user.clear(screen.getByLabelText('Marca'))
     expect(nameInput).toHaveValue('Top de entrenamiento')
+    await user.type(screen.getByLabelText(/Precio/), '19,95')
 
     await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
     expect(await screen.findByRole('button', { name: 'Top de entrenamiento' })).toBeInTheDocument()
     expect(await database.garments.toArray()).toEqual([
       expect.objectContaining({
         name: 'Top de entrenamiento',
+        price: 19.95,
         subcategory: 'Prenda deportiva',
         seasons: ['Primavera', 'Otoño', 'Invierno'],
         dressLevels: ['Deportivo'],
@@ -148,13 +142,15 @@ describe('wardrobe flow', () => {
 
   it('creates, consults, edits and deletes a garment through the interface', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
-    await user.type(await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca'), 'Camisa favorita')
-    const upload = screen.getByLabelText('Seleccionar fotografía de la prenda')
+    // Before the first photo there is only the place to add it: the fields come with something to review.
+    const upload = await screen.findByLabelText('Seleccionar fotografía de la prenda')
+    expect(screen.queryByPlaceholderText('p. ej. Camiseta azul · Marca')).not.toBeInTheDocument()
     const image = new File(['image-bytes'], 'camisa.png', { type: 'image/png' })
     await user.upload(upload, image)
+    await user.type(await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca'), 'Camisa favorita')
     await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
 
     expect(await screen.findByRole('button', { name: 'Camisa favorita' })).toBeInTheDocument()
@@ -189,14 +185,28 @@ describe('wardrobe flow', () => {
     expect(await screen.findByRole('heading', { name: 'Camisa actualizada' })).toBeInTheDocument()
     expect(await database.garments.count()).toBe(1)
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    // Works where window.confirm is silenced, as in embedded views: it would answer «no» without asking.
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('¿Eliminar esta prenda? No se puede deshacer.')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    expect(await database.garments.count()).toBe(1)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+    await user.click(await screen.findByRole('button', { name: 'Eliminar prenda' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(await database.garments.count()).toBe(0)
     expect(await database.garmentPhotos.count()).toBe(0)
     expect(await database.garmentThumbnails.count()).toBe(0)
     expect(screen.getByText('Tu armario empieza aquí.')).toBeInTheDocument()
-    expect(window.confirm).toHaveBeenCalledWith('¿Eliminar esta prenda? No se puede deshacer')
+    expect(window.confirm).not.toHaveBeenCalled()
   })
 
   it('combines multiple photos, applies a model alternative and persists the photo set', async () => {
@@ -210,10 +220,11 @@ describe('wardrobe flow', () => {
       modelId: 'wargoninnovation/wargon-clothing-classifier',
       modelVersion: 'test-revision',
       calibrated: true,
+      segmentations: [],
       analyzedAt: '2026-10-20T12:00:00.000Z'
     })
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
     const upload = await screen.findByLabelText('Seleccionar fotografía de la prenda')
@@ -257,9 +268,10 @@ describe('wardrobe flow', () => {
       alternatives: [],
       confidenceByAttribute: { category: 0.9, subcategory: 0.8, colors: 0.7 },
       unknownAttributes: ['size', 'textileComposition'],
-      modelId: 'vesta/dinov2-small-heads',
+      modelId: 'molt/dinov2-small-heads',
       modelVersion: 'heads-test',
       calibrated: true,
+      segmentations: [],
       analyzedAt: '2026-10-30T12:00:00.000Z'
     })
     vi.mocked(readGarmentLabel).mockResolvedValue({
@@ -268,7 +280,7 @@ describe('wardrobe flow', () => {
       composition: { value: '100 % piel', text: '100% LEATHER', score: 0.9 }
     })
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
     await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['shoe'], 'zapatilla.png', { type: 'image/png' }))
@@ -293,30 +305,125 @@ describe('wardrobe flow', () => {
     expect(saved?.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', composition: 'paddle-ocr' })
   })
 
-  it('filters the visible catalogue by category', async () => {
-    await database.garments.add({
-      id: 'top-1',
-      name: 'Camisa',
+  it('keeps the usable photos when one of those chosen is too large', async () => {
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+
+    const tooLarge = new File(['big'], 'grande.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(tooLarge, 'size', { value: 26 * 1024 * 1024 })
+    const allowed = new File(['ok'], 'buena.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(allowed, 'size', { value: 24 * 1024 * 1024 })
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), [tooLarge, allowed])
+
+    expect(await screen.findByText(/1 archivo no se ha añadido.*25 MB o menos/)).toBeInTheDocument()
+    await waitFor(() => expect(vi.mocked(analyzeGarmentImage)).toHaveBeenCalled())
+    expect(vi.mocked(analyzeGarmentImage).mock.lastCall?.[0]).toEqual([allowed])
+  })
+
+  it('replaces typed brand, size and composition with what a new label photo reads', async () => {
+    vi.mocked(analyzeGarmentImage).mockResolvedValue({
       category: 'Parte superior',
-      subcategory: '',
+      subcategory: 'Camiseta',
+      colors: ['Negro'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9, subcategory: 0.8, colors: 0.7 },
+      unknownAttributes: [],
+      modelId: 'molt/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      segmentations: [],
+      analyzedAt: '2026-10-30T12:00:00.000Z'
+    })
+    vi.mocked(readGarmentLabel)
+      .mockResolvedValueOnce({ lines: [{ text: 'XL', score: 0.95 }], brand: { brand: 'Nike', score: 0.95, text: 'NIKE' } })
+      .mockResolvedValueOnce({ lines: [{ text: '-XXL-', score: 0.95 }], composition: { value: '100 % algodón', text: '100% COTTON', score: 0.9 } })
+    const user = userEvent.setup()
+    await renderInWardrobe()
+
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['tee'], 'camiseta.png', { type: 'image/png' }))
+    await user.type(screen.getByLabelText('Marca'), 'Zara')
+    await user.type(screen.getByLabelText('Talla'), 'S')
+    await user.type(screen.getByLabelText('Composición'), '50 % lino')
+
+    await user.upload(screen.getByLabelText('Seleccionar foto de la etiqueta'), new File(['label 1'], 'etiqueta.png', { type: 'image/png' }))
+    await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('XL'))
+    expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
+    expect(screen.getByLabelText('Composición')).toHaveValue('50 % lino') // not read on this label
+
+    await user.upload(screen.getByLabelText('Cambiar foto de la etiqueta'), new File(['label 2'], 'etiqueta-2.png', { type: 'image/png' }))
+    await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('XXL'))
+    expect(screen.getByLabelText('Composición')).toHaveValue('100 % algodón')
+    expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
+  })
+
+  it('filters the visible catalogue by category and search', async () => {
+    const garment = {
       colors: [],
+      thumbnail: new Blob(['thumbnail']),
       width: 120,
       height: 180,
       seasons: [],
       styles: [],
-      dressLevels: ['Diario'],
-      role: 'Top',
+      dressLevels: ['Diario' as const],
+      image: new Blob(['image']),
       confirmedAttributes: [],
       suggestedAttributes: [],
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z'
-    })
-    await database.garmentThumbnails.add({ garmentId: 'top-1', thumbnail: new Blob(['thumbnail']) })
+    }
+    await database.garments.bulkAdd([
+      { ...garment, id: 'top-1', name: 'Camisa', category: 'Parte superior', subcategory: '', role: 'Top' },
+      { ...garment, id: 'bottom-1', name: 'Vaqueros', category: 'Parte inferior', subcategory: '', role: 'Bottom' }
+    ])
     const user = userEvent.setup()
-    render(<App />)
+    await renderInWardrobe()
 
     await screen.findByRole('button', { name: 'Camisa' })
-    await user.selectOptions(screen.getByLabelText('Filtrar por categoría'), 'Parte inferior')
+    // Only the categories in the wardrobe are offered, with how many garments each has.
+    expect(screen.queryByRole('button', { name: /Calzado/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Parte inferior 1' }))
+    expect(screen.queryByRole('button', { name: 'Camisa' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Vaqueros' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Todas 2' }))
+    await user.type(screen.getByLabelText('Buscar prendas'), 'zzz')
     expect(await screen.findByText('No encontramos esa prenda.')).toBeInTheDocument()
+  })
+
+  it('offers the three ways of adding garments as tabs', async () => {
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.click(screen.getByRole('button', { name: 'Varias prendas' }))
+    expect(await screen.findByRole('heading', { name: /añadir varias prendas/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Varias prendas' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Desde un look' }))
+    expect(await screen.findByRole('heading', { name: /desde un look/i })).toBeInTheDocument()
+  })
+
+  it('opens on Inicio with the guide when the wardrobe is empty, which stays closed afterwards', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /Te damos la bienvenida/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Fotografía tus prendas' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(screen.getByRole('heading', { name: 'Crea tus outfits' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Paso 2 de 5/ })).toHaveAttribute('aria-current', 'step')
+    await user.click(screen.getByRole('button', { name: /Paso 5 de 5/ }))
+    expect(screen.getByRole('heading', { name: 'Tu armario es tuyo' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Entendido' }))
+    expect(screen.queryByRole('heading', { name: 'Cómo funciona' })).not.toBeInTheDocument()
+
+    unmount()
+    render(<App />)
+    await screen.findByRole('heading', { name: /Te damos la bienvenida/ })
+    expect(screen.queryByRole('heading', { name: 'Cómo funciona' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cómo funciona' }))
+    expect(screen.getByRole('heading', { name: 'Fotografía tus prendas' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Añadir prendas' }))
+    expect(await screen.findByRole('heading', { name: /Añadir varias prendas/ })).toBeInTheDocument()
   })
 })
