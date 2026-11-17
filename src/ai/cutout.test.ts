@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alphaBox, outlineFound, plainBackgroundAlpha, singleGarmentRegion, tidyAlpha } from './cutout'
+import { alphaBox, lightOnLight, outlineFound, plainBackgroundAlpha, singleGarmentRegion, tidyAlpha } from './cutout'
 import { regionMask, type SegmentationMap } from './segmentation'
 
 const classes = ['background', 'top', 'bottom', 'one-piece', 'outerwear', 'footwear', 'accessory']
@@ -138,5 +138,28 @@ describe('tidying a cut-out', () => {
     alpha[at(1, 20)] = 0
     tidyAlpha(alpha, size, size, new Uint8Array(region.length).fill(1))
     expect(alpha[at(0, 20)]).toBe(0)
+  })
+})
+
+describe('light garment on a light backdrop', () => {
+  // 40 × 40: backdrop around, garment in the square 10–29 (its inside is 14–25).
+  const size = 40
+  const inside = new Uint8Array(size * size).map((_, i) => (i % size >= 14 && i % size < 26 && Math.floor(i / size) >= 14 && Math.floor(i / size) < 26 ? 1 : 0))
+  const photo = (garment: [number, number, number], backdrop: [number, number, number]) => {
+    const data = new Uint8ClampedArray(size * size * 4)
+    for (let i = 0; i < size * size; i += 1) {
+      const x = i % size
+      const y = Math.floor(i / size)
+      const colour = x >= 10 && x < 30 && y >= 10 && y < 30 ? garment : backdrop
+      data.set([...colour, 255], i * 4)
+    }
+    return data
+  }
+
+  it('is told apart from a light garment on a dark backdrop and a dark one on a light backdrop', () => {
+    expect(lightOnLight(photo([232, 225, 200], [236, 236, 233]), size, size, inside)).toBe(true) // cream on pale grey
+    expect(lightOnLight(photo([240, 240, 240], [160, 30, 40]), size, size, inside)).toBe(false) // white on red
+    expect(lightOnLight(photo([30, 30, 35], [240, 240, 240]), size, size, inside)).toBe(false) // black on white
+    expect(lightOnLight(photo([140, 180, 220], [240, 240, 240]), size, size, inside)).toBe(false) // light denim on white
   })
 })

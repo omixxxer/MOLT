@@ -1,4 +1,4 @@
-import { garmentColors, type ColorShare } from './colors'
+import { garmentColors, toLab, type ColorShare } from './colors'
 import { encodeImage, outline, outlineAlpha } from './sam'
 import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Region, type SegmentationMap } from './segmentation'
 
@@ -238,6 +238,36 @@ export function tidyAlpha(alpha: Uint8ClampedArray, width: number, height: numbe
   }
 }
 
+/**
+ * A light garment on a light backdrop (a cream jacket on pale grey): the plain fill takes parts of it for backdrop
+ * (shoulders, sleeves) even when its inside is kept. True when the inside of the region (`inside`, same size) and
+ * the photo's border are both light (Lab L above 70) and close in colour (ΔE under 20). Exported for tests.
+ */
+export function lightOnLight(data: Uint8ClampedArray, width: number, height: number, inside: Uint8Array): boolean {
+  const average = (pick: (i: number) => boolean) => {
+    const sum = [0, 0, 0]
+    let count = 0
+    for (let i = 0; i < inside.length; i += 3) {
+      if (!pick(i)) continue
+      const [l, a, b] = toLab(data[i * 4]!, data[i * 4 + 1]!, data[i * 4 + 2]!)
+      sum[0]! += l
+      sum[1]! += a
+      sum[2]! += b
+      count += 1
+    }
+    return count ? sum.map((value) => value / count) as [number, number, number] : undefined
+  }
+  const edge = 4
+  const garment = average((i) => inside[i] === 1)
+  const border = average((i) => {
+    const x = i % width
+    const y = (i - x) / width
+    return x < edge || y < edge || x >= width - edge || y >= height - edge
+  })
+  if (!garment || !border) return false
+  return garment[0] > 70 && border[0] > 70 && Math.hypot(garment[0] - border[0], garment[1] - border[1], garment[2] - border[2]) < 20
+}
+
 /** Share of the region (mask of the same size) the alpha covers, and of the alpha inside the region. */
 function agreement(alpha: Uint8ClampedArray, region: Uint8Array): { recall: number; precision: number } {
   let inRegion = 0
@@ -323,6 +353,11 @@ export async function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 's
         const { recall, precision } = agreement(plain, near)
         // High precision: on a model photo the fill keeps the person (head, arms, the other garments) too.
         if (recall >= 0.4 && precision >= 0.92) alpha = plain.slice()
+        // A light garment on a light backdrop loses pieces to the fill: SlimSAM's outline is added to what it kept.
+        if (alpha && mode === 'single' && lightOnLight(pixels.data, work.width, work.height, coarse(region, -1))) {
+          const outlined = await outlineWithSam(region)
+          if (outlined) for (let i = 0; i < alpha.length; i += 1) alpha[i] = Math.max(alpha[i]!, outlined[i]!)
+        }
       }
       alpha ??= await outlineWithSam(region)
       if (!alpha) continue
