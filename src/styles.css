@@ -26,6 +26,12 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; min-height: 100%; background: var(--white); }
+/* Keyboard focus never lands under what stays on screen: the bottom navigation, the bars pinned over it (outfit actions,
+   form and batch footers) and the wardrobe's search bar at the top. Scrolling to a focused element leaves this room. */
+html { scroll-padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+html:has(.garment-form > .form-footer, .batch-dock) { scroll-padding-bottom: calc(156px + env(safe-area-inset-bottom)); }
+html:has(.wardrobe-toolbar) { scroll-padding-top: 132px; }
+.detail-panel:has(.form-footer) { scroll-padding-bottom: 96px; }
 body { min-width: 320px; min-height: 100vh; margin: 0; background: transparent; }
 button, input, select, textarea { color: inherit; font: inherit; }
 button { cursor: pointer; }
@@ -510,6 +516,9 @@ button.choice-chip { font-family: inherit; }
 .studio { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .studio-plan { display: grid; gap: 10px; }
 .studio-link { padding: 0; border: 0; background: transparent; font-size: var(--text-label); text-decoration: underline; }
+/* A text button is small; an invisible margin around it makes it about 44 px high to tap, without moving anything. */
+.studio-link { position: relative; }
+.studio-link::after { content: ''; position: absolute; inset: -13px -6px; }
 .studio-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 20px; }
 @media (min-width: 860px) {
   .studio-layout { grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 28px; }
@@ -560,6 +569,8 @@ button.choice-chip { font-family: inherit; }
 .picker-best { position: absolute; top: 6px; left: 6px; padding: 2px 7px; border-radius: 10px; color: var(--white); background: var(--ink); font-size: var(--text-caption); font-weight: 650; }
 .picker-name { font-size: var(--text-label); line-height: 1.3; overflow-wrap: anywhere; }
 .picker-wash, .picker-away button { justify-self: start; padding: 0; border: 0; background: transparent; font-size: var(--text-small); text-decoration: underline; opacity: .8; }
+.picker-wash, .picker-away button { position: relative; }
+.picker-wash::after, .picker-away button::after { content: ''; position: absolute; inset: -3px -6px -11px; }
 .picker-away h3 { margin: 4px 0 8px; font-size: var(--text-body); font-weight: 650; }
 .picker-away ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .picker-away li { display: flex; align-items: center; gap: 10px; font-size: var(--text-body); }
@@ -807,7 +818,7 @@ button.choice-chip { font-family: inherit; }
 .packing-list h3 { margin: 10px 0 2px; font-size: var(--text-label); font-weight: 650; }
 .packing-list section:first-child h3 { margin-top: 0; }
 .packing-item small { display: block; font-size: var(--text-small); font-weight: 400; }
-.packing-extra label { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.packing-extra label { display: flex; flex: 1; align-self: stretch; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
 .packing-extra input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
 .packing-extra[data-packed] label span { text-decoration: line-through; opacity: .6; }
 .packing-extra button { display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; }
@@ -938,7 +949,19 @@ button.choice-chip { font-family: inherit; }
 .look-garments small { color: var(--ink); font-size: var(--text-caption); }
 .look-include, .look-save-outfit { display: flex; gap: 7px; align-items: center; font-size: var(--text-label); font-weight: 650; }
 
-/* Phones: one reading size, and everything tapped at least 40 px high. */
+/* Anything used with a finger (phones, and tablets in the wider layout too): everything tapped at least 40 px high. */
+@media (max-width: 720px), (pointer: coarse) {
+  .category-chips button, .choice-chip { min-height: 40px; border-radius: 20px; }
+  .add-modes button, .outfit-tabs [role="tab"], .trip-tabs [role=tab], .batch-tabs button { min-height: 44px; }
+  .studio-slot-tools .icon-button, .photo-stage-remove, .guide-steps button { width: 40px; height: 40px; }
+  .analysis-alternatives button, .trip-add { min-height: 40px; border-radius: 20px; }
+  .outfit-actions .button, .packing-add .button, .packing-add input, .trip-occasion select, .batch-other { min-height: 44px; }
+  /* The bottom navigation too (phones make it larger still, below). */
+  .molt-pill-nav { --pn-h: 52px !important; --pn-inner: 44px !important; }
+  .close-button, .packing-extra button { width: 40px; height: 40px; }
+}
+
+/* Phones: one reading size. */
 @media (max-width: 720px) {
   :root {
     --text-micro: 12px;
@@ -950,11 +973,6 @@ button.choice-chip { font-family: inherit; }
   .button { font-size: 14px; }
   .add-modes { display: flex; width: 100%; }
   .add-modes button { flex: 1 1 auto; padding: 0 6px; }
-  .category-chips button, .choice-chip { min-height: 40px; border-radius: 20px; }
-  .add-modes button, .outfit-tabs [role="tab"], .trip-tabs [role=tab], .batch-tabs button { min-height: 44px; }
-  .studio-slot-tools .icon-button, .photo-stage-remove, .guide-steps button { width: 40px; height: 40px; }
-  .analysis-alternatives button, .trip-add { min-height: 40px; border-radius: 20px; }
-  .outfit-actions .button, .packing-add .button, .packing-add input, .trip-occasion select, .batch-other { min-height: 44px; }
 
   /* The bottom navigation fills the width: five equal places, the words alone. */
   .molt-pill-nav {
@@ -972,5 +990,8 @@ button.choice-chip { font-family: inherit; }
 
   /* Bars that sit on top of the navigation. */
   .garment-form > .form-footer, .studio-actions, .batch-dock { bottom: calc(82px + env(safe-area-inset-bottom)); }
+  html { scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  html:has(.studio-actions, .garment-form > .form-footer) { scroll-padding-bottom: calc(162px + env(safe-area-inset-bottom)); }
+  html:has(.batch-dock) { scroll-padding-bottom: calc(212px + env(safe-area-inset-bottom)); }
   .screen-content { padding-bottom: calc(138px + env(safe-area-inset-bottom)); }
 }

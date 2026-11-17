@@ -116,6 +116,22 @@ El menú **Datos** del armario reúne:
 
 Formato de la copia (`molt-wardrobe-backup`, versión 1; se siguen leyendo las `vesta-wardrobe-backup` anteriores al cambio de nombre): `backup.json` con todos los registros, donde cada foto se sustituye por la ruta de su archivo en `photos/<id de prenda>/`, más esos archivos. Así podrá sincronizarse archivo a archivo más adelante.
 
+## Pantallas y teclado
+
+Revisión de Armario, Outfits y Maleta (con sus paneles, el selector de prendas, «Mis outfits», la lista de la maleta y el formulario de viaje) a 360, 768 y 1280 px, con un armario de prueba de 26 prendas, nombres largos, un outfit y un viaje. Se midió en el navegador el desbordamiento horizontal, el tamaño de cada zona táctil, lo que queda bajo la barra inferior al final de la página y dónde acaba el foco al recorrer cada pantalla con el teclado, hacia delante y hacia atrás. Problemas, de más a menos grave:
+
+1. **Grave, corregido. El foco del teclado quedaba tapado** por la barra inferior o por la barra fija de acciones de Outfits: a 360 px, 9 controles de Outfits y 7 de Maleta (algunos del todo); a 1280 px, 3 de Maleta (hasta la mitad). Incumplía WCAG 2.2, criterio 2.4.11. Ahora la página reserva ese espacio al desplazarse hacia un elemento (`scroll-padding`), también bajo la barra de búsqueda del armario y en el panel de edición de prenda: ningún control queda tapado en los tres anchos.
+2. **Media, corregido. Tabletas táctiles con tamaños de ratón:** a partir de 721 px los controles medían 30–38 px y la barra inferior 36 px, porque los tamaños para el dedo solo se aplicaban en anchos de móvil. Ahora dependen también del tipo de puntero: con el dedo, 40–44 px en cualquier ancho; con ratón, nada cambia.
+3. **Media, corregido. Botones de texto de 16–18 px de alto** («Empezar de cero», «Añadir tu ciudad», «A la lavadora»): una zona invisible alrededor los lleva a 30–43 px sin mover nada ni pisar los controles vecinos.
+4. **Media, corregido. Lista de la maleta:** la casilla de lo que no es ropa solo respondía sobre el texto (19 px de una fila de 44), y los botones de quitar y de cerrar medían 28 y 34 px. Ahora toda la fila marca y, con el dedo, los botones miden 40 px.
+5. **Leve, se deja.** El enlace «Datos de Open-Meteo» mide 15 px de alto, pero va dentro de una frase (excepción del criterio 2.5.8).
+6. **Leve, se deja.** Chips e iconos miden 40 px con el dedo: por encima del mínimo de WCAG (24 px) y por debajo de los 44 px que recomienda Apple.
+7. **Leve, se deja.** A 768 px la barra de acciones de Outfits no queda fija y el contenido pasa bajo la barra inferior al desplazarse (con un desenfoque que no bloquea los toques). Al final de la página no queda nada tapado.
+
+**Sin problemas:** ninguna pantalla desborda en horizontal en los tres anchos; las barras fijas quedan 10 px por encima de la navegación; el detalle y el selector se abren por encima de la navegación, reciben el foco y se cierran con Escape; el foco se ve al usar Tab. El gesto de deslizar en Outfits (cambiar de idea) tiene su alternativa en los botones de «Otras ideas» y en «Otra combinación», que funcionan con teclado.
+
+**Sin revisar:** dispositivos reales (iOS Safari, Android), lectores de pantalla, horizontal en móvil, el formulario con una foto ya elegida (su barra se comprobó solo por sus medidas en CSS) y la importación de varias prendas con fotos.
+
 ## Privacidad
 
 - Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
@@ -257,6 +273,7 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [ ] Copia en Drive por archivos (solo las fotos que cambian) en lugar de un ZIP completo, para armarios grandes.
 - [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.
 - [x] Guardar los planes de viaje.
+- [x] Revisar Armario, Outfits y Maleta en móvil, tableta y escritorio, con teclado (ver «Pantallas y teclado»).
 - [ ] Tendencias, con una fuente fiable y fechada.
 - [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB).
 - [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
