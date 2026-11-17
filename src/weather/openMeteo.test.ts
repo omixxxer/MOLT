@@ -167,3 +167,105 @@ describe('getForecast', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+
+// Phase 4: places that do not exist, network errors and forecasts that cover only part of what was asked.
+
+/** The service as it answers: the days between start_date and end_date, both included. */
+function answerDates(input: URL) {
+  const url = new URL(String(input))
+  const dates: string[] = []
+  for (let day = new Date(`${url.searchParams.get('start_date')}T12:00:00Z`); day <= new Date(`${url.searchParams.get('end_date')}T12:00:00Z`); day = new Date(day.getTime() + 86_400_000)) {
+    dates.push(day.toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+describe('searchPlaces when something goes wrong', () => {
+  it('finds nothing for a place that does not exist, as the service answers it', async () => {
+    // Open-Meteo leaves out «results» when nothing matches.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ generationtime_ms: 0.4 })))
+    expect(await searchPlaces('Ciudadquenoexiste')).toEqual([])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ results: [] })))
+    expect(await searchPlaces('Ciudadquenoexiste')).toEqual([])
+  })
+
+  it('tries again once without network and then says to check the connection', async () => {
+    const offline = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', offline)
+    await expect(searchPlaces('Valencia')).rejects.toMatchObject({ kind: 'offline', message: expect.stringMatching(/conexión/) })
+    expect(offline).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops without retrying when the search is cancelled', async () => {
+    const controller = new AbortController()
+    const fetchMock = vi.fn((_input: URL, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const search = searchPlaces('Valencia', controller.signal)
+    controller.abort()
+    await expect(search).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not blame the connection for an answer it cannot read', async () => {
+    const broken = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token <') } })
+    vi.stubGlobal('fetch', broken)
+    await expect(searchPlaces('Valencia')).rejects.toMatchObject({ kind: 'service' })
+  })
+})
+
+describe('getForecast with partial answers', () => {
+  it('refuses a forecast that does not reach every day asked for', async () => {
+    const dates = days(1, 3)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(daily(dates.slice(0, 2)))))
+    await expect(getForecast(valencia, dates[0]!, 3)).rejects.toMatchObject({ kind: 'service', message: expect.stringMatching(/no cubre/) })
+  })
+
+  it('refuses a day without temperatures, and reads a day without the optional values', async () => {
+    const dates = days(1, 2)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(daily(dates, { temperature_2m_max: [20, null] }))))
+    await expect(getForecast(valencia, dates[0]!, 2)).rejects.toMatchObject({ kind: 'service', message: expect.stringMatching(/incompleta/) })
+
+    localStorage.clear()
+    const bare = { daily: { time: dates, temperature_2m_max: [20, 22], temperature_2m_min: [10, 12] } }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(bare)))
+    const { days: result } = await getForecast(valencia, dates[0]!, 2)
+    expect(result[0]).toEqual(expect.objectContaining({ temperatureCelsius: 16, high: 20, low: 10, rainChance: undefined, windKmh: undefined, conditions: ['condiciones variables'] }))
+  })
+
+  it('does not hand over part of a trip as if it were all of it when the service fails', async () => {
+    const dates = days(1, 3)
+    const now = new Date()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(daily(dates.slice(0, 2)))))
+    await getForecast(valencia, dates[0]!, 2, { now })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    // Two of the three days are known, but a plan needs all of them.
+    await expect(getForecast(valencia, dates[0]!, 3, { now })).rejects.toMatchObject({ kind: 'offline' })
+  })
+
+  it('fails as a whole when one of the past years cannot be read', async () => {
+    const now = new Date('2026-11-17T12:00:00')
+    // 2025 answers; 2024 fails twice.
+    vi.stubGlobal('fetch', vi.fn(async (input: URL) => new URL(String(input)).searchParams.get('start_date')!.startsWith('2025')
+      ? ok(daily(answerDates(input)))
+      : { ok: false, status: 500 }))
+    await expect(getForecast(valencia, '2026-12-17', 1, { now })).rejects.toMatchObject({ kind: 'service' })
+  })
+
+  it('averages past years for a trip far ahead across 29 February', async () => {
+    // 2028 is a leap year: 28 Feb to 1 Mar is three days, two in the years before.
+    const now = new Date('2026-11-17T12:00:00')
+    const fetchMock = vi.fn(async (input: URL) => ok(daily(answerDates(input))))
+    vi.stubGlobal('fetch', fetchMock)
+    const { days: result } = await getForecast(valencia, '2028-02-28', 3, { now })
+    expect(result.map((day) => day.date)).toEqual(['2028-02-28', '2028-02-29', '2028-03-01'])
+    expect(result.every((day) => day.source === 'climate')).toBe(true)
+
+    // And the other way round: from a normal year, a range of past years that includes 29 February.
+    localStorage.clear()
+    const { days: after } = await getForecast(valencia, '2029-02-27', 4, { now })
+    expect(after.map((day) => day.date)).toEqual(['2029-02-27', '2029-02-28', '2029-03-01', '2029-03-02'])
+    for (const call of fetchMock.mock.calls.slice(-2)) expect(answerDates(call[0] as URL)).toHaveLength(4)
+  })
+})

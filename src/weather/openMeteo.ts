@@ -136,7 +136,14 @@ async function fetchJson<T>(url: URL, signal?: AbortSignal, attempt = 1): Promis
   signal?.addEventListener('abort', onAbort)
   try {
     const response = await fetch(url, { signal: timeout.signal })
-    if (response.ok) return await response.json() as T
+    if (response.ok) {
+      try {
+        return await response.json() as T
+      } catch {
+        // It answered, so the connection works: what came is not what was expected.
+        throw new WeatherError('service', 'La respuesta del servicio del tiempo no se ha podido leer.')
+      }
+    }
     if (response.status === 429) throw new WeatherError('limit', 'El servicio del tiempo está saturado. Inténtalo dentro de un rato.')
     if (response.status >= 500 && attempt < 2) return await fetchJson<T>(url, signal, attempt + 1)
     throw new WeatherError('service', `El servicio del tiempo no ha podido responder (${response.status}).`)
@@ -227,12 +234,14 @@ async function fetchForecast(place: Place, start: string, count: number, signal?
 /** What these dates were like, on average, in the last years. */
 async function fetchClimate(place: Place, start: string, count: number, signal?: AbortSignal): Promise<DailyWeather[]> {
   const years = await Promise.all(Array.from({ length: CLIMATE_YEARS }, async (_, index) => {
+    // The same number of days in each past year: a range across 29 February has one day more or less in another year.
+    const yearStart = withYearsBack(start, index + 1)
     const url = new URL('https://archive-api.open-meteo.com/v1/archive')
     url.search = new URLSearchParams({
       ...coordinates(place),
       daily: 'temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max',
-      start_date: withYearsBack(start, index + 1),
-      end_date: withYearsBack(shiftDay(start, count - 1), index + 1)
+      start_date: yearStart,
+      end_date: shiftDay(yearStart, count - 1)
     }).toString()
     return daysFrom(await fetchJson<DailyResponse>(url, signal), count)
   }))

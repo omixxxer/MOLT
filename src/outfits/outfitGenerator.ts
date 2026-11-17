@@ -83,8 +83,18 @@ const MAX_RESULTS = 5
 const DAY = 86_400_000
 const FEEDBACK_HALF_LIFE_DAYS = 60
 
+// Scoring an outfit compares the same few words (colours, styles, conditions) thousands of times per search: each is
+// normalised once. The texts come from the wardrobe and the weather, so the cache stays small.
+const normalized = new Map<string, string>()
+
 function normalize(value: string) {
-  return value.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  let result = normalized.get(value)
+  if (result === undefined) {
+    result = value.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+    if (normalized.size > 5000) normalized.clear()
+    normalized.set(value, result)
+  }
+  return result
 }
 
 function isAvailable(garment: Garment) {
@@ -109,7 +119,18 @@ const COOL_FIBRES = /lino|seda/i
 const OPEN_SHOES = new Set(['sandalias', 'chanclas'])
 const RAIN_LAYERS = new Set(['chubasquero', 'abrigo', 'plumifero'])
 
-const subcategoryId = (garment: Garment) => matchLabel('subcategory', garment.subcategory)
+// The same for the taxonomy id of each subcategory, read several times per outfit.
+const subcategoryIds = new Map<string, string | null>()
+
+function subcategoryId(garment: Garment) {
+  let id = subcategoryIds.get(garment.subcategory)
+  if (id === undefined) {
+    id = matchLabel('subcategory', garment.subcategory)
+    if (subcategoryIds.size > 5000) subcategoryIds.clear()
+    subcategoryIds.set(garment.subcategory, id)
+  }
+  return id
+}
 
 function warmth(garment: Garment) {
   const base = WARMTH[subcategoryId(garment) ?? ''] ?? WARMTH_BY_ROLE[garment.role]
@@ -290,18 +311,71 @@ function eventWeight(event: OutfitFeedback, now: number) {
   return strength * 0.5 ** (age / FEEDBACK_HALF_LIFE_DAYS)
 }
 
-function preferenceScore(garments: Garment[], options: OutfitGenerationOptions) {
-  const feedback = options.feedback ?? []
+/** What the history says, worked out once per search instead of once per outfit scored. */
+interface History {
+  feedback: OutfitFeedback[] | undefined
+  wear: WearEvent[] | undefined
+  now: number
+  /** The weight today of each piece of feedback that still counts. */
+  weights: number[]
+  /** The feedback (positions in weights) that mentions each garment. */
+  eventsOf: Map<string, number[]>
+  /** Feedback weight of each garment, for who enters the search. */
+  byGarment: Map<string, number>
+  /** Days since each garment was last worn. */
+  worn: Map<string, number>
+  /** Combinations worn in the last two weeks. */
+  recentlyWorn: Set<string>
+}
+
+// A trip plans every day with the same history (in copies of the options): the last one worked out is kept.
+let lastHistory: History | undefined
+
+function historyOf(options: OutfitGenerationOptions): History {
   const now = (options.now ?? new Date()).getTime()
-  const ids = garments.map((garment) => garment.id)
-  let signal = 0
-  for (const event of feedback) {
+  const cached = lastHistory
+  // Reused while the lists are the same and, without a fixed date, for a minute.
+  if (cached && cached.feedback === options.feedback && cached.wear === options.wear
+    && (options.now ? cached.now === now : Math.abs(now - cached.now) < 60_000)) return cached
+  const weights: number[] = []
+  const eventsOf = new Map<string, number[]>()
+  const byGarment = new Map<string, number>()
+  for (const event of options.feedback ?? []) {
     const weight = eventWeight(event, now)
+    const ids = new Set(event.garmentIds)
+    for (const id of ids) byGarment.set(id, (byGarment.get(id) ?? 0) + weight * 8)
     if (!weight) continue
-    const present = ids.filter((id) => event.garmentIds.includes(id)).length
+    for (const id of ids) {
+      const list = eventsOf.get(id)
+      if (list) list.push(weights.length)
+      else eventsOf.set(id, [weights.length])
+    }
+    weights.push(weight)
+  }
+  const worn = new Map<string, number>()
+  const recentlyWorn = new Set<string>()
+  for (const event of options.wear ?? []) {
+    const age = Math.max(0, now - Date.parse(event.at)) / DAY
+    for (const id of event.garmentIds) if (!worn.has(id) || age < worn.get(id)!) worn.set(id, age)
+    if (now - Date.parse(event.at) < 14 * DAY) recentlyWorn.add([...event.garmentIds].sort().join('|'))
+  }
+  lastHistory = { feedback: options.feedback, wear: options.wear, now, weights, eventsOf, byGarment, worn, recentlyWorn }
+  return lastHistory
+}
+
+function preferenceScore(garments: Garment[], options: OutfitGenerationOptions) {
+  const ids = garments.map((garment) => garment.id)
+  const { weights, eventsOf } = historyOf(options)
+  // Only the feedback that mentions one of these garments, counted in its original order.
+  const present = new Map<number, number>()
+  for (const id of new Set(ids)) for (const index of eventsOf.get(id) ?? []) present.set(index, (present.get(index) ?? 0) + 1)
+  let signal = 0
+  for (const index of [...present.keys()].sort((a, b) => a - b)) {
+    const weight = weights[index]!
+    const count = present.get(index)!
     // What went together counts for the pair: disliking an outfit says little about each garment alone.
-    signal += weight * (present / Math.max(1, ids.length)) * (weight < 0 ? 4 : 6)
-    if (present >= 2) signal += weight * (present - 1) * 8
+    signal += weight * (count / Math.max(1, ids.length)) * (weight < 0 ? 4 : 6)
+    if (count >= 2) signal += weight * (count - 1) * 8
   }
   let score = 55 + signal
   const preferences = options.preferences
@@ -321,18 +395,11 @@ function preferenceScore(garments: Garment[], options: OutfitGenerationOptions) 
 
 /** Days since each garment was last worn. */
 function lastWorn(options: OutfitGenerationOptions) {
-  const now = (options.now ?? new Date()).getTime()
-  const days = new Map<string, number>()
-  for (const event of options.wear ?? []) {
-    const age = Math.max(0, now - Date.parse(event.at)) / DAY
-    for (const id of event.garmentIds) if (!days.has(id) || age < days.get(id)!) days.set(id, age)
-  }
-  return days
+  return historyOf(options).worn
 }
 
 function rotationScore(garments: Garment[], options: OutfitGenerationOptions) {
   const worn = lastWorn(options)
-  const now = (options.now ?? new Date()).getTime()
   let score = 80
   for (const garment of garments) {
     const days = worn.get(garment.id)
@@ -342,7 +409,7 @@ function rotationScore(garments: Garment[], options: OutfitGenerationOptions) {
     score += (days < 1.5 ? -22 : days < 3.5 ? -12 : days < 7.5 ? -5 : days > 21 ? 5 : 0) * weight
   }
   const key = outfitKey(garments)
-  if ((options.wear ?? []).some((event) => [...event.garmentIds].sort().join('|') === key && now - Date.parse(event.at) < 14 * DAY)) score -= 25
+  if (historyOf(options).recentlyWorn.has(key)) score -= 25
   // A plan in the making (a trip): the days just proposed.
   const ids = new Set(garments.map((garment) => garment.id))
   const recent = (options.recentOutfits ?? []).slice(0, 12)
@@ -448,7 +515,7 @@ function rankForRole(garment: Garment, context: OutfitContext, options: OutfitGe
   const days = worn.get(garment.id)
   return (target ? levelFit(garment, target) : 72)
     + (wanted ? 30 : 0)
-    + (options.feedback ?? []).reduce((sum, event) => sum + (event.garmentIds.includes(garment.id) ? eventWeight(event, (options.now ?? new Date()).getTime()) * 8 : 0), 0)
+    + (historyOf(options).byGarment.get(garment.id) ?? 0)
     - (days === undefined ? 0 : days < 3.5 ? 25 : days < 7.5 ? 8 : 0)
     - (shown.get(garment.id) ?? 0) * 12
     + (options.seed ? jitter(options.seed + garment.id) * 10 : 0)
