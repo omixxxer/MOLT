@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie'
+import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { assignMissingCodes, codeCounters } from './garmentCodes'
 
@@ -111,30 +111,50 @@ export class WardrobeDatabase extends Dexie {
     this.version(8)
       .stores({ garmentPhotos: 'garmentId', garmentThumbnails: 'garmentId' })
       .upgrade(async (transaction) => {
-        const garments = transaction.table('garments')
-        const photos = transaction.table('garmentPhotos')
-        const thumbnails = transaction.table('garmentThumbnails')
+        const tables = { garments: transaction.table('garments'), photos: transaction.table('garmentPhotos'), thumbnails: transaction.table('garmentThumbnails') }
         // One garment at a time, so the photos of the whole wardrobe are never in memory together.
-        for (const id of await garments.toCollection().primaryKeys()) {
-          const stored = await garments.get(id) as (Garment & Partial<GarmentPhotos> & { thumbnail?: Blob }) | undefined
-          if (!stored) continue
-          const { image, additionalImages, labelImage, cutout, thumbnail, ...fields } = stored
-          if (image) {
-            await photos.put({
-              garmentId: id,
-              image,
-              ...(additionalImages?.length ? { additionalImages } : {}),
-              ...(labelImage ? { labelImage } : {}),
-              ...(cutout ? { cutout } : {})
-            })
-          }
-          // Garments from the first versions may have no thumbnail; the photo is used in its place when read.
-          if (thumbnail) await thumbnails.put({ garmentId: id, thumbnail })
-          await garments.put({ ...fields, ...(cutout ? { hasCutout: true } : {}) })
-        }
+        for (const id of await tables.garments.toCollection().primaryKeys()) await moveInlinePhotos(tables, id as string)
       })
     if (legacyName) this.on('ready', () => moveLegacyDatabase(this, legacyName))
   }
+}
+
+/** A garment record that still carries its images, as every version before 8 saved them. */
+export function hasInlinePhotos(record: object): boolean {
+  return 'image' in record || 'thumbnail' in record || 'cutout' in record || 'additionalImages' in record || 'labelImage' in record
+}
+
+interface PhotoTables {
+  garments: Table
+  photos: Table
+  thumbnails: Table
+}
+
+/**
+ * Moves the images kept inside a garment record to their own stores; call inside a transaction over the three tables.
+ * Used by the upgrade to version 8 and to repair records written later by an app still running an older version
+ * (a tab left open across an update): Dexie opens a newer database with the older schema, which then saves photos
+ * inside the garment again. Those are the newest images of the garment, so they replace what the stores have.
+ * Returns whether anything was moved.
+ */
+export async function moveInlinePhotos(tables: PhotoTables, id: string): Promise<boolean> {
+  const stored = await tables.garments.get(id) as (Garment & Partial<GarmentPhotos> & { thumbnail?: Blob }) | undefined
+  if (!stored || !hasInlinePhotos(stored)) return false
+  const { image, additionalImages, labelImage, cutout, thumbnail, hasCutout: _hasCutout, ...fields } = stored
+  if (image) {
+    await tables.photos.put({
+      garmentId: id,
+      image,
+      ...(additionalImages?.length ? { additionalImages } : {}),
+      ...(labelImage ? { labelImage } : {}),
+      ...(cutout ? { cutout } : {})
+    })
+  }
+  // Garments from the first versions may have no thumbnail; the photo is used in its place when read.
+  if (thumbnail) await tables.thumbnails.put({ garmentId: id, thumbnail })
+  else if (image) await tables.thumbnails.delete(id)
+  await tables.garments.put({ ...fields, ...(cutout ? { hasCutout: true } : {}) })
+  return true
 }
 
 /**
