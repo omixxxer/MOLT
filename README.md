@@ -226,11 +226,11 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [ ] Copia en Drive por archivos (solo las fotos que cambian) en lugar de un ZIP completo, para armarios grandes.
 - [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.
 - [x] Guardar los planes de viaje.
+- [x] Revisar Armario, Outfits y Maleta en móvil, tableta y escritorio, con teclado (ver «Pantallas y teclado»).
 - [ ] Tendencias, con una fuente fiable y fechada.
 - [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB).
 - [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
-- [x] Revisar Armario, Outfits y Maleta en móvil, tableta y escritorio, con teclado (ver «Pantallas y teclado»).
-- [ ] Probar la usabilidad con personas y en dispositivos reales, y validar el generador con armarios grandes e incompletos.
+- [ ] Probar la usabilidad en móvil y escritorio, y validar el generador con armarios grandes e incompletos.
 
 ## Licencia
 
