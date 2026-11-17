@@ -42,7 +42,7 @@ const navigation: PillItem[] = [
   { label: 'Armario', href: '#armario', icon: <span className="pill-nav__icon" aria-hidden="true">▦</span> },
   { label: 'Outfits', href: '#outfits', icon: <span className="pill-nav__icon" aria-hidden="true">✳</span> },
   { label: 'Historial', href: '#historial', icon: <span className="pill-nav__icon" aria-hidden="true">◷</span> },
-  { label: 'Maleta', href: '#maleta', icon: <span className="pill-nav__icon" aria-hidden="true">▣</span> }
+  { label: 'Maleta', href: '#maleta', icon: <span className="pill-nav__icon pill-nav__icon--luggage" aria-hidden="true" /> }
 ]
 
 const pageHrefs: Record<Page, string> = {

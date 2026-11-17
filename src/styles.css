@@ -456,6 +456,19 @@ button.photo-stage-pill { text-decoration: underline; }
 .outfit-actions .button { min-height: 40px; padding: 0 13px; }
 .icon-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--mist); border-radius: 50%; background: var(--white); transition: background-color .18s ease; }
 .icon-button:hover { background: var(--mist); }
+
+/* A drawn icon in the navigation (Maleta): the image only gives the shape; it takes the colour of the text, light on
+   the bar and dark on the active pill. */
+.pill-nav__icon--luggage {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  background-color: currentColor;
+  -webkit-mask: url('/icons/nav-maleta.png') center / contain no-repeat;
+  mask: url('/icons/nav-maleta.png') center / contain no-repeat;
+}
+
 .outfit-folds { margin-top: 26px; }
 .outfit-folds label.form-field, .trip-form label.form-field { font-size: var(--text-label); font-weight: 650; }
 .preference-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
