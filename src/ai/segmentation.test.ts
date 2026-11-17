@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestMatch, garmentRegions, patchCenter, patchLabels, promptFor, regionMask, type SegmentationMap } from './segmentation'
+import { bestMatch, garmentRegions, patchCenter, patchLabels, promptFor, regionMask, ringPromptFor, type SegmentationMap } from './segmentation'
 
 const classes = ['background', 'top', 'bottom', 'one-piece', 'outerwear', 'footwear', 'accessory']
 
@@ -41,6 +41,23 @@ describe('segmentation regions', () => {
     }
     expect(prompt.points.slice(0, 4).every((point) => classAt(point) === 1)).toBe(true)
     expect(prompt.points.slice(4).every((point) => classAt(point) !== 1)).toBe(true)
+  })
+
+  it('can also ask with a ring of points around a single garment', () => {
+    // A top in the middle of a square photo, rows 3–12 and columns 4–11.
+    const single = map((row, col) => (row >= 3 && row <= 12 && col >= 4 && col <= 11 ? 1 : 0))
+    const [top] = garmentRegions(single, 224, 224, true)
+    const prompt = ringPromptFor(top!, 16, 224, 224)
+    const classAt = ([x, y]: [number, number]) => patchLabels(single, 224, 224)[Math.floor(y / 14) * 16 + Math.floor(x / 14)]
+    const positives = prompt.points.filter((_, index) => prompt.labels[index] === 1)
+    const negatives = prompt.points.filter((_, index) => prompt.labels[index] === 0)
+    expect(positives.length).toBeGreaterThan(4)
+    expect(positives.every((point) => classAt(point) === 1)).toBe(true)
+    // The ring is outside the top but close to it (within two patches), plus the four corners.
+    expect(negatives.length).toBeGreaterThan(8)
+    expect(negatives.every((point) => classAt(point) === 0)).toBe(true)
+    const ring = negatives.slice(0, -4)
+    expect(ring.every(([x, y]) => x >= 2 * 14 && x <= 14 * 14 && y >= 1 * 14 && y <= 15 * 14)).toBe(true)
   })
 
   it('draws a region mask and picks the candidate that matches it', () => {
