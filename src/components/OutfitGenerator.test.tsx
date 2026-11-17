@@ -16,8 +16,6 @@ function makeGarment(id: string, role: Garment['role'], change: Partial<Garment>
     styles: [],
     dressLevels: ['Diario'],
     role,
-    image: new Blob(['photo'], { type: 'image/png' }),
-    thumbnail: new Blob(['thumbnail'], { type: 'image/png' }),
     width: 100,
     height: 100,
     confirmedAttributes: [],
@@ -53,9 +51,14 @@ async function boardReady() {
 
 beforeEach(() => localStorage.clear())
 
+// The screen reads each thumbnail from its own store, by garment id.
+beforeEach(async () => {
+  await database.garmentThumbnails.bulkPut(['camisa', 'polo', 'vaqueros', 'chinos', 'zapatillas', 'lavada'].map((garmentId) => ({ garmentId, thumbnail: new Blob(['t'], { type: 'image/png' }) })))
+})
+
 afterEach(async () => {
   await database.open()
-  await Promise.all([database.outfits.clear(), database.preferences.clear(), database.outfitFeedback.clear()])
+  await Promise.all([database.outfits.clear(), database.preferences.clear(), database.outfitFeedback.clear(), database.garmentThumbnails.clear()])
   localStorage.clear()
   vi.restoreAllMocks()
 })
@@ -157,11 +160,11 @@ describe('OutfitGenerator', () => {
     expect(within(screen.getByRole('region', { name: 'Outfit' })).queryAllByRole('img')).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Elegir parte de abajo' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'chinos' }))
-    expect(onBoard()).toEqual(['chinos'])
+    // Each thumbnail is read from the database when its piece appears.
+    await waitFor(() => expect(onBoard()).toEqual(['chinos']))
     await user.click(screen.getByRole('button', { name: 'Completar el outfit' }))
-    const shown = onBoard()
-    expect(shown).toContain('chinos')
-    expect(shown.some((name) => name === 'camisa' || name === 'polo')).toBe(true)
+    await waitFor(() => expect(onBoard().some((name) => name === 'camisa' || name === 'polo')).toBe(true))
+    expect(onBoard()).toContain('chinos')
   })
 
   it('starts around the garment it comes from', async () => {

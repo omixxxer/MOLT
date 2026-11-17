@@ -9,7 +9,7 @@ import TripPlanner from './TripPlanner'
 function garment(id: string, role: GarmentRole, change: Partial<Garment> = {}): Garment {
   return {
     id, name: id, category: role === 'Top' ? 'Parte superior' : 'Parte inferior', subcategory: '', colors: [], seasons: [], styles: [], dressLevels: ['Diario'], role,
-    image: new Blob(['image']), thumbnail: new Blob(['thumbnail']), width: 100, height: 100, confirmedAttributes: [], suggestedAttributes: [],
+    width: 100, height: 100, confirmedAttributes: [], suggestedAttributes: [],
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', ...change
   }
 }

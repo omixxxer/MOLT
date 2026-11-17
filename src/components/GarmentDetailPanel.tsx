@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { europeanEquivalent } from '../ai/labelParser'
 import { categoryIdForLabel } from '../ml/taxonomy'
 import { askConfirm } from './confirmDialog'
-import type { Garment } from '../types/domain'
+import type { Garment, GarmentWithPhotos } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
 import GarmentForm from './GarmentForm'
+import { useGarmentWithPhotos } from './useGarmentImages'
 
 interface GarmentDetailPanelProps {
   garment: Garment
   onClose: () => void
-  onSave: (garment: Garment) => Promise<void>
+  onSave: (garment: GarmentWithPhotos) => Promise<void>
   onDelete: (id: string) => Promise<void>
   /** To the outfits screen, to build an outfit around this garment. */
   onCreateOutfit?: (garment: Garment) => void
@@ -26,10 +27,15 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete,
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   // A US or UK size is kept as written; its approximate European size is shown next to it.
   const european = garment.size ? europeanEquivalent(garment.size, categoryIdForLabel(garment.category)) : undefined
-  const photos = [garment.image, ...(garment.additionalImages ?? [])]
+  // The original photos are only read here, when the detail opens; the wardrobe list never carries them.
+  const { photos: stored, failed: photosFailed } = useGarmentWithPhotos(garment)
+  const photos = stored ? [stored.image, ...(stored.additionalImages ?? [])] : []
   // The cut-out first (as in the gallery), then the photos, and the label photo last, apart from them.
-  const first = garment.cutout ? 1 : 0
-  const viewable = [...(garment.cutout ? [garment.cutout] : []), ...photos, ...(garment.labelImage ? [garment.labelImage] : [])]
+  const first = stored?.cutout ? 1 : 0
+  const viewable = [...(stored?.cutout ? [stored.cutout] : []), ...photos, ...(stored?.labelImage ? [stored.labelImage] : [])]
+  const photosStatus = !stored && (
+    <p className="loading-state" role="status">{photosFailed ? 'No se pudieron leer las fotografías de esta prenda.' : 'Cargando fotografías…'}</p>
+  )
   const selectedPhoto = viewable[selectedPhotoIndex] ?? photos[0]
   const thumbLabel = (index: number) => index < first ? 'Ver sin fondo' : index >= first + photos.length ? 'Ver etiqueta' : `Ver foto ${index - first + 1}`
 
@@ -96,18 +102,21 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete,
         {isEditing ? (
           <>
             <h2 className="detail-heading" id="detail-title">Editar prenda</h2>
-            <GarmentForm
+            {photosStatus}
+            {stored && <GarmentForm
               garment={garment}
+              stored={stored}
               onSave={async (updated) => {
                 await onSave(updated)
                 setIsEditing(false)
               }}
               onCancel={() => setIsEditing(false)}
-            />
+            />}
           </>
         ) : (
           <>
             <h2 className="detail-heading" id="detail-title">{garment.name.trim() || garment.subcategory || garment.category}</h2>
+            {photosStatus}
             {selectedPhoto && (
               <>
                 <GarmentPhoto image={selectedPhoto} className="detail-photo" alt={garment.name || garment.category} />

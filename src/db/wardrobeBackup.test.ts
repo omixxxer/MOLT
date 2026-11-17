@@ -2,12 +2,12 @@
 // Node Blobs: jsdom ones do not survive the structured clone of fake-indexeddb with their contents.
 import { afterEach, describe, expect, it } from 'vitest'
 import { blobBytes, createZip, crc32, readZip } from '../ml/zip'
-import type { Garment, Outfit } from '../types/domain'
+import type { GarmentWithPhotos, Outfit } from '../types/domain'
 import { database } from './database'
 import { garmentRepository } from './garmentRepository'
 import { createWardrobeBackup, importWardrobeBackup, readWardrobeBackup } from './wardrobeBackup'
 
-const makeGarment = (id: string, extras: Partial<Garment> = {}): Garment => ({
+const makeGarment = (id: string, extras: Partial<GarmentWithPhotos> = {}): GarmentWithPhotos => ({
   id,
   name: `Prenda ${id}`,
   category: 'Parte superior',
@@ -37,7 +37,7 @@ async function text(blob: Blob | undefined) {
 }
 
 async function clearAll() {
-  await Promise.all([database.garments, database.garmentCodeCounters, database.outfits, database.preferences,
+  await Promise.all([database.garments, database.garmentPhotos, database.garmentThumbnails, database.garmentCodeCounters, database.outfits, database.preferences,
     database.outfitFeedback, database.trendPacks].map((table) => table.clear()))
 }
 
@@ -60,7 +60,11 @@ describe('wardrobe backup', () => {
     expect(backup.exportedAt).toBe('2026-10-30T12:00:00.000Z')
     expect(await importWardrobeBackup(backup, 'replace')).toMatchObject({ added: 1, outfits: 1 })
 
-    const restored = await database.garments.get('a')
+    const restored = await garmentRepository.withPhotos('a')
+    // The data record holds no image: photos and thumbnail go back to their own stores.
+    expect(Object.values(await database.garments.get('a') ?? {}).some((value) => value instanceof Blob)).toBe(false)
+    expect(await database.garmentPhotos.count()).toBe(1)
+    expect(await database.garmentThumbnails.count()).toBe(1)
     expect(restored).toMatchObject({ code: 'SDC-001', name: 'Prenda a', dressLevels: ['Diario'] })
     expect(await text(restored?.image)).toBe('foto a')
     expect(await text(restored?.thumbnail)).toBe('miniatura a')

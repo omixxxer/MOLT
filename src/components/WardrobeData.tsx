@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DriveRestore } from '../cloud/driveSync'
 import type { DriveSync } from '../cloud/useDriveSync'
 import { backupReminderSnoozedUntil, isStorageFull, lastFileBackup, recordFileBackup, shouldRemindBackup, snoozeBackupReminder, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
+import { garmentRepository } from '../db/garmentRepository'
 import type { ImportMode, WardrobeBackup } from '../db/wardrobeBackup'
 import type { Garment } from '../types/domain'
 import { askConfirm } from './confirmDialog'
@@ -151,7 +152,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     setMessage('')
     try {
       const { createTrainingExport } = await import('../ml/datasetExport')
-      download(await createTrainingExport(garments), `molt-dataset-${today()}.zip`)
+      download(await createTrainingExport(garments, garmentRepository.photos), `molt-dataset-${today()}.zip`)
       setMessage(`Exportadas ${plural(garments.length, 'prenda', 'prendas')} con sus fotos y etiquetas. El archivo se genera en este dispositivo; no incluye nombres, marcas, tallas ni notas.`)
     } catch (error) {
       console.error('No se pudo exportar el dataset:', error)

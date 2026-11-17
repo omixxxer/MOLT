@@ -10,7 +10,7 @@ const TARGET = 'target-test'
 function garment(id: string): Garment {
   return {
     id, code: `SUD-${id}`, name: id, category: 'Parte superior', subcategory: '', colors: [], seasons: [], styles: [], dressLevels: [], role: 'Top',
-    image: new Blob(['photo']), thumbnail: new Blob(['thumb']), width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
+    width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z'
   }
 }
@@ -21,6 +21,8 @@ async function seedLegacy() {
   const legacy = new WardrobeDatabase(LEGACY)
   await legacy.open()
   await legacy.garments.bulkAdd([garment('a'), garment('b')])
+  await legacy.garmentPhotos.bulkAdd(['a', 'b'].map((garmentId) => ({ garmentId, image: new Blob(['photo']) })))
+  await legacy.garmentThumbnails.bulkAdd(['a', 'b'].map((garmentId) => ({ garmentId, thumbnail: new Blob(['thumb']) })))
   await legacy.outfits.add(outfit)
   await legacy.outfitFeedback.add({ id: 'f', type: 'worn', garmentIds: ['a', 'b'], createdAt: '2026-01-01T00:00:00.000Z' })
   await legacy.garmentCodeCounters.add({ prefix: 'SUD', last: 2 })
@@ -49,6 +51,9 @@ describe('moving the wardrobe from the old database', () => {
     // Not opened by hand: the first query opens it, as in the app.
     expect((await database.garments.toArray()).map((item) => item.code).sort()).toEqual(['SUD-a', 'SUD-b'])
     expect(await database.outfits.get('o')).toEqual(outfit)
+    // Photos and thumbnails come over in their own stores.
+    expect((await database.garmentPhotos.toCollection().primaryKeys()).sort()).toEqual(['a', 'b'])
+    expect((await database.garmentThumbnails.toCollection().primaryKeys()).sort()).toEqual(['a', 'b'])
     expect(await database.outfitFeedback.count()).toBe(1)
     expect((await database.preferences.get('current'))?.preferredColors).toEqual(['Azul'])
     expect((await database.garmentCodeCounters.get('SUD'))?.last).toBe(2)

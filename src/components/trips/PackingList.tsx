@@ -3,7 +3,7 @@ import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import type { PackingGroup } from '../../trips/packingPlan'
 import type { Trip } from '../../types/domain'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
 
 interface PackingListProps {
@@ -44,7 +44,7 @@ export default function PackingList({ trip, groups, onChange }: PackingListProps
               return (
                 <label className="packing-item" key={garment.id} {...(isPacked ? { 'data-packed': '' } : {})}>
                   <input type="checkbox" checked={isPacked} onChange={(event) => onChange({ packedIds: event.target.checked ? [...trip.packedIds, garment.id] : trip.packedIds.filter((id) => id !== garment.id) })} />
-                  <GarmentPhoto image={garment.thumbnail ?? garment.image} alt="" />
+                  <GarmentThumbnail garment={garment} alt="" />
                   <span>
                     {garmentLabel(garment)}
                     <small>{days === 1 ? '1 día' : `${days} días`}{garment.availability === 'laundry' && ' · está en la lavadora'}{garment.availability === 'unavailable' && ' · está guardada'}</small>

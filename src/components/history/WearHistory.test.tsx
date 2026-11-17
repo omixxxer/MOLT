@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { database } from '../../db/database'
 import { createOutfitFeedback } from '../../outfits/outfitGenerator'
 import { localDay } from '../../stats/wardrobeStats'
@@ -11,7 +11,7 @@ import WearHistory from './WearHistory'
 function garment(id: string, role: Garment['role'], change: Partial<Garment> = {}): Garment {
   return {
     id, name: id, category: role === 'Top' ? 'Parte superior' : role === 'Bottom' ? 'Parte inferior' : 'Calzado', subcategory: '', colors: ['Azul'], seasons: [], styles: [], dressLevels: ['Diario'], role,
-    image: new Blob(['i'], { type: 'image/png' }), thumbnail: new Blob(['t'], { type: 'image/png' }), width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
+    width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', ...change
   }
 }
@@ -29,9 +29,14 @@ function setup(garments = wardrobe()) {
   return { user: userEvent.setup(), ...props }
 }
 
+// The screen reads each thumbnail from its own store, by garment id.
+beforeEach(async () => {
+  await database.garmentThumbnails.bulkPut(['camisa', 'vaqueros', 'botas', 'olvidada'].map((garmentId) => ({ garmentId, thumbnail: new Blob(['t'], { type: 'image/png' }) })))
+})
+
 afterEach(async () => {
   await database.open()
-  await Promise.all([database.outfits.clear(), database.outfitFeedback.clear(), database.preferences.clear()])
+  await Promise.all([database.outfits.clear(), database.outfitFeedback.clear(), database.preferences.clear(), database.garmentThumbnails.clear()])
   localStorage.clear()
 })
 

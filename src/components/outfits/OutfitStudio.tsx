@@ -22,7 +22,7 @@ import type { Garment, GarmentRole, Outfit } from '../../types/domain'
 import { localDay } from '../../stats/wardrobeStats'
 import { weatherContext } from '../../weather/openMeteo'
 import { useDayForecast } from '../../weather/useDayForecast'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
 import GarmentPicker from './GarmentPicker'
 import WeatherBar from '../weather/WeatherBar'
@@ -299,7 +299,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
                 {garment ? (
                   <>
                     <button type="button" className="studio-slot-photo" onClick={() => setPicking(role)} aria-label={`Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}: ahora, ${garmentLabel(garment)}`}>
-                      <span className="garment-tile"><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /></span>
+                      <span className="garment-tile"><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /></span>
                     </button>
                     <span className="studio-slot-tools">
                       <button type="button" className="icon-button" aria-pressed={locked.includes(garment.id)} onClick={() => toggleLock(garment)} aria-label={`${locked.includes(garment.id) ? 'Soltar' : 'Fijar'} ${garmentLabel(garment)}`} title={locked.includes(garment.id) ? 'Fijada: no cambiará' : 'Fijar esta prenda'}>
@@ -361,7 +361,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
                   return (
                     <li key={key}>
                       <button type="button" aria-pressed={key === boardKey} aria-label={`Idea ${index + 1}: ${look.garments.map(garmentLabel).join(', ')}`} onClick={() => showLook(look)}>
-                        {look.garments.filter((garment) => garment.role !== 'Accesorio').slice(0, 4).map((garment) => <GarmentPhoto key={garment.id} image={garment.thumbnail ?? garment.image} alt="" />)}
+                        {look.garments.filter((garment) => garment.role !== 'Accesorio').slice(0, 4).map((garment) => <GarmentThumbnail key={garment.id} garment={garment} alt="" />)}
                       </button>
                     </li>
                   )

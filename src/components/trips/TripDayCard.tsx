@@ -6,7 +6,7 @@ import { logWear } from '../../stats/wearLog'
 import { dayContext, nextOutfitForDay } from '../../trips/packingPlan'
 import type { Garment, GarmentRole, PackingStyle, TripDay } from '../../types/domain'
 import { dayFromToday } from '../../weather/openMeteo'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
 import GarmentPicker from '../outfits/GarmentPicker'
 import type { OutfitData } from '../outfits/outfitData'
@@ -104,7 +104,7 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
           {outfit.map((garment) => (
             <li key={garment.id}>
               <button type="button" onClick={() => setPicking(garment.role)} aria-label={`Cambiar ${garmentLabel(garment)}`}>
-                <span className="garment-tile"><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /></span>
+                <span className="garment-tile"><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /></span>
                 <span className="trip-piece-name">{garmentLabel(garment)}</span>
               </button>
             </li>

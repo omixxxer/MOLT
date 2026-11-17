@@ -1,4 +1,4 @@
-import type { Garment } from '../types/domain'
+import type { Garment, GarmentPhotos } from '../types/domain'
 import { categoryIdForLabel, categoryOfSubcategory, matchLabel, TAXONOMY_VERSION, type LabelHead } from './taxonomy'
 import { blobBytes, createZip, type ZipEntry } from './zip'
 
@@ -29,16 +29,16 @@ function uniqueMatches(head: LabelHead, values: string[]): string[] | null {
   return matches.length ? matches : null
 }
 
-export function photosOf(garment: Garment): Blob[] {
-  return [garment.image, ...(garment.additionalImages ?? [])]
+export function photosOf(photos: GarmentPhotos): Blob[] {
+  return [photos.image, ...(photos.additionalImages ?? [])]
 }
 
 /** Labels only: no name, brand, size or notes leave the device in the export. */
-export function toTrainingRecord(garment: Garment): TrainingRecord {
+export function toTrainingRecord(garment: Garment, photos: Blob[]): TrainingRecord {
   const subcategory = matchLabel('subcategory', garment.subcategory)
   return {
     garmentId: garment.id,
-    images: photosOf(garment).map((photo, index) => `images/${garment.id}-${index}.${extensions[photo.type] ?? 'jpg'}`),
+    images: photos.map((photo, index) => `images/${garment.id}-${index}.${extensions[photo.type] ?? 'jpg'}`),
     labels: {
       // The taxonomy decides the category when the subcategory is known (e.g. a jersey is a top).
       category: (subcategory && categoryOfSubcategory(subcategory)) ?? categoryIdForLabel(garment.category),
@@ -69,9 +69,23 @@ export function toTrainingRecord(garment: Garment): TrainingRecord {
   }
 }
 
-export async function createTrainingExport(garments: Garment[], exportedAt = new Date()): Promise<Blob> {
+/** Photos are read one garment at a time through loadPhotos; a garment whose photos are missing is left out. */
+export async function createTrainingExport(
+  garments: Garment[],
+  loadPhotos: (garmentId: string) => Promise<GarmentPhotos | undefined>,
+  exportedAt = new Date()
+): Promise<Blob> {
   const encoder = new TextEncoder()
-  const records = garments.map(toTrainingRecord)
+  const records: TrainingRecord[] = []
+  const images: ZipEntry[] = []
+  for (const garment of garments) {
+    const stored = await loadPhotos(garment.id)
+    if (!stored) continue
+    const photos = photosOf(stored)
+    const record = toTrainingRecord(garment, photos)
+    records.push(record)
+    for (const [index, name] of record.images.entries()) images.push({ name, data: await blobBytes(photos[index]!) })
+  }
   const entries: ZipEntry[] = [
     {
       name: 'export.json',
@@ -84,11 +98,5 @@ export async function createTrainingExport(garments: Garment[], exportedAt = new
     },
     { name: 'labels.jsonl', data: encoder.encode(records.map((record) => JSON.stringify(record)).join('\n') + '\n') }
   ]
-  for (const [index, garment] of garments.entries()) {
-    const photos = photosOf(garment)
-    for (const [photoIndex, name] of records[index]!.images.entries()) {
-      entries.push({ name, data: await blobBytes(photos[photoIndex]!) })
-    }
-  }
-  return createZip(entries)
+  return createZip([...entries, ...images])
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { garmentLabel } from '../OutfitBoard'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import type { GarmentOption } from '../../outfits/outfitGenerator'
 import type { Garment } from '../../types/domain'
 
@@ -51,7 +51,7 @@ export default function GarmentPicker({ title, options, unavailable, current, ca
           {options.map(({ garment }, index) => (
             <li key={garment.id}>
               <button type="button" className="picker-option" onClick={() => onPick(garment)} aria-label={garmentLabel(garment)}>
-                <span className="garment-tile"><GarmentPhoto image={garment.thumbnail ?? garment.image} alt="" /></span>
+                <span className="garment-tile"><GarmentThumbnail garment={garment} alt="" /></span>
                 {index < 3 && options.length > 3 && <span className="picker-best">Combina mejor</span>}
                 <span className="picker-name">{garmentLabel(garment)}</span>
               </button>
@@ -65,7 +65,7 @@ export default function GarmentPicker({ title, options, unavailable, current, ca
             <ul>
               {unavailable.map((garment) => (
                 <li key={garment.id}>
-                  <GarmentPhoto image={garment.thumbnail ?? garment.image} alt="" />
+                  <GarmentThumbnail garment={garment} alt="" />
                   <span>{garmentLabel(garment)}</span>
                   <button type="button" onClick={() => onAvailability(garment, 'available')} aria-label={`Marcar ${garmentLabel(garment)} como disponible`}>Ya está disponible</button>
                 </li>

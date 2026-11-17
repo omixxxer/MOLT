@@ -12,8 +12,6 @@ const garment = (id: string, role: Garment['role'], extras: Partial<Garment> = {
   styles: [],
   dressLevels: ['Diario'],
   role,
-  image: new Blob(['photo']),
-  thumbnail: new Blob(['thumbnail']),
   width: 100,
   height: 100,
   confirmedAttributes: [],

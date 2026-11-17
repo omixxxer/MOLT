@@ -1,7 +1,8 @@
 import { blobBytes, createZip, readZip, type ZipEntry } from '../ml/zip'
-import type { Garment, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
+import type { Garment, GarmentWithPhotos, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { database } from './database'
 import { codeCounters, codePrefix, nextCode } from './garmentCodes'
+import { garmentTables, getGarmentWithPhotos, putGarmentWithPhotos } from './garmentRepository'
 
 // A full copy of the wardrobe in one ZIP: backup.json holds every record, with the photos replaced by paths to
 // separate files, so the same layout can later be synced file by file (e.g. to the user's own Drive).
@@ -12,15 +13,13 @@ const LEGACY_BACKUP_FORMAT = 'vesta-wardrobe-backup'
 export const BACKUP_VERSION = 1
 const MANIFEST = 'backup.json'
 
-type PhotoField = 'image' | 'thumbnail' | 'labelImage' | 'cutout'
-
 interface PhotoReference {
   path: string
   type: string
 }
 
 /** A garment as stored in backup.json: the same fields, with each photo replaced by a reference to its file. */
-export type GarmentRecord = Omit<Garment, PhotoField | 'additionalImages'> & {
+export type GarmentRecord = Garment & {
   photos: {
     image: PhotoReference
     thumbnail: PhotoReference
@@ -48,7 +47,7 @@ interface BackupManifest {
 
 export interface WardrobeBackup {
   exportedAt: string
-  garments: Garment[]
+  garments: GarmentWithPhotos[]
   outfits: Outfit[]
   preferences: UserPreferences[]
   outfitFeedback: OutfitFeedback[]
@@ -82,7 +81,7 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
 
   // One garment at a time, so the whole wardrobe's photos are not read twice into memory.
   for (const id of await database.garments.toCollection().primaryKeys()) {
-    const garment = await database.garments.get(id)
+    const garment = await getGarmentWithPhotos(id)
     if (!garment) continue
     const { image, thumbnail, additionalImages, labelImage, cutout, ...fields } = garment
     garments.push({
@@ -142,7 +141,7 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
     if (!data) throw new Error(`Falta la foto ${reference.path} en la copia.`)
     return new Blob([data as BlobPart], { type: reference.type })
   }
-  const garments = manifest.garments.map(({ photos, ...fields }): Garment => ({
+  const garments = manifest.garments.map(({ photos, ...fields }): GarmentWithPhotos => ({
     ...fields,
     image: photo(photos.image),
     thumbnail: photo(photos.thumbnail),
@@ -163,7 +162,7 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
 }
 
 const tables = () => [
-  database.garments,
+  ...garmentTables(),
   database.garmentCodeCounters,
   database.outfits,
   database.preferences,
@@ -181,7 +180,7 @@ export async function importWardrobeBackup(backup: WardrobeBackup, mode: ImportM
     const summary: ImportSummary = { added: 0, updated: 0, unchanged: 0, recoded: 0, outfits: 0 }
     if (mode === 'replace') {
       await Promise.all(tables().map((table) => table.clear()))
-      await database.garments.bulkAdd(backup.garments)
+      for (const garment of backup.garments) await putGarmentWithPhotos(garment)
       await database.outfits.bulkAdd(backup.outfits)
       await database.preferences.bulkAdd(backup.preferences)
       await database.outfitFeedback.bulkAdd(backup.outfitFeedback)
@@ -199,7 +198,7 @@ export async function importWardrobeBackup(backup: WardrobeBackup, mode: ImportM
       const existing = await database.garments.get(garment.id)
       if (existing) {
         if (garment.updatedAt > existing.updatedAt) {
-          await database.garments.put({ ...garment, code: existing.code })
+          await putGarmentWithPhotos({ ...garment, code: existing.code })
           summary.updated += 1
         } else {
           summary.unchanged += 1
@@ -217,7 +216,7 @@ export async function importWardrobeBackup(backup: WardrobeBackup, mode: ImportM
         code = nextCode(prefix, [...codes as string[], ...backupCodes], counter?.last)
         if (garment.code) summary.recoded += 1
       }
-      await database.garments.add({ ...garment, code })
+      await putGarmentWithPhotos({ ...garment, code })
       summary.added += 1
       const [counter] = codeCounters(code ? [code] : [])
       const current = counter && await database.garmentCodeCounters.get(counter.prefix)

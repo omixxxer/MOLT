@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Garment } from '../types/domain'
+import type { Garment, GarmentPhotos } from '../types/domain'
 import { createTrainingExport, EXPORT_FORMAT, toTrainingRecord } from './datasetExport'
 import { matchLabel } from './taxonomy'
 import { crc32 } from './zip'
@@ -17,9 +17,6 @@ const makeGarment = (overrides: Partial<Garment> = {}): Garment => ({
   styles: ['Casual'],
   dressLevels: ['Arreglado'],
   role: 'Capa',
-  image: new Blob(['principal'], { type: 'image/jpeg' }),
-  additionalImages: [new Blob(['detalle'], { type: 'image/png' })],
-  thumbnail: new Blob(['thumbnail'], { type: 'image/jpeg' }),
   width: 640,
   height: 800,
   confirmedAttributes: ['category', 'colors'],
@@ -38,6 +35,12 @@ const makeGarment = (overrides: Partial<Garment> = {}): Garment => ({
   updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides
 })
+
+const stored: GarmentPhotos = {
+  image: new Blob(['principal'], { type: 'image/jpeg' }),
+  additionalImages: [new Blob(['detalle'], { type: 'image/png' })]
+}
+const photos = [stored.image, ...stored.additionalImages!]
 
 interface ParsedEntry { name: string; data: Uint8Array; crc: number }
 
@@ -86,7 +89,7 @@ describe('taxonomy matching', () => {
 
 describe('training export', () => {
   it('maps garments to taxonomy ids and records how each label was reviewed', () => {
-    const record = toTrainingRecord(makeGarment())
+    const record = toTrainingRecord(makeGarment(), photos)
     expect(record.labels).toEqual({
       category: 'top',
       subcategory: 'jersey',
@@ -103,13 +106,13 @@ describe('training export', () => {
   })
 
   it('keeps unknown values as null instead of guessing', () => {
-    const record = toTrainingRecord(makeGarment({ subcategory: 'Kimono raro', category: 'Calzado', pattern: undefined, seasons: [], colors: [] }))
+    const record = toTrainingRecord(makeGarment({ subcategory: 'Kimono raro', category: 'Calzado', pattern: undefined, seasons: [], colors: [] }), photos)
     expect(record.labels).toMatchObject({ category: 'footwear', subcategory: null, pattern: null, seasons: null, colors: null })
     expect(record.raw.subcategory).toBe('Kimono raro')
   })
 
   it('writes a valid zip with metadata, labels and every photo', async () => {
-    const archive = await createTrainingExport([makeGarment()], new Date('2026-10-28T00:00:00.000Z'))
+    const archive = await createTrainingExport([makeGarment(), makeGarment({ id: 'sin-fotos' })], async (id) => id === 'g1' ? stored : undefined, new Date('2026-10-28T00:00:00.000Z'))
     const entries = readStoredZip(await readBlob(archive))
     expect(entries.map((entry) => entry.name)).toEqual(['export.json', 'labels.jsonl', 'images/g1-0.jpg', 'images/g1-1.png'])
     for (const entry of entries) expect(entry.crc).toBe(crc32(entry.data))

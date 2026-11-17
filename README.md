@@ -7,13 +7,13 @@ Armario virtual *local-first*: catalogas tus prendas con una foto, generas outfi
 ## Funcionalidades
 
 ### Armario
-- Galería de tarjetas con búsqueda (nombre, marca, color, código…) siempre a mano y filtros por categoría con su número de prendas; carga 40 prendas por tanda. Si hay un lote de fotos en curso, un aviso lleva de vuelta a él.
+- Galería de tarjetas con búsqueda (nombre, marca, color, código…) siempre a mano y filtros por categoría con su número de prendas; carga 40 prendas por tanda y solo lee de la base las miniaturas de las prendas que muestra. Si hay un lote de fotos en curso, un aviso lleva de vuelta a él.
 - Hasta 4 fotos por prenda (JPG, PNG o WebP de hasta 25 MB cada una), con portada elegible y miniaturas locales de 640 px como máximo.
 - **Fotos reducidas al guardar:** se guardan a 2048 px por lado como máximo, en JPEG al 85 % (las transparencias, sobre blanco). Una foto de móvil de 12 MP pasa de ~3 MB a ~0,3 MB, así que 1.000 prendas ocupan unos 0,7 GB en lugar de unos 4,6 GB. Las fotos que ya miden 2048 px o menos y pesan menos de 1 MB se guardan tal cual. El análisis se hace antes, con la foto original. Las fotos guardadas antes de este cambio no se reducen.
 - **Código único por prenda** según su tipo, como `SDC-002` (sudadera con capucha nº 2) o `VAQ-001`, para distinguir prendas parecidas. No cambia al editar la prenda y no se reutiliza al borrarla.
 - **Hacer la foto en el momento:** en móviles y tabletas, «Hacer foto» abre la cámara del dispositivo, para la prenda, la etiqueta o un look. La foto se usa igual que una elegida del carrete.
 - **Añadir prenda:** pestañas para una prenda, varias o desde un look. Con una prenda, primero solo se pide la foto; después se ven la foto en grande, lo que Molt cree que es, los datos principales y, plegados con su resumen, «Uso» y «Notas».
-- Detalle de cada prenda con sus fotos, la foto de la etiqueta, los atributos y la procedencia del análisis; edición y borrado.
+- Detalle de cada prenda con sus fotos, la foto de la etiqueta, los atributos y la procedencia del análisis; edición y borrado. Las fotos originales se leen al abrir el detalle, no antes.
 
 ### Catalogación automática
 Al añadir o cambiar fotos, la app propone los campos y marca cada uno como **Sugerido** hasta que lo revisas:
@@ -133,28 +133,48 @@ React 19, TypeScript y Vite (pantallas, formulario, detalle de prenda y fondo an
 | `src/app/` | Pantallas, navegación y estado |
 | `src/components/` | Formulario y detalle de prenda, galería, generador de outfits, maleta; `garmentForm/` agrupa las piezas del formulario (fotos, etiqueta, análisis, campos, nombre sugerido y registro del análisis) |
 | `src/ai/` | Clasificador ONNX, lector de texto (OCR), marcas, talla y composición, reglas de uso, color |
-| `src/db/` | Base de datos Dexie, repositorio de prendas, códigos, copia de seguridad y miniaturas |
+| `src/db/` | Base de datos Dexie, repositorio de prendas (datos, fotos y miniaturas en almacenes separados), códigos, copia de seguridad y reducción de fotos |
 | `src/cloud/` | Inicio de sesión con Google, API de Drive y guardado automático |
 | `src/outfits/` | Generación y puntuación de outfits |
 | `src/weather/` | Cliente de Open-Meteo |
 | `src/ml/` | Taxonomía compartida con el entrenamiento y exportación de datos |
 | `ml/` | Entrenamiento, evaluación y exportación del modelo propio (Python) |
 | `public/models/` | Modelos ONNX del clasificador y del OCR, con sus avisos de licencia |
+| `bench/` | Medición de la lectura del armario en el navegador con armarios sintéticos; solo se sirve en desarrollo |
 
 ### Base de datos
 
-La base local se llama `molt-wardrobe` y está en la versión 7. Al abrirse trae los datos de `vesta-wardrobe`, el nombre anterior de la app, en una sola transacción, y borra la antigua en un arranque posterior:
+La base local se llama `molt-wardrobe` y está en la versión 8. Al abrirse trae los datos de `vesta-wardrobe`, el nombre anterior de la app, en una sola transacción, y borra la antigua en un arranque posterior:
 
 | Almacén | Índices | Contenido |
 |---|---|---|
-| `garments` | `id`, `category`, `name`, `updatedAt`, `&code` | Prendas con atributos, código, fotos, foto de la etiqueta y miniatura (`Blob`) |
+| `garments` | `id`, `category`, `name`, `updatedAt`, `&code` | Prendas: atributos, código, análisis, tamaño de la miniatura y si tienen recorte. Ningún `Blob` |
+| `garmentPhotos` | `garmentId` | Fotos originales de cada prenda (principal, adicionales, etiqueta y recorte sin fondo) como `Blob` |
+| `garmentThumbnails` | `garmentId` | Miniatura de cada prenda como `Blob` |
 | `garmentCodeCounters` | `prefix` | Último número dado a cada prefijo de código |
 | `outfits` | `id`, `createdAt`, `favorite`, `kind` | Outfits generados y manuales guardados, con historial de uso |
 | `preferences` | `id` | Preferencias del generador |
 | `outfitFeedback` | `id`, `type`, `createdAt` | Valoraciones que ajustan las puntuaciones |
 | `trendPacks` | `id`, `version`, `publishedAt` | Reservado para tendencias (sin pantalla todavía) |
+| `trips` | `id`, `startDate` | Planes de viaje guardados |
 
-Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v3, el feedback; v4, el tipo de outfit; v5, los códigos de prenda (asignados por fecha de alta) y sus contadores; v6 convierte la formalidad anterior en niveles de estilo (Casual → Diario, Smart casual → Arreglado, Formal → Formal), también en las preferencias y en los outfits guardados. Las imágenes aún van dentro del registro de cada prenda, así que leer el armario carga todos los `Blob`.
+Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v3, el feedback; v4, el tipo de outfit; v5, los códigos de prenda (asignados por fecha de alta) y sus contadores; v6 convierte la formalidad anterior en niveles de estilo (Casual → Diario, Smart casual → Arreglado, Formal → Formal), también en las preferencias y en los outfits guardados; v7 añade los viajes; v8 saca las fotos, el recorte y la miniatura de cada prenda a `garmentPhotos` y `garmentThumbnails`, prenda a prenda, sin tocar el resto de almacenes (una prenda antigua sin miniatura conserva su foto, que se usa en su lugar). La migración v7 → v8 tiene su prueba, que parte de datos en v7, en [`src/db/database.migration.test.ts`](src/db/database.migration.test.ts).
+
+**Qué se lee y cuándo.** Al abrir la app se lee solo `garments` (sin imágenes). Cada pantalla (Armario, Inicio, Outfits, Historial, Maleta) pide las miniaturas de las prendas que muestra, agrupadas en una sola lectura; las fotos originales se leen al abrir el detalle o editar y al exportar una copia o los datos de entrenamiento, nunca en la lista. Las URL de objeto se revocan cuando la imagen cambia o sale de la pantalla. Cambiar solo la disponibilidad de una prenda no reescribe sus fotos.
+
+#### Medición de la lectura inicial
+
+Con [`bench/storage.html`](bench/storage.html) (`npm run dev` y abrir `/bench/storage.html`): crea un armario sintético en una base aparte con el esquema anterior (imágenes dentro de cada prenda), mide, lo migra y vuelve a medir. Cada prenda lleva una foto de 300 kB y una miniatura de 40 kB con bytes aleatorios. Medido el 16-11-2026 en escritorio (Windows 10, Chromium 156, servidor de desarrollo), tres ejecuciones por tamaño (dos con 2.000); se da el intervalo, porque entre ejecuciones varía hasta el doble según la carga del equipo. «Lista» es la mediana de 6 lecturas, cada una con una conexión nueva.
+
+| Prendas | Lista, antes | Lista, después | `Blob` que devuelve la lista, antes | Después | Leer 40 miniaturas, antes | Después | Migración |
+|---|---|---|---|---|---|---|---|
+| 100 | 11–23 ms | 1,5–4,2 ms | 200 (34,8 MB) | 0 | 4–14 ms | 7–16 ms | 0,2–0,5 s |
+| 500 | 54–139 ms | 5–14 ms | 1.000 (174,1 MB) | 0 | 6–19 ms | 7–21 ms | 0,8–1,9 s |
+| 2.000 | 240–361 ms | 25–61 ms | 4.000 (696,3 MB) | 0 | 9–15 ms | 6–20 ms | 7–15 s |
+
+- **Tiempo:** en cada ejecución la lista se leyó entre 4 y 16 veces más rápido; la primera lectura con 2.000 prendas pasó de 0,6–1,8 s a 28–59 ms. Leer las miniaturas de la primera tanda cuesta lo mismo que antes.
+- **Memoria:** en Chromium, leer un registro no carga los bytes de sus `Blob` (leer después los 4.000 costó 3,9–5,5 s aparte), así que antes la lista ya solo retenía referencias. El crecimiento del *heap* de JavaScript al leer la lista (`performance.memory`, de poca resolución) no pasó de 4 MB ni antes ni después: no hay diferencia medible. No se ha podido medir la memoria que ocupan los `Blob` fuera del *heap*, ni Firefox, Safari o un móvil, donde el coste de la lectura anterior puede ser distinto.
+- **Límites:** la migración se hace en una sola transacción al abrir la app tras actualizar (7–15 s con 2.000 prendas en este equipo, sin indicador de progreso propio) y puede necesitar espacio para las fotos por duplicado hasta que termina. Los datos son bytes aleatorios, no JPEG reales: no se mide la decodificación de imágenes.
 
 ## Modelos de IA
 
@@ -205,7 +225,7 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [x] Prototipo: añadir prendas desde una foto de cuerpo entero y guardar el look.
 - [ ] Validar «Desde un look» con selfies reales, detectar duplicados ("¿es esta prenda?") y registrar el look como «me lo pongo hoy».
 - [x] «Me lo pongo hoy» con calendario, y estadísticas (coste por uso, prendas olvidadas, colores, marcas).
-- [ ] Separar metadatos e imágenes en IndexedDB y cargar miniaturas bajo demanda.
+- [x] Separar metadatos e imágenes en IndexedDB y cargar miniaturas bajo demanda (la lista de 2.000 prendas pasa de 240–361 ms a 25–61 ms en escritorio).
 - [x] Copia de seguridad opcional en el Google Drive del propio usuario.
 - [ ] Copia en Drive por archivos (solo las fotos que cambian) en lugar de un ZIP completo, para armarios grandes.
 - [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.

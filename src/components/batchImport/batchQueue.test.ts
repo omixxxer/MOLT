@@ -60,7 +60,7 @@ async function analysed() {
 
 afterEach(async () => {
   clearBatch()
-  await database.garments.clear()
+  await Promise.all([database.garments.clear(), database.garmentPhotos.clear(), database.garmentThumbnails.clear()])
 })
 
 describe('many garments at once', () => {
@@ -126,8 +126,13 @@ describe('many garments at once', () => {
       composition: '95 % algodón, 5 % elastano',
       colors: ['Negro']
     })
-    expect(saved[1]!.labelImage).toBeDefined()
-    expect(saved[1]!.cutout).toBeDefined()
+    // The images are saved apart from the garment's data.
+    const photos = await database.garmentPhotos.get(saved[1]!.id)
+    expect(photos?.labelImage).toBeDefined()
+    expect(photos?.cutout).toBeDefined()
+    expect(saved[1]!.hasCutout).toBe(true)
+    expect(saved[1]).not.toHaveProperty('image')
+    expect(await database.garmentThumbnails.count()).toBe(saved.length)
     expect(saved[1]!.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', brand: 'paddle-ocr' })
   })
 })

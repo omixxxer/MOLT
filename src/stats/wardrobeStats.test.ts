@@ -10,7 +10,7 @@ const now = new Date('2026-11-02T12:00:00')
 function garment(id: string, role: Garment['role'], change: Partial<Garment> = {}): Garment {
   return {
     id, name: id, category: 'Parte superior', subcategory: '', colors: ['Azul'], seasons: [], styles: [], dressLevels: [], role,
-    image: new Blob(['i']), thumbnail: new Blob(['t']), width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
+    width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', ...change
   }
 }

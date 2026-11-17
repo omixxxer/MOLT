@@ -21,6 +21,8 @@ import {
   type DressLevel,
   type Garment,
   type GarmentCategory,
+  type GarmentPhotos,
+  type GarmentWithPhotos,
   type Season
 } from '../types/domain'
 import ColorPalette from './ColorPalette'
@@ -52,12 +54,14 @@ const usageFields: UsageField[] = ['seasons', 'dressLevels', 'styles']
 
 interface GarmentFormProps {
   garment?: Garment
-  onSave: (garment: Garment) => Promise<void>
+  /** The stored images of the garment being edited, read by the detail panel. */
+  stored?: GarmentPhotos & { thumbnail?: Blob }
+  onSave: (garment: GarmentWithPhotos) => Promise<void>
   onCancel: () => void
   submitLabel?: string
 }
 
-export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: GarmentFormProps) {
+export default function GarmentForm({ garment, stored, onSave, onCancel, submitLabel }: GarmentFormProps) {
   const fieldId = useId()
   const [name, setName] = useState(garment?.name ?? '')
   const [category, setCategory] = useState<GarmentCategory>(garment?.category ?? 'Parte superior')
@@ -73,10 +77,10 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   const [styles, setStyles] = useState<string[]>(garment?.styles ?? [])
   const [levels, setLevels] = useState<DressLevel[]>(garment?.dressLevels ?? [])
   const [nameManuallyEdited, setNameManuallyEdited] = useState(Boolean(garment?.name))
-  const [photos, setPhotos] = useState<Blob[]>(() => garment ? [garment.image, ...(garment.additionalImages ?? [])] : [])
+  const [photos, setPhotos] = useState<Blob[]>(() => stored ? [stored.image, ...(stored.additionalImages ?? [])] : [])
   const [imageChanged, setImageChanged] = useState(false)
   // The main photo without its background, shown and saved unless the user prefers the original.
-  const [cutout, setCutout] = useState<Blob | undefined>(garment?.cutout)
+  const [cutout, setCutout] = useState<Blob | undefined>(stored?.cutout)
   const [cuttingOut, setCuttingOut] = useState(false)
   const [useCutout, setUseCutout] = useState(true)
   const [formError, setFormError] = useState('')
@@ -86,7 +90,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   const [analysisSuggestion, setAnalysisSuggestion] = useState<ClothingAnalysisSuggestion>()
   const [suggested, setSuggested] = useState<Set<SuggestedField>>(() => new Set())
   // The care label has its own photo, read only for text, so it never weighs on the garment photos' results.
-  const [labelPhoto, setLabelPhoto] = useState<Blob | undefined>(garment?.labelImage)
+  const [labelPhoto, setLabelPhoto] = useState<Blob | undefined>(stored?.labelImage)
   const [labelReading, setLabelReading] = useState<LabelReading>()
   const [readingLabel, setReadingLabel] = useState(false)
   const [labelError, setLabelError] = useState('')
@@ -323,13 +327,13 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
     try {
       // Stored photos are reduced (≤ 2048 px); photos already saved are not processed again.
       const [image, ...additionalImages] = (imageChanged ? await Promise.all(photos.map(reducePhoto)) : photos) as [Blob, ...Blob[]]
-      const labelImage = labelPhoto && labelPhoto !== garment?.labelImage ? await reducePhoto(labelPhoto) : labelPhoto
+      const labelImage = labelPhoto && labelPhoto !== stored?.labelImage ? await reducePhoto(labelPhoto) : labelPhoto
       // The gallery shows the cut-out when there is one; its thumbnail and size come from it.
       const savedCutout = useCutout ? cutout : undefined
-      const processedImage = imageChanged || savedCutout !== garment?.cutout || !garment || !garment.thumbnail || !garment.width || !garment.height
+      const processedImage = imageChanged || savedCutout !== stored?.cutout || !garment || !stored?.thumbnail || !garment.width || !garment.height
         ? await createThumbnail(savedCutout ?? image)
         : {
-            thumbnail: garment.thumbnail,
+            thumbnail: stored.thumbnail,
             width: garment.width,
             height: garment.height
           }

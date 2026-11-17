@@ -9,7 +9,7 @@ import MoltMark from '../components/MoltMark'
 import PillNav from '../components/PillNav.jsx'
 import WardrobeData from '../components/WardrobeData'
 import { useDriveSync } from '../cloud/useDriveSync'
-import { garmentCategories, type Garment } from '../types/domain'
+import { garmentCategories, type Garment, type GarmentWithPhotos } from '../types/domain'
 import { ClickSpark, Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
 type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
@@ -136,18 +136,19 @@ function App() {
 
   const closeDetail = useCallback(() => setSelectedGarment(null), [])
 
-  const createGarment = useCallback(async (garment: Garment) => {
+  const createGarment = useCallback(async (garment: GarmentWithPhotos) => {
     setError('')
     await garmentRepository.create(garment)
     await refreshGarments()
     setPage('wardrobe')
   }, [refreshGarments])
 
-  const updateGarment = useCallback(async (garment: Garment) => {
+  const updateGarment = useCallback(async (garment: GarmentWithPhotos) => {
     setError('')
     await garmentRepository.update(garment)
-    await refreshGarments()
-    setSelectedGarment(garment)
+    const list = await refreshGarments()
+    // The stored data, not the form's object, so the state keeps no photo.
+    setSelectedGarment(list.find((entry) => entry.id === garment.id) ?? null)
   }, [refreshGarments])
 
   const removeGarment = useCallback(async (id: string) => {

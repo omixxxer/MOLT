@@ -4,7 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { localDay, type WearEntry } from '../../stats/wardrobeStats'
 import { logWear, removeWear } from '../../stats/wearLog'
 import type { Garment, Outfit } from '../../types/domain'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import OutfitBoard, { garmentLabel } from '../OutfitBoard'
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -115,7 +115,7 @@ export default function WearCalendar({ garments, outfits, entries, onChanged, on
                 onClick={() => setSelected(day)}
               >
                 <span className="calendar-number">{Number(day.slice(-2))}</span>
-                {cover && <GarmentPhoto image={cover.thumbnail ?? cover.image} alt="" />}
+                {cover && <GarmentThumbnail garment={cover} alt="" />}
                 {list.length > 1 && <span className="calendar-more">+{list.length - 1}</span>}
               </button>
             )
@@ -153,7 +153,7 @@ export default function WearCalendar({ garments, outfits, entries, onChanged, on
               return (
                 <li key={outfit.id}>
                   <button type="button" aria-label={`Apuntar ${outfit.name || items.map(garmentLabel).join(', ')}`} onClick={() => void run(() => logWear(outfit, selected))}>
-                    <span className="calendar-strip">{items.slice(0, 4).map((garment) => <GarmentPhoto key={garment.id} image={garment.thumbnail ?? garment.image} alt="" />)}</span>
+                    <span className="calendar-strip">{items.slice(0, 4).map((garment) => <GarmentThumbnail key={garment.id} garment={garment} alt="" />)}</span>
                     <span>{outfit.name || outfit.occasion}</span>
                   </button>
                 </li>

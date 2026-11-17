@@ -59,7 +59,7 @@ async function start(files: File[]) {
 
 afterEach(async () => {
   clearBatch()
-  await database.garments.clear()
+  await Promise.all([database.garments.clear(), database.garmentPhotos.clear(), database.garmentThumbnails.clear()])
 })
 
 describe('adding many garments', () => {
@@ -152,7 +152,8 @@ describe('adding many garments', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar 1 prenda' }))
     await waitFor(() => expect(onDone).toHaveBeenCalledWith(1))
     const [saved] = await database.garments.toArray()
-    expect(saved?.cutout).toBeUndefined()
+    expect(saved?.hasCutout).toBeUndefined()
+    expect((await database.garmentPhotos.get(saved!.id))?.cutout).toBeUndefined()
     expect(saved?.colors).toEqual(['Gris', 'Rojo'])
   })
 

@@ -3,7 +3,7 @@ import { createOutfitRecord, generateOutfitCandidates, outfitKey, seasonOfDate, 
 import { forgottenGarments, localDay, wardrobeGaps, wardrobeStats } from '../../stats/wardrobeStats'
 import { loadWearHistory, logWear } from '../../stats/wearLog'
 import type { Garment } from '../../types/domain'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import OutfitBoard, { garmentLabel } from '../OutfitBoard'
 import { emptyOutfitData, loadOutfitData, type OutfitData } from '../outfits/outfitData'
 import { weatherContext } from '../../weather/openMeteo'
@@ -153,7 +153,7 @@ export default function HomeScreen({ garments, loading, onNavigate, onOpenGarmen
                   {forgotten.map(({ garment }) => (
                     <li key={garment.id}>
                       <button type="button" className="garment-tile" onClick={() => onOpenGarment(garment)} aria-label={garmentLabel(garment)} title={garmentLabel(garment)}>
-                        <GarmentPhoto image={garment.thumbnail ?? garment.image} alt="" />
+                        <GarmentThumbnail garment={garment} alt="" />
                       </button>
                     </li>
                   ))}

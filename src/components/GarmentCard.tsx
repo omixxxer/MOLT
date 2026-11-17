@@ -1,6 +1,6 @@
 import { colorSwatch } from '../ai/colors'
 import type { Garment } from '../types/domain'
-import GarmentPhoto from './GarmentPhoto'
+import { GarmentThumbnail } from './GarmentPhoto'
 
 interface GarmentCardProps {
   garment: Garment
@@ -13,8 +13,8 @@ export default function GarmentCard({ garment, label, onOpen }: GarmentCardProps
   const details = [garment.brand, garment.size].filter(Boolean).join(' · ') || garment.category
   return (
     <button className="garment-card" type="button" onClick={onOpen} aria-label={label}>
-      <span className="garment-card-image" {...(garment.cutout ? { 'data-cutout': '' } : {})}>
-        <GarmentPhoto image={garment.thumbnail ?? garment.image} alt="" />
+      <span className="garment-card-image" {...(garment.hasCutout ? { 'data-cutout': '' } : {})}>
+        <GarmentThumbnail garment={garment} alt="" />
         {garment.code && <span className="garment-card-code">{garment.code}</span>}
       </span>
       <span className="garment-card-title">{label}</span>

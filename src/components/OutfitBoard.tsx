@@ -1,5 +1,5 @@
 import type { Garment } from '../types/domain'
-import GarmentPhoto from './GarmentPhoto'
+import { GarmentThumbnail } from './GarmentPhoto'
 
 export function garmentLabel(garment: Garment) {
   return garment.name.trim() || garment.subcategory || garment.category
@@ -11,7 +11,7 @@ export default function OutfitBoard({ garments }: { garments: Garment[] }) {
     <div className="outfit-garments">
       {garments.map((garment) => (
         <figure key={garment.id}>
-          <span className="garment-tile"><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /></span>
+          <span className="garment-tile"><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /></span>
           <figcaption>{garmentLabel(garment)}</figcaption>
         </figure>
       ))}

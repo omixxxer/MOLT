@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { DressLevel, Garment, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
+import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { assignMissingCodes, codeCounters } from './garmentCodes'
 
 const levelOfFormality: Record<LegacyFormality, DressLevel> = { Casual: 'Diario', 'Smart casual': 'Arreglado', Formal: 'Formal' }
@@ -17,6 +17,10 @@ export class WardrobeDatabase extends Dexie {
   /** Highest number given per code prefix, so a deleted garment's code is never given to another one. */
   garmentCodeCounters!: EntityTable<{ prefix: string; last: number }, 'prefix'>
   trips!: EntityTable<Trip, 'id'>
+  /** Original photos, one record per garment; never read by the wardrobe list. */
+  garmentPhotos!: EntityTable<GarmentPhotos & { garmentId: string }, 'garmentId'>
+  /** Thumbnails, read only for the garments on screen. */
+  garmentThumbnails!: EntityTable<{ garmentId: string; thumbnail: Blob }, 'garmentId'>
 
   /** `legacyName`: a database from before the app was renamed, whose contents are brought here on opening. */
   constructor(name = DATABASE_NAME, legacyName?: string) {
@@ -103,6 +107,32 @@ export class WardrobeDatabase extends Dexie {
         })
       })
     this.version(7).stores({ trips: 'id, startDate' })
+    // Photos and thumbnails leave the garment record, so listing the wardrobe reads no image.
+    this.version(8)
+      .stores({ garmentPhotos: 'garmentId', garmentThumbnails: 'garmentId' })
+      .upgrade(async (transaction) => {
+        const garments = transaction.table('garments')
+        const photos = transaction.table('garmentPhotos')
+        const thumbnails = transaction.table('garmentThumbnails')
+        // One garment at a time, so the photos of the whole wardrobe are never in memory together.
+        for (const id of await garments.toCollection().primaryKeys()) {
+          const stored = await garments.get(id) as (Garment & Partial<GarmentPhotos> & { thumbnail?: Blob }) | undefined
+          if (!stored) continue
+          const { image, additionalImages, labelImage, cutout, thumbnail, ...fields } = stored
+          if (image) {
+            await photos.put({
+              garmentId: id,
+              image,
+              ...(additionalImages?.length ? { additionalImages } : {}),
+              ...(labelImage ? { labelImage } : {}),
+              ...(cutout ? { cutout } : {})
+            })
+          }
+          // Garments from the first versions may have no thumbnail; the photo is used in its place when read.
+          if (thumbnail) await thumbnails.put({ garmentId: id, thumbnail })
+          await garments.put({ ...fields, ...(cutout ? { hasCutout: true } : {}) })
+        }
+      })
     if (legacyName) this.on('ready', () => moveLegacyDatabase(this, legacyName))
   }
 }

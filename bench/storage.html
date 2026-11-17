@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Molt · medición de almacenamiento</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 60rem; }
+      pre { background: #f3f3ee; padding: 1rem; overflow: auto; }
+      button { margin-right: .5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Medición de almacenamiento</h1>
+    <p>
+      Crea un armario sintético en una base propia (<code>molt-bench-N</code>, nunca <code>molt-wardrobe</code>) con el
+      esquema de la versión 7, mide la lectura inicial, lo migra a la versión actual y vuelve a medir. La base se borra
+      al terminar. Solo se sirve con <code>npm run dev</code>, en <code>/bench/storage.html</code>.
+    </p>
+    <p>
+      <button data-size="100">100 prendas</button>
+      <button data-size="500">500 prendas</button>
+      <button data-size="2000">2000 prendas</button>
+    </p>
+    <p id="status">Sin ejecutar.</p>
+    <pre id="output"></pre>
+    <script type="module" src="./storageBench.ts"></script>
+  </body>
+</html>

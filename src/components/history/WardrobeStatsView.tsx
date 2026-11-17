@@ -4,7 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../../ai/colors'
 import { daysBetween, wardrobeGaps, wardrobeStats, type GarmentUse, type StatRow, type WearEntry } from '../../stats/wardrobeStats'
 import type { Garment } from '../../types/domain'
-import GarmentPhoto from '../GarmentPhoto'
+import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
 
 const PERIODS: Array<[number | undefined, string]> = [[30, '30 días'], [90, '3 meses'], [365, 'Un año'], [undefined, 'Todo']]
@@ -33,7 +33,7 @@ function GarmentRow({ use, note, onOpen }: { use: GarmentUse; note: string; onOp
   return (
     <li>
       <button type="button" className="stat-garment" onClick={() => onOpen(use.garment)}>
-        <span className="garment-tile"><GarmentPhoto image={use.garment.thumbnail ?? use.garment.image} alt="" /></span>
+        <span className="garment-tile"><GarmentThumbnail garment={use.garment} alt="" /></span>
         <span>{garmentLabel(use.garment)}<small>{note}</small></span>
       </button>
     </li>

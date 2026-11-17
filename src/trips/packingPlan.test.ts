@@ -6,7 +6,7 @@ import { defaultExtras, forecastChanges, nextOutfitForDay, packingGroups, planDa
 function garment(id: string, role: GarmentRole, change: Partial<Garment> = {}): Garment {
   return {
     id, name: id, category: 'Parte superior', subcategory: '', colors: ['Azul marino'], seasons: [], styles: [], dressLevels: ['Diario'], role,
-    image: new Blob(['i']), thumbnail: new Blob(['t']), width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
+    width: 1, height: 1, confirmedAttributes: [], suggestedAttributes: [],
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', ...change
   }
 }
