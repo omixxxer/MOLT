@@ -2,7 +2,7 @@
 // Node Blobs: jsdom ones do not survive the structured clone of fake-indexeddb with their contents.
 import { afterEach, describe, expect, it } from 'vitest'
 import { database } from './database'
-import { garmentRepository } from './garmentRepository'
+import { garmentRepository, repairInlinePhotos } from './garmentRepository'
 import type { GarmentWithPhotos } from '../types/domain'
 
 const makeGarment = (id: string): GarmentWithPhotos => ({
@@ -164,5 +164,32 @@ describe('garmentRepository', () => {
         unknownAttributes: ['pattern', 'sleeveType', 'neckline']
       }
     })
+  })
+
+  it('repairs garments saved with their images inside by an older version of the app still open', async () => {
+    // A tab with the previous version, left open across the update, writes the whole garment as it used to.
+    await garmentRepository.create(makeGarment('edited'))
+    const inline = (id: string, extras: object = {}) => ({
+      ...makeGarment(id), code: `CSA-0${id.length}`, image: new Blob([`old app ${id}`]), thumbnail: new Blob([`old thumb ${id}`]),
+      cutout: new Blob([`old cutout ${id}`], { type: 'image/png' }), ...extras
+    })
+    await database.garments.put(inline('edited', { name: 'Editada en la pestaña antigua' }))
+    await database.garments.put(inline('added', { additionalImages: [new Blob(['back'])] }))
+
+    // The wardrobe list moves them to their stores, and the newer images win over the ones stored before.
+    const list = await garmentRepository.list()
+    expect(list.some(hasBlob)).toBe(false)
+    expect(list.find((garment) => garment.id === 'edited')).toMatchObject({ name: 'Editada en la pestaña antigua', hasCutout: true })
+    expect(await (await garmentRepository.photos('edited'))?.image.text()).toBe('old app edited')
+    expect(await (await garmentRepository.photos('added'))?.additionalImages?.[0]?.text()).toBe('back')
+    expect(await (await garmentRepository.thumbnails(['added'])).get('added')?.text()).toBe('old thumb added')
+    expect(await repairInlinePhotos()).toBe(0)
+
+    // Reading one garment repairs it too, without the list (an export, or the detail of a garment just written).
+    await database.garments.put(inline('late'))
+    expect(await (await garmentRepository.withPhotos('late'))?.cutout?.text()).toBe('old cutout late')
+    expect(hasBlob(await garmentRepository.get('late'))).toBe(false)
+    await database.garments.put(inline('thumb-only'))
+    expect(await (await garmentRepository.thumbnails(['thumb-only'])).get('thumb-only')?.text()).toBe('old thumb thumb-only')
   })
 })

@@ -1,4 +1,4 @@
-import { database } from './database'
+import { database, hasInlinePhotos, moveInlinePhotos } from './database'
 import { codePrefix, nextCode } from './garmentCodes'
 import type { Garment, GarmentPhotos, GarmentWithPhotos } from '../types/domain'
 
@@ -30,8 +30,21 @@ export async function putGarmentWithPhotos(garment: GarmentWithPhotos): Promise<
   await database.garmentThumbnails.put({ garmentId: garment.id, thumbnail })
 }
 
+/** Moves to their stores the images that these garments (all, by default) still keep in their record. */
+export async function repairInlinePhotos(ids?: string[]): Promise<number> {
+  return database.transaction('rw', garmentTables(), async () => {
+    const tables = { garments: database.garments, photos: database.garmentPhotos, thumbnails: database.garmentThumbnails }
+    let moved = 0
+    for (const id of ids ?? await database.garments.toCollection().primaryKeys()) {
+      if (await moveInlinePhotos(tables, id as string)) moved += 1
+    }
+    return moved
+  })
+}
+
 async function photosOf(id: string): Promise<GarmentPhotos | undefined> {
-  const stored = await database.garmentPhotos.get(id)
+  let stored = await database.garmentPhotos.get(id)
+  if (!stored && await repairInlinePhotos([id])) stored = await database.garmentPhotos.get(id)
   if (!stored) return undefined
   const { garmentId: _garmentId, ...photos } = stored
   return photos
@@ -47,15 +60,26 @@ export async function getGarmentWithPhotos(id: string): Promise<GarmentWithPhoto
 }
 
 export const garmentRepository = {
-  /** Data only: no photo or thumbnail is read. */
-  list: () => database.garments.orderBy('updatedAt').reverse().toArray(),
+  /**
+   * Data only: no photo or thumbnail is read. A garment saved by an older version of the app still open somewhere
+   * keeps its images in the record: they are moved to their stores first.
+   */
+  list: async () => {
+    const garments = await database.garments.orderBy('updatedAt').reverse().toArray()
+    const inline = garments.filter(hasInlinePhotos).map((garment) => garment.id)
+    if (!inline.length) return garments
+    await repairInlinePhotos(inline)
+    return database.garments.orderBy('updatedAt').reverse().toArray()
+  },
   get: (id: string) => database.garments.get(id),
   /** The original photos of one garment, for the detail, the form and the exports. */
   photos: photosOf,
   withPhotos: getGarmentWithPhotos,
   /** Thumbnails of the given garments only; one without thumbnail (first versions of the app) gets its photo. */
   thumbnails: async (ids: string[]): Promise<Map<string, Blob>> => {
-    const stored = await database.garmentThumbnails.bulkGet(ids)
+    let stored = await database.garmentThumbnails.bulkGet(ids)
+    const missing = ids.filter((_, index) => !stored[index])
+    if (missing.length && await repairInlinePhotos(missing)) stored = await database.garmentThumbnails.bulkGet(ids)
     const found = new Map<string, Blob>()
     for (const [index, id] of ids.entries()) {
       const thumbnail = stored[index]?.thumbnail ?? (await database.garmentPhotos.get(id))?.image
