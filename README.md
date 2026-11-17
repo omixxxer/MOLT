@@ -66,6 +66,33 @@ El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arregl
 
 Datos de [Open-Meteo](https://open-meteo.com/) (CC BY 4.0). **Su API gratuita es solo para uso no comercial;** una versión de pago de Molt necesitará su plan comercial.
 
+### Validación del generador, la maleta y el tiempo
+Las pruebas ([`outfitGenerator.test.ts`](src/outfits/outfitGenerator.test.ts), [`packingPlan.test.ts`](src/trips/packingPlan.test.ts), [`openMeteo.test.ts`](src/weather/openMeteo.test.ts)) cubren:
+- **Generador:** 300 armarios aleatorios y repetibles (0 a 40 prendas, una de cada cuatro sin ningún atributo, algunas en la lavadora) con ocasiones, temperaturas de -25 a 48 °C, lluvia, viento, prendas fijadas y excluidas. En cada propuesta se comprueba que se puede vestir (una prenda por tipo; arriba y abajo o una pieza), que respeta lo fijado, lo excluido, la lavadora, «Formal» y las capas, y que las puntuaciones están entre 0 y 100. Cuando no hay propuesta, siempre se explica por qué. Además: armarios de una sola combinación, solo un vestido, prendas sin atributos en todas las ocasiones y temperaturas, todo en la lavadora, -20 y 45 °C, y 2.000 prendas.
+- **Maleta:** viajes de 1 a 14 días con los tres estilos de maleta, una sola combinación posible, prendas sin atributos, todo en la lavadora, días alternos de -15 y 42 °C, días más allá de la previsión (medias de años anteriores), un día editado con una prenda ya borrada y 14 días con historial de uso.
+- **Open-Meteo**, con respuestas simuladas: lugar inexistente, sin red, búsqueda cancelada, respuesta ilegible, previsión que no llega a todos los días, día sin temperaturas, día sin los datos opcionales, parte del viaje guardado y la red caída, un año pasado que falla, y viajes lejanos que cruzan el 29 de febrero.
+
+**Fallos encontrados y corregidos:**
+- **Lentitud con historial.** Cada combinación (unas 1.800 por búsqueda) volvía a recorrer y fechar todas las valoraciones y los días de uso, y a normalizar los mismos textos. Ahora se resumen una vez por búsqueda. Los resultados son idénticos: se comparó con la versión anterior en 400 búsquedas y 25 viajes aleatorios con historial. Mediana en el equipo de desarrollo, en las pruebas (jsdom), con 120 prendas, 300 valoraciones y 200 días de uso; el cálculo es en el hilo principal:
+
+  | | Antes | Después |
+  |---|---|---|
+  | Un outfit, sin historial | 78–80 ms | 29–31 ms |
+  | Un outfit, con historial | 691–785 ms | 34–35 ms |
+  | Maleta de 14 días, sin historial | 3,7–4,8 s | 1,0–1,2 s |
+  | Maleta de 14 días, con historial | 25–27 s | 1,1–1,3 s |
+
+- **Viajes lejanos que cruzan el 29 de febrero:** las medias de años anteriores pedían un día de menos (o de más) y el viaje no se podía preparar («La previsión no cubre todas las fechas»). Ahora cada año pasado se pide con el mismo número de días.
+- **Respuesta ilegible del servicio:** se atribuía a la conexión («Comprueba tu conexión»); ahora dice que la respuesta no se ha podido leer.
+
+**Límites que quedan:**
+- No se ha medido en móvil. La maleta de 14 días tarda ~1 s en escritorio y se calcula en el hilo principal, así que en un móvil lento la pantalla puede quedarse parada unos segundos al preparar o reajustar un viaje.
+- Cada búsqueda considera como mucho 7 partes de arriba, 7 de abajo, 7 vestidos o monos, 3 capas, 3 calzados y 2 accesorios, elegidos por cómo encajan; el resto del armario aparece al pedir más propuestas.
+- Cuánto abriga una prenda se deduce de su tipo y su composición; una prenda sin tipo usa un valor medio de su categoría. Con poca ropa de abrigo a -20 °C se propone igualmente lo mejor que hay, con el aviso «Puede darte frío».
+- Las puntuaciones son reglas, no un modelo validado con usuarios.
+- Sin previsión, las estaciones son las del hemisferio norte.
+- Más allá de 16 días se usa la media de dos años, sin probabilidad de lluvia; si una parte del viaje no se puede consultar, no se planifica el viaje con días a medias.
+
 ### Copia de seguridad y datos
 El menú **Datos** del armario reúne:
 - **Exportar copia del armario:** un ZIP con todas las prendas y sus fotos (incluida la de la etiqueta), los outfits guardados, las preferencias y las valoraciones. Sirve como copia de seguridad y para pasar el armario a otro navegador o dispositivo. Contiene tus fotos: guárdalo en un sitio seguro.
@@ -213,7 +240,8 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [ ] Tendencias, con una fuente fiable y fechada.
 - [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB).
 - [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
-- [ ] Probar la usabilidad en móvil y escritorio, y validar el generador con armarios grandes e incompletos.
+- [x] Validar el generador y la maleta con armarios pequeños, grandes e incompletos, tiempo extremo y fechas fuera de la previsión.
+- [ ] Probar la usabilidad en móvil y escritorio, y medir la maleta en un móvil (ver «Validación del generador, la maleta y el tiempo»).
 
 ## Licencia
 

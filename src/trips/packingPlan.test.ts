@@ -151,3 +151,107 @@ describe('weather of the trip', () => {
     ])
   })
 })
+
+// Phase 4: trips of every length, small and incomplete wardrobes, extreme weather and dates beyond the forecast.
+
+const isBase = (ids: string[], garments: Garment[]) => {
+  const roles = ids.map((id) => garments.find((item) => item.id === id)?.role)
+  return roles.includes('Una pieza') ? !roles.includes('Top') && !roles.includes('Bottom') : roles.includes('Top') && roles.includes('Bottom')
+}
+
+describe('validation of the trip planner', () => {
+  const small = () => [garment('t1', 'Top'), garment('t2', 'Top'), garment('b1', 'Bottom'), garment('b2', 'Bottom'), garment('s1', 'Calzado')]
+
+  it('plans trips of 1 to 14 days, an outfit every day, with every packing style', () => {
+    for (let length = 1; length <= 14; length += 1) {
+      for (const style of ['light', 'balanced', 'roomy'] as const) {
+        const days = tripDays(length)
+        const plan = planDays(small(), days, style)
+        const label = `${length} days, ${style}`
+        expect(plan.map((day) => day.date), label).toEqual(days.map((day) => day.date))
+        for (const day of plan) expect(isBase(day.garmentIds, small()), `${label}: ${day.date}`).toBe(true)
+        // Never more than the wardrobe has, and no garment twice in a day.
+        for (const day of plan) expect(new Set(day.garmentIds).size, label).toBe(day.garmentIds.length)
+        expect(distinct(plan), label).toBeLessThanOrEqual(5)
+      }
+    }
+  })
+
+  it('repeats the only possible outfit every day rather than leaving days empty', () => {
+    const plan = planDays([garment('top', 'Top'), garment('bottom', 'Bottom')], tripDays(14), 'roomy')
+    expect(plan.every((day) => [...day.garmentIds].sort().join() === 'bottom,top')).toBe(true)
+  })
+
+  it('plans with garments that have no attributes, and with a dress as the only base', () => {
+    const bare = (id: string, role: GarmentRole) => garment(id, role, { colors: [], seasons: [], styles: [], dressLevels: [] })
+    expect(planDays([bare('t', 'Top'), bare('b', 'Bottom'), bare('s', 'Calzado')], tripDays(3), 'balanced').every((day) => day.garmentIds.length === 3)).toBe(true)
+    expect(planDays([garment('dress', 'Una pieza')], tripDays(2), 'balanced').map((day) => day.garmentIds)).toEqual([['dress'], ['dress']])
+  })
+
+  it('leaves every day empty when everything is in the wash', () => {
+    const washed = wardrobe().map((item) => ({ ...item, availability: 'laundry' as const }))
+    expect(planDays(washed, tripDays(5), 'balanced').every((day) => day.garmentIds.length === 0)).toBe(true)
+  })
+
+  it('dresses for each day of a trip with extreme temperatures, and says so in the summary', () => {
+    const garments = [
+      garment('tank', 'Top', { subcategory: 'Camiseta de tirantes' }), garment('jumper', 'Top', { subcategory: 'Jersey' }),
+      garment('shorts', 'Bottom', { subcategory: 'Pantalón corto' }), garment('jeans', 'Bottom', { subcategory: 'Vaqueros' }),
+      garment('down', 'Capa', { subcategory: 'Plumífero' }), garment('boots', 'Calzado', { subcategory: 'Botas' })
+    ]
+    const days = tripDays(4).map((day, index) => ({
+      ...day,
+      weather: index % 2
+        ? weather(day.date, { temperatureCelsius: 42, high: 45, low: 35 })
+        : weather(day.date, { temperatureCelsius: -15, high: -10, low: -20, conditions: ['nieve'] })
+    }))
+    const plan = planDays(garments, days, 'balanced')
+    for (const [index, day] of plan.entries()) {
+      if (index % 2) {
+        expect(day.garmentIds).toEqual(expect.arrayContaining(['tank', 'shorts']))
+        expect(day.garmentIds).not.toContain('down')
+      } else {
+        expect(day.garmentIds).toEqual(expect.arrayContaining(['jumper', 'jeans', 'down']))
+      }
+    }
+    const summary = summarizeWeather(days.map((day) => day.weather))
+    expect(summary).toEqual(expect.objectContaining({ low: -20, high: 45, snowDays: 2 }))
+    expect(summary.advice.join(' ')).toMatch(/Frío, hasta -20 °C.*Calor, hasta 45 °C/)
+  })
+
+  it('plans the days beyond the forecast with what past years were like', () => {
+    // Averages of past years: no weather code, no chance of rain, only «suele estar seco» or «lluvia probable».
+    const days = tripDays(3).map((day, index) => ({
+      ...day,
+      weather: weather(day.date, { temperatureCelsius: 6, high: 9, low: 2, source: 'climate', code: undefined, rainChance: undefined, conditions: [index ? 'lluvia probable' : 'suele estar seco'] })
+    }))
+    const plan = planDays(wardrobe(), days, 'balanced')
+    expect(plan.every((day) => day.garmentIds.some((id) => id.startsWith('coat-')))).toBe(true)
+    const summary = summarizeWeather(days.map((day) => day.weather))
+    expect(summary).toEqual(expect.objectContaining({ climateDays: 3, rainDays: 2 }))
+    expect(defaultExtras(days.map((day) => day.weather), 'leisure').map((extra) => extra.label)).toContain('Paraguas o chubasquero')
+  })
+
+  it('keeps a day the user made even if one of its garments has since been deleted', () => {
+    const days = tripDays(3)
+    days[1] = { ...days[1]!, garmentIds: ['top-a', 'deleted'], edited: true }
+    const plan = planDays(wardrobe(), days, 'balanced')
+    expect(plan[1]!.garmentIds).toEqual(['top-a', 'deleted'])
+    expect(plan[0]!.garmentIds.length).toBeGreaterThan(0)
+    expect(packingGroups(wardrobe(), plan).flatMap((group) => group.items.map((item) => item.garment.id))).not.toContain('deleted')
+  })
+
+  it('plans 14 days with a history of feedback and wear in reasonable time', () => {
+    const garments = Array.from({ length: 120 }, (_, index) => garment(`g${index}`, (['Top', 'Top', 'Bottom', 'Calzado', 'Capa', 'Accesorio'] as const)[index % 6]!, { subcategory: ['Camiseta', 'Vaqueros', 'Jersey', 'Zapatillas', 'Abrigo', 'Bufanda'][index % 6]! }))
+    const now = new Date('2026-11-09T12:00:00Z')
+    const feedback = Array.from({ length: 300 }, (_, index) => ({
+      id: `f${index}`, type: (['like', 'dislike', 'saved', 'worn'] as const)[index % 4]!, garmentIds: [`g${index % 120}`, `g${(index * 7) % 120}`], createdAt: new Date(now.getTime() - index * 28_800_000).toISOString()
+    }))
+    const wear = Array.from({ length: 200 }, (_, index) => ({ garmentIds: [`g${index % 120}`, `g${(index * 5) % 120}`], at: new Date(now.getTime() - index * 86_400_000).toISOString() }))
+    const started = performance.now()
+    const plan = planDays(garments, tripDays(14), 'balanced', { now, feedback, wear })
+    expect(plan.every((day) => day.garmentIds.length >= 2)).toBe(true)
+    // It took 27-29 s before the history was summed up once per search; about 1-2 s after, on the development machine.
+    expect(performance.now() - started).toBeLessThan(8000)
+  })
+})

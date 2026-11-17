@@ -296,3 +296,229 @@ describe('when there is nothing to propose', () => {
     expect(explainNoOutfits([garment('top', 'Top'), garment('bottom', 'Bottom')], { occasion: 'Frío y capas' })).toMatch(/capa de abrigo/)
   })
 })
+
+// Phase 4: validation with small, large, incomplete and random wardrobes, and extreme weather.
+
+/** A repeatable sequence of numbers in [0, 1), so a failing case can be run again. */
+function random(seed: number) {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let value = state
+    value = Math.imul(value ^ (value >>> 15), value | 1)
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296
+  }
+}
+
+const ROLES: Garment['role'][] = ['Top', 'Top', 'Bottom', 'Bottom', 'Una pieza', 'Capa', 'Calzado', 'Accesorio']
+const SUBCATEGORIES: Partial<Record<Garment['role'], string[]>> = {
+  Top: ['Camiseta', 'Camisa', 'Jersey', 'Sudadera con capucha', 'Camiseta de tirantes', ''],
+  Bottom: ['Vaqueros', 'Pantalón corto', 'Falda', 'Pantalón de chándal', ''],
+  'Una pieza': ['Vestido', 'Mono', ''],
+  Capa: ['Abrigo', 'Plumífero', 'Chubasquero', 'Blazer', 'Chaleco', ''],
+  Calzado: ['Zapatillas', 'Sandalias', 'Botas', 'Tacones', ''],
+  Accesorio: ['Bufanda', 'Gorro', '']
+}
+const COLOURS = ['Negro', 'Blanco', 'Gris', 'Azul marino', 'Rojo', 'Verde', 'Azul', 'Multicolor', 'Beige']
+const SEASONS = ['Primavera', 'Verano', 'Otoño', 'Invierno'] as const
+const LEVELS = ['Deportivo', 'Diario', 'Arreglado', 'Formal'] as const
+const OCCASIONS = ['Diario', 'Arreglado', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas', 'Viaje']
+const TEMPERATURES = [undefined, -25, -8, 0, 6, 12, 18, 24, 31, 38, 48]
+
+function pick<T>(next: () => number, list: readonly T[]): T {
+  return list[Math.floor(next() * list.length)]!
+}
+
+function some<T>(next: () => number, list: readonly T[], chance = 0.4): T[] {
+  return list.filter(() => next() < chance)
+}
+
+/** A wardrobe as users leave it: many garments without some or all of their attributes, some in the wash. */
+function randomWardrobe(next: () => number, size: number): Garment[] {
+  return Array.from({ length: size }, (_, index) => {
+    const role = pick(next, ROLES)
+    const bare = next() < 0.25
+    return garment(`g${index}`, role, {
+      subcategory: bare ? '' : pick(next, SUBCATEGORIES[role] ?? ['']),
+      colors: bare ? [] : some(next, COLOURS, 0.2),
+      seasons: bare ? [] : some(next, SEASONS),
+      styles: bare ? [] : some(next, ['Minimalista', 'Urbano', 'Clásico'], 0.3),
+      dressLevels: bare ? [] : some(next, LEVELS, 0.5),
+      pattern: bare || next() < 0.5 ? undefined : pick(next, ['Liso', 'Rayas', 'Cuadros']),
+      composition: next() < 0.2 ? pick(next, ['100 % lana', '100 % lino', '95 % algodón']) : undefined,
+      availability: next() < 0.15 ? pick(next, ['laundry', 'unavailable'] as const) : next() < 0.1 ? 'available' : undefined
+    })
+  })
+}
+
+function randomContext(next: () => number, garments: Garment[]) {
+  const temperatureCelsius = pick(next, TEMPERATURES)
+  const spread = Math.floor(next() * 14)
+  const ids = garments.map((item) => item.id)
+  return {
+    occasion: pick(next, OCCASIONS),
+    temperatureCelsius,
+    ...(temperatureCelsius !== undefined && next() < 0.5 ? { temperatureLow: temperatureCelsius - spread / 2, temperatureHigh: temperatureCelsius + spread / 2 } : {}),
+    weatherConditions: some(next, ['lluvia', 'viento', 'nieve', 'despejado', 'lluvia probable'], 0.25),
+    season: next() < 0.5 ? pick(next, SEASONS) : undefined,
+    includeGarmentIds: ids.length && next() < 0.3 ? [pick(next, ids)] : undefined,
+    excludeGarmentIds: ids.length && next() < 0.3 ? some(next, ids, 0.1) : undefined,
+    desiredStyle: next() < 0.2 ? 'Urbano' : undefined
+  }
+}
+
+const inRange = (value: number) => Number.isFinite(value) && value >= 0 && value <= 100
+const isAvailableGarment = (item: Garment) => item.availability !== 'laundry' && item.availability !== 'unavailable'
+
+describe('validation with random wardrobes', () => {
+  it('only proposes outfits that can be worn and respect what was asked, and explains when there are none', () => {
+    let checked = 0
+    let empty = 0
+    for (let seed = 1; seed <= 300; seed += 1) {
+      const next = random(seed)
+      const garments = randomWardrobe(next, Math.floor(next() * 40))
+      const context = randomContext(next, garments)
+      const candidates = generateOutfitCandidates(garments, context, { now, seed: String(seed) })
+      const label = `seed ${seed}: ${JSON.stringify(context)}`
+      expect(candidates.length, label).toBeLessThanOrEqual(5)
+      expect(new Set(candidates.map((candidate) => outfitKey(candidate.garments))).size, label).toBe(candidates.length)
+      if (!candidates.length) {
+        empty += 1
+        expect(explainNoOutfits(garments, context), label).toMatch(/\S/)
+      }
+      const pinned = new Set(context.includeGarmentIds ?? [])
+      for (const candidate of candidates) {
+        checked += 1
+        const ids = candidate.garments.map((item) => item.id)
+        const roles = candidate.garments.map((item) => item.role)
+        expect(inRange(candidate.score), label).toBe(true)
+        for (const value of Object.values(candidate.scores)) expect(inRange(value), label).toBe(true)
+        expect(new Set(ids).size, label).toBe(ids.length)
+        // One garment per role, and a base of top and bottom or a one-piece, never both.
+        expect(new Set(roles).size, label).toBe(roles.length)
+        const onePiece = roles.includes('Una pieza')
+        expect(onePiece ? !roles.includes('Top') && !roles.includes('Bottom') : roles.includes('Top') && roles.includes('Bottom'), label).toBe(true)
+        for (const id of pinned) expect(ids, label).toContain(id)
+        for (const id of context.excludeGarmentIds ?? []) expect(ids, label).not.toContain(id)
+        for (const item of candidate.garments) {
+          if (pinned.has(item.id)) continue
+          expect(isAvailableGarment(item), label).toBe(true)
+          if (context.occasion === 'Formal') expect(!item.dressLevels.length || item.dressLevels.includes('Formal'), label).toBe(true)
+        }
+        if (context.occasion === 'Frío y capas') expect(roles, label).toContain('Capa')
+        if (context.occasion === 'Calor y pocas capas') expect(candidate.garments.some((item) => item.role === 'Capa' && !pinned.has(item.id)), label).toBe(false)
+        expect(candidate.explanation.every((text) => text.trim().length > 0) && candidate.warnings.every((text) => text.trim().length > 0), label).toBe(true)
+      }
+    }
+    // The sample covers both cases.
+    expect(checked).toBeGreaterThan(300)
+    expect(empty).toBeGreaterThan(10)
+  })
+
+  it('always proposes something when there is an available top and bottom and nothing pinned', () => {
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const next = random(seed * 7)
+      const garments = [...randomWardrobe(next, Math.floor(next() * 20)), garment('base-top', 'Top', { dressLevels: [] }), garment('base-bottom', 'Bottom', { dressLevels: [] })]
+      const context = { ...randomContext(next, garments), includeGarmentIds: undefined, excludeGarmentIds: undefined }
+      // Only «Frío y capas» insists on a layer, which may be missing.
+      if (context.occasion === 'Frío y capas') continue
+      expect(generateOutfitCandidates(garments, context, { now }).length, `seed ${seed * 7}: ${JSON.stringify(context)}`).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('validation with small and incomplete wardrobes', () => {
+  const bare = (id: string, role: Garment['role']) => garment(id, role, { subcategory: '', colors: [], seasons: [], styles: [], dressLevels: [] })
+
+  it('gives the single possible outfit once, and nothing more when it has been seen', () => {
+    const only = [garment('top', 'Top'), garment('bottom', 'Bottom')]
+    const [candidate, ...rest] = generateOutfitCandidates(only, diario)
+    expect(rest).toEqual([])
+    expect(candidate!.garments.map((item) => item.id).sort()).toEqual(['bottom', 'top'])
+    expect(generateOutfitCandidates(only, diario, { skip: new Set([outfitKey(candidate!.garments)]) })).toEqual([])
+  })
+
+  it('dresses with a one-piece alone, and without shoes when there are none', () => {
+    const [candidate] = generateOutfitCandidates([garment('dress', 'Una pieza')], diario)
+    expect(candidate!.garments.map((item) => item.id)).toEqual(['dress'])
+  })
+
+  it('works with garments that have no attributes at all, for every occasion and temperature', () => {
+    const garments = [bare('top', 'Top'), bare('bottom', 'Bottom'), bare('dress', 'Una pieza'), bare('coat', 'Capa'), bare('shoe', 'Calzado')]
+    for (const occasion of OCCASIONS) {
+      for (const temperatureCelsius of TEMPERATURES) {
+        const candidates = generateOutfitCandidates(garments, { occasion, temperatureCelsius }, { now })
+        const label = `${occasion} ${temperatureCelsius}`
+        expect(candidates.length, label).toBeGreaterThan(0)
+        for (const candidate of candidates) {
+          expect(inRange(candidate.score), label).toBe(true)
+          // Nothing is said about colours or levels the garments do not have.
+          expect(candidate.explanation.join(' '), label).not.toMatch(/color|tono|neutros|estampado|Encaja con/i)
+        }
+      }
+    }
+  })
+
+  it('leaves out what is in the wash, and says so when nothing is left', () => {
+    const washed = [garment('top', 'Top', { availability: 'laundry' }), garment('bottom', 'Bottom'), garment('dress', 'Una pieza', { availability: 'unavailable' })]
+    expect(generateOutfitCandidates(washed, diario)).toEqual([])
+    expect(explainNoOutfits(washed, diario)).toMatch(/lavadora/)
+    expect(optionsForRole('Top', [], washed, diario)).toEqual([])
+    // A garment in the wash can still be worn if the user pins it.
+    expect(generateOutfitCandidates(washed, { ...diario, includeGarmentIds: ['top'] })[0]!.garments.map((item) => item.id).sort()).toEqual(['bottom', 'top'])
+  })
+
+  it('finds no outfit for a pinned garment that is also excluded or no longer exists', () => {
+    expect(generateOutfitCandidates(basicWardrobe(), { ...diario, includeGarmentIds: ['top'], excludeGarmentIds: ['top'] })).toEqual([])
+    expect(generateOutfitCandidates(basicWardrobe(), { ...diario, includeGarmentIds: ['deleted'] })).toEqual([])
+  })
+})
+
+describe('validation with extreme temperatures', () => {
+  const wardrobe = [
+    garment('tank', 'Top', { subcategory: 'Camiseta de tirantes' }),
+    garment('jumper', 'Top', { subcategory: 'Jersey', composition: '100 % lana' }),
+    garment('shorts', 'Bottom', { subcategory: 'Pantalón corto' }),
+    garment('jeans', 'Bottom', { subcategory: 'Vaqueros' }),
+    garment('down', 'Capa', { subcategory: 'Plumífero' }),
+    garment('sandals', 'Calzado', { subcategory: 'Sandalias' }),
+    garment('boots', 'Calzado', { subcategory: 'Botas' })
+  ]
+
+  it('dresses warmly at -20 °C and lightly at 45 °C', () => {
+    const [cold] = generateOutfitCandidates(wardrobe, { occasion: 'Diario', temperatureCelsius: -20 }, { now })
+    expect(cold!.garments.map((item) => item.id)).toEqual(expect.arrayContaining(['jumper', 'jeans', 'down', 'boots']))
+    const [hot] = generateOutfitCandidates(wardrobe, { occasion: 'Diario', temperatureCelsius: 45 }, { now })
+    expect(hot!.garments.map((item) => item.id)).toEqual(expect.arrayContaining(['tank', 'shorts']))
+    expect(hot!.garments.some((item) => item.role === 'Capa')).toBe(false)
+  })
+
+  it('warns instead of praising when the wardrobe cannot cope with the weather', () => {
+    const summer = [garment('tank', 'Top', { subcategory: 'Camiseta de tirantes' }), garment('shorts', 'Bottom', { subcategory: 'Pantalón corto' })]
+    const [frozen] = generateOutfitCandidates(summer, { occasion: 'Diario', temperatureCelsius: -20 }, { now })
+    expect(frozen!.warnings.join()).toMatch(/Puede darte frío a -20 °C/)
+    expect(frozen!.explanation.join()).not.toMatch(/Bien para/)
+    const winter = [garment('jumper', 'Top', { subcategory: 'Jersey', composition: '100 % lana' }), garment('jeans', 'Bottom', { subcategory: 'Vaqueros' })]
+    expect(generateOutfitCandidates(winter, { occasion: 'Diario', temperatureCelsius: 45 }, { now })[0]!.warnings.join()).toMatch(/Puede darte calor a 45 °C/)
+  })
+
+  it('asks for a layer for «Frío y capas» and explains when there is none', () => {
+    const noLayer = wardrobe.filter((item) => item.role !== 'Capa')
+    expect(generateOutfitCandidates(noLayer, { occasion: 'Frío y capas', temperatureCelsius: -20 })).toEqual([])
+    expect(explainNoOutfits(noLayer, { occasion: 'Frío y capas' })).toMatch(/capa de abrigo/)
+  })
+})
+
+describe('validation with large wardrobes', () => {
+  it('generates from 2000 garments quickly and still within the rules', () => {
+    const garments = randomWardrobe(random(2026), 2000)
+    const started = performance.now()
+    const candidates = generateOutfitCandidates(garments, { occasion: 'Diario', temperatureCelsius: 12, weatherConditions: ['lluvia'] }, { now, seed: 'large' })
+    const elapsed = performance.now() - started
+    expect(candidates).toHaveLength(5)
+    expect(candidates.every((candidate) => candidate.garments.every(isAvailableGarment))).toBe(true)
+    // Generous: the search keeps a few garments per role, so its time barely depends on the size of the wardrobe.
+    expect(elapsed).toBeLessThan(1500)
+  })
+})
