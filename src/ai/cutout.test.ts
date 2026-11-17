@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alphaBox, outlineFound, plainBackgroundAlpha, singleGarmentRegion } from './cutout'
+import { alphaBox, outlineFound, plainBackgroundAlpha, singleGarmentRegion, tidyAlpha } from './cutout'
 import { regionMask, type SegmentationMap } from './segmentation'
 
 const classes = ['background', 'top', 'bottom', 'one-piece', 'outerwear', 'footwear', 'accessory']
@@ -103,5 +103,40 @@ describe('cut-out helpers', () => {
     expect(outlineFound(region, region, 10, 10)).toBe(true)
     expect(outlineFound(new Uint8Array(100).fill(1), region, 10, 10)).toBe(false)
     expect(outlineFound(new Uint8Array(100), region, 10, 10)).toBe(false)
+  })
+})
+
+describe('tidying a cut-out', () => {
+  // 40 × 40: the garment is the square 10–29; the region the segmentation sees is the same square.
+  const size = 40
+  const region = new Uint8Array(size * size).map((_, i) => (i % size >= 10 && i % size < 30 && Math.floor(i / size) >= 10 && Math.floor(i / size) < 30 ? 1 : 0))
+  const at = (x: number, y: number) => y * size + x
+
+  it('drops loose bits of the backdrop and fills small holes in the garment', () => {
+    const alpha = new Uint8ClampedArray(region.length).map((_, i) => (region[i] ? 255 : 0))
+    alpha[at(2, 2)] = 255 // a speck of bedspread far from the garment
+    alpha[at(3, 2)] = 255
+    for (let y = 15; y < 25; y += 1) alpha[at(20, y)] = 0 // a white zip taken for background, closed all round
+    tidyAlpha(alpha, size, size, region)
+    expect(alpha[at(2, 2)]).toBe(0)
+    expect(alpha[at(20, 15)]).toBe(255)
+    expect(alpha[at(15, 15)]).toBe(255)
+  })
+
+  it('keeps a second large piece (the other shoe) and a large hole (between an arm and the body)', () => {
+    const alpha = new Uint8ClampedArray(region.length).map((_, i) => (region[i] ? 255 : 0))
+    for (let y = 32; y < 38; y += 1) for (let x = 2; x < 22; x += 1) alpha[at(x, y)] = 255 // other shoe, off the region
+    for (let y = 14; y < 26; y += 1) for (let x = 14; x < 26; x += 1) alpha[at(x, y)] = 0 // a hole of 144 px, over 3 %
+    tidyAlpha(alpha, size, size, region)
+    expect(alpha[at(10, 35)]).toBe(255)
+    expect(alpha[at(20, 20)]).toBe(0)
+  })
+
+  it('leaves alone a hole that opens to the edge of the photo', () => {
+    const alpha = new Uint8ClampedArray(region.length).fill(255)
+    alpha[at(0, 20)] = 0
+    alpha[at(1, 20)] = 0
+    tidyAlpha(alpha, size, size, new Uint8Array(region.length).fill(1))
+    expect(alpha[at(0, 20)]).toBe(0)
   })
 })

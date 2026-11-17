@@ -144,6 +144,54 @@ export function promptFor(region: Region, grid: number, width: number, height: n
 }
 
 /**
+ * A second way of asking for a single garment's outline, for busy backgrounds (a patterned bedspread): up to 8 points
+ * on the inside of the region, away from its edge, and a ring of up to 12 points 1–2 patches outside it, plus the
+ * photo's corners. It does better than promptFor on some photos and worse on others, so both are asked and the
+ * candidate that matches the region best is kept.
+ */
+export function ringPromptFor(region: Region, grid: number, width: number, height: number): Prompt {
+  const inside = new Set(region.patches)
+  const row = (patch: number) => Math.floor(patch / grid)
+  const col = (patch: number) => patch % grid
+  const distance = (a: number, b: number) => (row(a) - row(b)) ** 2 + (col(a) - col(b)) ** 2
+  /** Up to `count` patches of the pool, the one nearest its centre first and then always the farthest from those chosen. */
+  const spread = (pool: number[], count: number, minimum: number) => {
+    if (!pool.length) return []
+    const centreRow = pool.reduce((sum, patch) => sum + row(patch), 0) / pool.length
+    const centreCol = pool.reduce((sum, patch) => sum + col(patch), 0) / pool.length
+    const toCentre = (patch: number) => (row(patch) - centreRow) ** 2 + (col(patch) - centreCol) ** 2
+    const chosen = [pool.reduce((best, patch) => toCentre(patch) < toCentre(best) ? patch : best)]
+    while (chosen.length < count) {
+      let best = -1
+      let bestDistance = -1
+      for (const patch of pool) {
+        const nearest = Math.min(...chosen.map((other) => distance(patch, other)))
+        if (nearest > bestDistance) {
+          best = patch
+          bestDistance = nearest
+        }
+      }
+      if (bestDistance < minimum) break
+      chosen.push(best)
+    }
+    return chosen
+  }
+  const interior = region.patches.filter((patch) => [-1, 1, -grid, grid].every((step) => inside.has(patch + step)))
+  const positives = spread(interior.length >= 3 ? interior : region.patches, 8, 4)
+  const ring = Array.from({ length: grid * grid }, (_, patch) => patch).filter((patch) =>
+    !inside.has(patch) && patchCenter(patch, grid, width, height)
+    && region.patches.some((member) => distance(patch, member) <= 4)
+    && !region.patches.some((member) => distance(patch, member) <= 1))
+  const negatives = spread(ring, 12, 5)
+  const points = [...positives, ...negatives].map((patch) => patchCenter(patch, grid, width, height)!)
+  const corners: Array<[number, number]> = [[0.02, 0.02], [0.98, 0.02], [0.02, 0.98], [0.98, 0.98]].map(([x, y]) => [x! * width, y! * height])
+  return {
+    points: [...points, ...corners],
+    labels: [...positives.map(() => 1), ...negatives.map(() => 0), ...corners.map(() => 0)]
+  }
+}
+
+/**
  * The region as a mask of width × height (true inside), grown by `grow` patches so the exact outline from SlimSAM
  * is kept whole while anything far from the region is dropped.
  */
