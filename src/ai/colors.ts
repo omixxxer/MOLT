@@ -1,5 +1,6 @@
-// Garment colours from pixels: each pixel is named by the nearest colour of the taxonomy palette in CIELAB (closer
-// to how we see colour than RGB), and the colours covering a fair share of the garment are returned. With a mask
+// Garment colours from pixels: each pixel is named in CIELAB (closer to how we see colour than RGB). A pixel with
+// little colour (chroma under NEUTRAL_CHROMA) is black, grey or white by its lightness; any other, the nearest
+// coloured shade of the taxonomy palette. The colours covering a fair share of the garment are returned. With a mask
 // (from the segmentation head) only garment pixels count; without one, the border colour is taken as background.
 
 interface PaletteColor {
@@ -7,14 +8,14 @@ interface PaletteColor {
   rgb: [number, number, number]
 }
 
-// Reference shades; the names are the taxonomy labels (plus «Gris claro», kept from earlier versions). Some names
-// have several shades: burgundy is red, khaki and camel are beige, olive is green, denim is blue.
+// Reference shades; the names are the taxonomy labels. Some names have several shades: light grey is grey,
+// burgundy is red, khaki and camel are beige, olive is green, denim is blue.
 const PALETTE: PaletteColor[] = [
   { label: 'Negro', rgb: [28, 28, 30] },
   { label: 'Blanco', rgb: [244, 244, 240] },
   { label: 'Gris', rgb: [125, 125, 125] },
   { label: 'Gris', rgb: [80, 82, 86] },
-  { label: 'Gris claro', rgb: [192, 192, 190] },
+  { label: 'Gris', rgb: [192, 192, 190] },
   { label: 'Beige', rgb: [214, 196, 163] },
   { label: 'Beige', rgb: [176, 156, 118] },
   { label: 'Beige', rgb: [196, 154, 108] },
@@ -51,18 +52,29 @@ export function toLab(red: number, green: number, blue: number): [number, number
   return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))]
 }
 
-const paletteLab = PALETTE.map((entry) => ({ label: entry.label, lab: toLab(...entry.rgb) }))
+const NEUTRALS = new Set(['Negro', 'Blanco', 'Gris'])
+const paletteLab = PALETTE.filter((entry) => !NEUTRALS.has(entry.label)).map((entry) => ({ label: entry.label, lab: toLab(...entry.rgb) }))
+
+// Measured on 74 photos of Clothing Dataset (garments on floors and walls, often dim) and 28 own photos, with the
+// colours reviewed by hand (bench/colors.html): a white shirt in dim light is L ≈ 72–82 with chroma ≈ 3, and a
+// faded blue one has chroma ≈ 6–8, so nearest-shade naming called most of them «Gris claro».
+const NEUTRAL_CHROMA = 10
+const BLACK_BELOW = 30
+const WHITE_FROM = 75
 
 /** CSS colour to show a colour name as a swatch (its first shade); several colours for «Multicolor». */
 export function colorSwatch(label: string): string {
   if (label === 'Multicolor') return 'conic-gradient(#b5463c, #d9a441, #5e8a5a, #3f6ea5, #7a5a9c, #b5463c)'
+  // Named by earlier versions; garments saved then may still have it.
+  if (label === 'Gris claro') return 'rgb(192 192 190)'
   const entry = PALETTE.find((color) => color.label === label)
   return entry ? `rgb(${entry.rgb.join(' ')})` : 'var(--stone)'
 }
 
-/** The palette colour nearest to an RGB value. */
+/** The palette colour of an RGB value: a neutral by lightness when it has little colour, else the nearest shade. */
 export function colorName(red: number, green: number, blue: number): string {
   const [l, a, b] = toLab(red, green, blue)
+  if (Math.hypot(a, b) < NEUTRAL_CHROMA) return l < BLACK_BELOW ? 'Negro' : l >= WHITE_FROM ? 'Blanco' : 'Gris'
   let best = paletteLab[0]!
   let bestDistance = Infinity
   for (const entry of paletteLab) {
@@ -108,6 +120,46 @@ function backgroundHeuristic(pixels: ImageData): Uint8Array {
 }
 
 /**
+ * The mask without its edge: pixels at most `radius` away (in a square) from a pixel outside it. Edge pixels blend
+ * the garment with what is around it (the backdrop, a soft cut-out edge), so they do not say the garment's colour.
+ * When that would leave under 40 % of the mask (a strap, a thin belt), the whole mask is kept.
+ */
+export function maskInterior(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  if (radius < 1) return mask
+  // Distance to the nearest outside pixel along rows, then along columns (square neighbourhood).
+  const across = new Uint8Array(width * height)
+  for (let y = 0; y < height; y += 1) {
+    let run = 0
+    for (let x = 0; x < width; x += 1) {
+      run = mask[y * width + x] ? run + 1 : 0
+      across[y * width + x] = Math.min(run, radius + 1)
+    }
+    run = 0
+    for (let x = width - 1; x >= 0; x -= 1) {
+      run = mask[y * width + x] ? run + 1 : 0
+      across[y * width + x] = Math.min(across[y * width + x]!, run)
+    }
+  }
+  const interior = new Uint8Array(width * height)
+  for (let x = 0; x < width; x += 1) {
+    let run = 0
+    const down = new Uint8Array(height)
+    for (let y = 0; y < height; y += 1) {
+      run = across[y * width + x]! > radius ? run + 1 : 0
+      down[y] = Math.min(run, radius + 1)
+    }
+    run = 0
+    for (let y = height - 1; y >= 0; y -= 1) {
+      run = across[y * width + x]! > radius ? run + 1 : 0
+      if (Math.min(down[y]!, run) > radius) interior[y * width + x] = 1
+    }
+  }
+  const before = mask.reduce((sum, value) => sum + (value ? 1 : 0), 0)
+  const after = interior.reduce((sum, value) => sum + value, 0)
+  return after >= before * 0.4 ? interior : mask
+}
+
+/**
  * Colours of the garment, most common first, each covering at least `minShare` of it (at most three). A mask with
  * too few pixels (under 3 % of the image) is ignored in favour of the background heuristic.
  */
@@ -115,7 +167,7 @@ export function garmentColors(pixels: ImageData, mask?: Uint8Array, minShare = 0
   const { data, width, height } = pixels
   if (!width || !height || data.length < width * height * 4) return []
   const masked = mask ? mask.reduce((sum, value) => sum + (value ? 1 : 0), 0) : 0
-  const use = mask && masked >= width * height * 0.03 ? mask : backgroundHeuristic(pixels)
+  const use = maskInterior(mask && masked >= width * height * 0.03 ? mask : backgroundHeuristic(pixels), width, height, Math.round(Math.min(width, height) / 48))
   const counts = new Map<string, number>()
   let total = 0
   for (let i = 0; i < width * height; i += 1) {

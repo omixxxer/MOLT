@@ -43,5 +43,8 @@ export default defineConfig({
         lang: 'es'
       }
     })
-  ]
+  ],
+  // MOLT_BENCH=1 also builds the measurement pages of bench/ (never in the published build), so they can run with
+  // several threads in npm run preview, as the app does in production.
+  ...(process.env.MOLT_BENCH ? { build: { rollupOptions: { input: { main: 'index.html', classifier: 'bench/classifier.html', colors: 'bench/colors.html',storage: 'bench/storage.html' } } } } : {})
 })
