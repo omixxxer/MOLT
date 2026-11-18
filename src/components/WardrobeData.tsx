@@ -201,6 +201,10 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
             Exportar datos de entrenamiento
             <small>Fotos y etiquetas, sin nombres, marcas ni notas</small>
           </button>
+          <a className="data-menu-link" href="/privacidad.html">
+            Privacidad
+            <small>Qué se guarda y qué sale del dispositivo{drive.configured ? ', también con Google Drive' : ''}</small>
+          </a>
         </div>
       </details>
       <input

@@ -30,8 +30,9 @@ addPlugins([isolation])
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
-// The app shell for every page, except the Google sign-in return page, which must load itself.
-registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/oauth\//] }))
+// The app shell for every page, except those that must load themselves: the Google sign-in return page and the
+// privacy policy (Google's consent screen links to it).
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/oauth\//, /^\/privacidad/] }))
 
 // ONNX Runtime's WebAssembly and its loader, kept once downloaded.
 registerRoute(

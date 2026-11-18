@@ -64,7 +64,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .molt-mark { position: relative; flex: none; display: block; width: 32px; height: 32px; margin-right: 10px; overflow: hidden; border-radius: 8px; background: linear-gradient(160deg, #9786BC, #8A79B2); }
 .molt-mark__logo { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .wordmark > span, h1 > span { color: var(--lavender); }
-.privacy-note { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: var(--text-small); }
+.privacy-note { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--ink); font-size: var(--text-small); text-decoration: none; }
+.privacy-note:hover .privacy-long, .privacy-note:hover .privacy-short { text-decoration: underline; }
 .privacy-short { display: none; }
 .privacy-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--lavender); }
 .screen-content {
@@ -86,6 +87,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .data-menu-items button:hover:not(:disabled) { background: var(--mist); }
 .data-menu-items button:disabled { cursor: default; opacity: .45; }
 .data-menu-items small { font-size: var(--text-caption); font-weight: 500; opacity: .75; }
+.data-menu-link { display: grid; gap: 2px; margin-top: 4px; padding: 9px 10px; border-top: 1px solid var(--mist); border-radius: 0 0 5px 5px; color: inherit; font-size: var(--text-label); font-weight: 650; text-decoration: none; }
+.data-menu-link:hover { background: var(--mist); }
 .data-menu-heading { margin: 6px 10px 2px; padding-top: 8px; border-top: 1px solid var(--mist); font-size: var(--text-micro); font-weight: 700; letter-spacing: .6px; text-transform: uppercase; opacity: .7; }
 .data-menu-toggle { display: flex; gap: 9px; align-items: flex-start; padding: 9px 10px; font-size: var(--text-label); font-weight: 650; cursor: pointer; }
 .data-menu-toggle span { display: grid; gap: 2px; }
