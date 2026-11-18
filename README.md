@@ -111,8 +111,9 @@ El menú **Datos** del armario reúne:
 3. En **Clientes → Crear cliente**, tipo **Aplicación web**:
    - **Orígenes de JavaScript autorizados:** `http://localhost:5173` y `http://localhost:4173`.
    - **URI de redireccionamiento autorizados:** `http://localhost:5173/oauth/google.html` y `http://localhost:4173/oauth/google.html`.
-   - Cuando la app tenga dirección pública, añade también su origen y su `/oauth/google.html`.
+   - Para la app publicada, añade también su origen (`https://molt.ximomartinez98.workers.dev`) y su `https://molt.ximomartinez98.workers.dev/oauth/google.html`, exacto, con `.html`.
 4. Copia `.env.example` a `.env.local`, pon el ID de cliente en `VITE_GOOGLE_CLIENT_ID` y reinicia `npm run dev`. El ID de cliente no es secreto; `.env.local` está en `.gitignore`.
+5. **Para que cualquiera pueda usarlo** (no solo los usuarios de prueba): en **Google Auth Platform → Público**, **Publicar app**. Como `drive.appdata` es un permiso no sensible, Google no exige verificación; sin verificar la marca, la pantalla de Google muestra el dominio en lugar del nombre y el logo de Molt. En **Marca**, la página de inicio es la dirección de la app y la política de privacidad, [`/privacidad`](public/privacidad.html). En modo prueba solo pueden entrar hasta 100 cuentas añadidas a mano, y su autorización caduca a los 7 días.
 
 Formato de la copia (`molt-wardrobe-backup`, versión 1; se siguen leyendo las `vesta-wardrobe-backup` anteriores al cambio de nombre): `backup.json` con todos los registros, donde cada foto se sustituye por la ruta de su archivo en `photos/<id de prenda>/`, más esos archivos. Así podrá sincronizarse archivo a archivo más adelante.
 
@@ -137,6 +138,7 @@ Revisión de Armario, Outfits y Maleta (con sus paneles, el selector de prendas,
 - Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
 - Los modelos (clasificador y lector de texto) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
 - Conexiones externas, solo cuando las usas: **Open-Meteo** al consultar el tiempo (recibe la ciudad y sus coordenadas, nunca el inventario ni las fotos) y **Google Drive** si guardas o restauras allí la copia (recibe la copia completa, fotos incluidas, en tu propia cuenta).
+- La [política de privacidad](public/privacidad.html) (`/privacidad.html`, enlazada desde la cabecera y el menú **Datos**) lo explica para quien use la app. Es una página estática, fuera de la app, y una prueba ([`privacyPage.test.ts`](src/privacyPage.test.ts)) comprueba que nombra el permiso de Drive, el archivo de la copia y cada servicio externo que permite la CSP.
 - La política CSP solo permite conexiones al propio origen, a Open-Meteo (previsión, búsqueda de lugares e histórico) y a la API de Google (`www.googleapis.com`). La app no carga scripts de Google: el inicio de sesión ocurre en una ventana aparte.
 - La PWA precachea la interfaz, pero no los modelos ni los datos personales. Los modelos se guardan en Cache Storage tras la primera descarga, para funcionar sin conexión.
 

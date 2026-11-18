@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Qué datos trata Molt, dónde se guardan y qué sale del dispositivo." />
+    <title>Privacidad · Molt</title>
+    <link rel="icon" href="/icons/favicon-48.png" />
+    <style>
+      :root { color-scheme: light; --ink: #2D2838; --muted: #5F5870; --line: rgba(45, 40, 56, .16); --soft: #EEEBF4; --lavender: #8A79B2; --white: #F8F6FB; }
+      * { box-sizing: border-box; }
+      html { background: var(--white); }
+      body { margin: 0; color: var(--ink); background: var(--white); font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+      main { width: min(760px, 100%); margin: 0 auto; padding: 28px 18px 64px; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+      .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif; font-size: 22px; text-decoration: none; }
+      .brand img { width: 32px; height: 32px; border-radius: 8px; }
+      .back { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; color: var(--ink); font-weight: 600; text-decoration: none; }
+      h1, h2 { font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif; font-weight: 500; line-height: 1.2; }
+      h1 { margin: 34px 0 6px; font-size: 40px; }
+      h2 { margin: 36px 0 8px; font-size: 24px; }
+      .date { margin: 0; color: var(--muted); font-size: 14px; }
+      .summary { margin: 24px 0 0; padding: 18px 20px; border-left: 3px solid var(--lavender); border-radius: 0 12px 12px 0; background: var(--soft); }
+      .summary ul { margin: 6px 0 0; padding-left: 20px; }
+      ul { padding-left: 22px; }
+      li { margin: 4px 0; }
+      a { color: #5B4A8C; }
+      a:focus-visible { outline: 2px solid var(--lavender); outline-offset: 3px; }
+      code { padding: 1px 5px; border-radius: 4px; background: var(--soft); font-size: 14px; }
+      footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+      @media (max-width: 480px) { h1 { font-size: 32px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="brand" href="/"><img src="/icons/logo-96.png" alt="" width="32" height="32" />Molt</a>
+        <a class="back" href="/">Volver a la app</a>
+      </header>
+
+      <h1>Privacidad</h1>
+      <p class="date">Última actualización: 18 de noviembre de 2026</p>
+
+      <section class="summary" aria-labelledby="summary-title">
+        <strong id="summary-title">En pocas palabras</strong>
+        <ul>
+          <li>Tus prendas, fotos, outfits, viajes y preferencias se guardan <strong>solo en este navegador</strong>, en tu dispositivo.</li>
+          <li>Las fotos se analizan <strong>en el propio dispositivo</strong>: no se envían a ningún servidor.</li>
+          <li>Molt no tiene cuentas de usuario, ni analítica, ni publicidad, ni cookies de seguimiento.</li>
+          <li>Solo sale algo del dispositivo cuando lo usas: el nombre de una ciudad para consultar el tiempo, y tu copia de seguridad si eliges guardarla en tu propio Google Drive.</li>
+        </ul>
+      </section>
+
+      <h2>Qué datos guarda Molt y dónde</h2>
+      <p>Todo lo que añades a Molt se guarda en el almacenamiento del navegador (IndexedDB) de tu dispositivo:</p>
+      <ul>
+        <li>Las prendas, con sus fotos, la foto de la etiqueta, el recorte sin fondo, los atributos (tipo, colores, marca, talla, composición, precio si lo pones, notas) y el resultado del análisis.</li>
+        <li>Los outfits guardados, los días en que te los has puesto, tus valoraciones y tus preferencias de colores y estilo.</li>
+        <li>Los viajes, con su previsión del tiempo y la lista de la maleta.</li>
+      </ul>
+      <p>Además, el navegador guarda en este dispositivo algunos ajustes pequeños: la ciudad que eliges para el tiempo, las últimas previsiones consultadas (para no pedirlas otra vez), si ya has visto la guía, cuándo hiciste la última copia y, si usas Google Drive, si el guardado automático está activo y cuándo se guardó por última vez. Los modelos de inteligencia artificial se guardan en la caché del navegador tras la primera descarga, para funcionar sin conexión.</p>
+      <p>Nadie más que tú tiene estos datos: no se envían al autor de Molt ni a ningún servidor de Molt, porque no existe tal servidor.</p>
+
+      <h2>Análisis de las fotos en el dispositivo</h2>
+      <p>Al añadir una prenda, Molt propone su tipo, colores, estampado y marca, lee la etiqueta (talla y composición) y quita el fondo de la foto. Todo eso lo hacen modelos que se descargan del propio sitio de Molt y se ejecutan en tu navegador. Ni las fotos ni los resultados del análisis salen del dispositivo.</p>
+
+      <h2>Qué sale del dispositivo, y solo si lo usas</h2>
+      <ul>
+        <li><strong>Previsión del tiempo (Open-Meteo).</strong> Al buscar una ciudad o consultar el tiempo para un outfit o un viaje, Molt envía a <a href="https://open-meteo.com/">Open-Meteo</a> el nombre que escribes, las coordenadas del lugar elegido y las fechas. Nunca envía tus prendas, fotos ni outfits. Open-Meteo recibe tu petición como cualquier servicio web (con tu dirección IP).</li>
+        <li><strong>Copia en Google Drive (opcional).</strong> Si eliges guardar o restaurar la copia en Google Drive, se explica en la sección siguiente.</li>
+        <li><strong>Alojamiento (Cloudflare).</strong> La web de Molt se sirve desde Cloudflare. Como cualquier servidor web, Cloudflare recibe las peticiones de los archivos de la app (por ejemplo, tu dirección IP y tu navegador) y puede tratarlas según su propia política de privacidad. Esas peticiones no contienen tu armario. Molt no añade herramientas de analítica ni de seguimiento.</li>
+      </ul>
+
+      <h2 id="google-drive">Google Drive</h2>
+      <p>La copia en Google Drive es opcional y solo funciona si inicias sesión con tu cuenta de Google desde el menú <strong>Datos</strong>.</p>
+      <ul>
+        <li><strong>Qué permiso pide:</strong> solo <code>drive.appdata</code>, que da acceso a una carpeta oculta reservada a Molt dentro de tu Drive. Molt no puede ver, leer ni cambiar el resto de tus archivos de Drive, ni tu correo, ni tus contactos.</li>
+        <li><strong>Qué guarda:</strong> un único archivo, <code>molt-armario.zip</code>, con la misma copia que puedes descargar a mano: tus prendas con sus fotos, outfits, preferencias, valoraciones y viajes. Se guarda en tu propia cuenta; el autor de Molt no tiene acceso a él.</li>
+        <li><strong>Para qué lo usa:</strong> solo para guardar esa copia y para leerla cuando eliges restaurarla. No se usa para nada más, no se comparte con terceros y no se usa para publicidad ni para entrenar modelos.</li>
+        <li><strong>El acceso:</strong> Google entrega a Molt un permiso temporal que dura una hora y se guarda solo en la memoria de la página mientras está abierta. Molt no guarda tu contraseña ni ese permiso.</li>
+        <li><strong>Borrarlo:</strong> en Google Drive, <em>Configuración → Administrar aplicaciones → Molt → Eliminar datos de aplicación ocultos</em>. Puedes retirar el acceso de Molt en cualquier momento en <a href="https://myaccount.google.com/permissions">tu cuenta de Google → Seguridad → Aplicaciones de terceros</a>.</li>
+      </ul>
+      <p>El uso y la transferencia a cualquier otra aplicación de la información recibida de las API de Google se ajustan a la <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de datos de usuario de los servicios de API de Google</a>, incluidos los requisitos de uso limitado.</p>
+
+      <h2>Copias y exportaciones</h2>
+      <ul>
+        <li><strong>Copia del armario:</strong> un archivo ZIP con todo tu armario, fotos incluidas, que se crea en tu dispositivo y guardas donde quieras. No va cifrado: guárdalo en un sitio seguro.</li>
+        <li><strong>Datos de entrenamiento:</strong> si lo eliges, Molt crea un ZIP con las fotos y sus etiquetas normalizadas, sin nombres, marcas, tallas, notas ni la foto de la etiqueta. También se crea en tu dispositivo; solo sale de él si tú lo envías.</li>
+      </ul>
+
+      <h2>Cómo borrar tus datos</h2>
+      <ul>
+        <li>Cada prenda, outfit o viaje se puede eliminar desde la app.</li>
+        <li>Para borrarlo todo, borra los datos de este sitio en los ajustes de tu navegador. Ten en cuenta que no se puede deshacer: haz antes una copia si la quieres conservar.</li>
+        <li>Las copias que hayas descargado o guardado en Google Drive se borran donde las tengas (ver la sección de Google Drive).</li>
+      </ul>
+
+      <h2>Seguridad y pérdida de datos</h2>
+      <p>Los datos del navegador no van cifrados: cualquiera que use tu dispositivo con tu sesión puede ver tu armario. Si borras los datos del sitio, usas otro navegador o perfil, o el navegador los purga (Safari lo hace con sitios que no visitas en un tiempo), el armario se pierde o queda separado. Por eso Molt recuerda de vez en cuando hacer una copia.</p>
+
+      <h2>Cambios en esta política</h2>
+      <p>Si Molt cambia lo que hace con tus datos (por ejemplo, una nueva conexión externa), esta página se actualizará antes y su fecha cambiará.</p>
+
+      <h2>Responsable y contacto</h2>
+      <p>Molt es un proyecto de Ximo Martínez. Para cualquier pregunta sobre privacidad, puedes escribir en <a href="https://github.com/omixxxer/MOLT/issues">github.com/omixxxer/MOLT/issues</a> (los mensajes allí son públicos: no incluyas datos personales).</p>
+
+      <footer>© 2026 Ximo Martínez · <a href="/">Volver a Molt</a></footer>
+    </main>
+  </body>
+</html>

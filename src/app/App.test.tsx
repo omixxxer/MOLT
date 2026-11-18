@@ -75,6 +75,8 @@ describe('wardrobe flow', () => {
     const user = userEvent.setup()
     await renderInWardrobe()
 
+    // The note on where the data is kept opens the privacy policy.
+    expect(screen.getByRole('link', { name: /Tus prendas y fotografías se guardan únicamente en este dispositivo/ })).toHaveAttribute('href', '/privacidad.html')
     const navigation = screen.getByRole('navigation', { name: 'Navegación principal' })
     expect(navigation).toHaveTextContent('Armario')
     expect(navigation).toHaveTextContent('Outfits')

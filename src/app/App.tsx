@@ -201,7 +201,7 @@ function App() {
             <MoltMark />
             Molt<span aria-hidden="true">.</span>
           </a>
-          <span className="privacy-note"><span className="privacy-indicator" /><span className="privacy-long">{localStorageMessage}</span><span className="privacy-short">Guardado solo en tu dispositivo</span></span>
+          <a className="privacy-note" href="/privacidad.html" title="Privacidad: qué se guarda y qué sale del dispositivo"><span className="privacy-indicator" /><span className="privacy-long">{localStorageMessage}</span><span className="privacy-short">Guardado solo en tu dispositivo</span></a>
         </header>
 
         <main className="screen-content">
