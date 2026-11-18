@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { defaultExtras, occasionOfKind, PACKING_STYLES, planDays, TRIP_KINDS, type TripKind } from '../../trips/packingPlan'
+import { defaultExtras, occasionOfKind, PACKING_STYLES, TRIP_KINDS, type TripKind } from '../../trips/packingPlan'
+import { planDaysInBackground } from '../../trips/plannerClient'
 import type { Garment, PackingStyle, Trip } from '../../types/domain'
 import { dayFromToday, FORECAST_DAYS, getForecast, MAX_TRIP_DAYS, searchPlaces, type Place } from '../../weather/openMeteo'
 import type { OutfitData } from '../outfits/outfitData'
@@ -29,7 +30,7 @@ export default function TripForm({ garments, data, onCreated }: TripFormProps) {
   const [endDate, setEndDate] = useState(() => dayFromToday(3))
   const [kind, setKind] = useState<TripKind>('leisure')
   const [style, setStyle] = useState<PackingStyle>('balanced')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState<'' | 'weather' | 'outfits'>('')
   const [error, setError] = useState('')
   const length = daysBetween(startDate, endDate) + 1
   const tooLong = length > MAX_TRIP_DAYS
@@ -45,13 +46,14 @@ export default function TripForm({ garments, data, onCreated }: TripFormProps) {
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError('')
-    setLoading(true)
+    setLoading('weather')
     try {
       const destination = place ?? (await searchPlaces(query))[0]
       if (!destination) throw new Error(`No encontramos «${query.trim()}». Prueba con otro nombre.`)
       const { days, fetchedAt } = await getForecast(destination, startDate, length)
       const occasion = occasionOfKind(kind)
-      const planned = planDays(garments, days.map((weather) => ({ date: weather.date, weather, occasion, garmentIds: [] })), style, { preferences: data.preferences, feedback: data.feedback, wear: data.wear })
+      setLoading('outfits')
+      const planned = await planDaysInBackground(garments, days.map((weather) => ({ date: weather.date, weather, occasion, garmentIds: [] })), style, { preferences: data.preferences, feedback: data.feedback, wear: data.wear })
       const now = new Date().toISOString()
       await onCreated({
         id: crypto.randomUUID(),
@@ -70,7 +72,7 @@ export default function TripForm({ garments, data, onCreated }: TripFormProps) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo preparar la maleta.')
     } finally {
-      setLoading(false)
+      setLoading('')
     }
   }
 
@@ -108,8 +110,8 @@ export default function TripForm({ garments, data, onCreated }: TripFormProps) {
       </fieldset>
 
       {error && <p className="form-error" role="alert">{error}</p>}
-      <button className="button button-dark" type="submit" disabled={loading || !query.trim() || invalid || tooLong}>
-        {loading ? 'Consultando el tiempo…' : 'Preparar la maleta'}
+      <button className="button button-dark" type="submit" disabled={Boolean(loading) || !query.trim() || invalid || tooLong}>
+        {loading === 'weather' ? 'Consultando el tiempo…' : loading === 'outfits' ? 'Eligiendo los outfits…' : 'Preparar la maleta'}
       </button>
       <p className="weather-note">
         {beyondForecast ? `La previsión llega a ${FORECAST_DAYS} días; para el resto usaremos cómo fue el tiempo esas fechas en años anteriores, y lo actualizaremos al acercarse. ` : ''}
