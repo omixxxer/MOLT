@@ -111,9 +111,9 @@ El menú **Datos** del armario reúne:
 3. En **Clientes → Crear cliente**, tipo **Aplicación web**:
    - **Orígenes de JavaScript autorizados:** `http://localhost:5173` y `http://localhost:4173`.
    - **URI de redireccionamiento autorizados:** `http://localhost:5173/oauth/google.html` y `http://localhost:4173/oauth/google.html`.
-   - Para la app publicada, añade también su origen (`https://molt.ximomartinez98.workers.dev`) y su `https://molt.ximomartinez98.workers.dev/oauth/google.html`, exacto, con `.html`.
+   - Para la app publicada, añade también su origen (`https://molt.omixer.workers.dev`) y su `https://molt.omixer.workers.dev/oauth/google.html`, exacto, con `.html`.
 4. Copia `.env.example` a `.env.local`, pon el ID de cliente en `VITE_GOOGLE_CLIENT_ID` y reinicia `npm run dev`. El ID de cliente no es secreto; `.env.local` está en `.gitignore`.
-5. **Para que cualquiera pueda usarlo** (no solo los usuarios de prueba): en **Google Auth Platform → Público**, **Publicar app**. Como `drive.appdata` es un permiso no sensible, Google no exige verificación; sin verificar la marca, la pantalla de Google muestra el dominio en lugar del nombre y el logo de Molt. En **Marca**, la página de inicio es la dirección de la app y la política de privacidad, [`/privacidad`](public/privacidad.html). En modo prueba solo pueden entrar hasta 100 cuentas añadidas a mano, y su autorización caduca a los 7 días.
+5. **Para que cualquiera pueda usarlo** (no solo los usuarios de prueba): en **Google Auth Platform → Público**, **Publicar app**. Hace falta un dominio propio verificado en Google Search Console: Google no acepta un subdominio de `workers.dev` como dominio autorizado. Hasta tenerlo, la app sigue en modo prueba. Como `drive.appdata` es un permiso no sensible, Google no exige verificación; sin verificar la marca, la pantalla de Google muestra el dominio en lugar del nombre y el logo de Molt. En **Marca**, la página de inicio es la dirección de la app y la política de privacidad, [`/privacidad`](public/privacidad.html). En modo prueba solo pueden entrar hasta 100 cuentas añadidas a mano, y su autorización caduca a los 7 días.
 
 Formato de la copia (`molt-wardrobe-backup`, versión 1; se siguen leyendo las `vesta-wardrobe-backup` anteriores al cambio de nombre): `backup.json` con todos los registros, donde cada foto se sustituye por la ruta de su archivo en `photos/<id de prenda>/`, más esos archivos. Así podrá sincronizarse archivo a archivo más adelante.
 
@@ -160,7 +160,7 @@ npm run preview    # previsualizar la compilación
 
 ## Despliegue en Cloudflare Workers
 
-La app está publicada en <https://molt.ximomartinez98.workers.dev> como archivos estáticos de un Worker. Para conectar el repositorio: en el panel de Cloudflare, **Workers & Pages → Create application → GitHub**, elige este repositorio, usa `main` como rama de producción, `npm run build` para compilar y `dist` como carpeta de archivos.
+La app está publicada en <https://molt.omixer.workers.dev> como archivos estáticos de un Worker. Para conectar el repositorio: en el panel de Cloudflare, **Workers & Pages → Create application → GitHub**, elige este repositorio, usa `main` como rama de producción, `npm run build` para compilar y `dist` como carpeta de archivos.
 
 - **Cabeceras:** [`public/_headers`](public/_headers) da el aislamiento que ONNX Runtime necesita para usar varios hilos. Comprueba en la consola del navegador que `crossOriginIsolated` es `true`.
 - **Tamaño:** Cloudflare admite 25 MiB por archivo. `model_quantized.onnx` ocupa 24,55 MiB; `npm run build` falla con un aviso claro si un archivo pasa de ese límite ([`check-asset-size.mjs`](scripts/check-asset-size.mjs)).
