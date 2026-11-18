@@ -86,7 +86,7 @@ Las pruebas ([`outfitGenerator.test.ts`](src/outfits/outfitGenerator.test.ts), [
 - **Respuesta ilegible del servicio:** se atribuía a la conexión («Comprueba tu conexión»); ahora dice que la respuesta no se ha podido leer.
 
 **Límites que quedan:**
-- No se ha medido en móvil. La maleta de 14 días tarda ~1 s en escritorio y se calcula en el hilo principal, así que en un móvil lento la pantalla puede quedarse parada unos segundos al preparar o reajustar un viaje.
+- **La maleta se calcula en un worker** ([`planner.worker.ts`](src/trips/planner.worker.ts), con [`plannerClient.ts`](src/trips/plannerClient.ts)): preparar, reajustar y «Otra opción» no bloquean la pantalla. Con 120 prendas, 300 valoraciones y 200 días de uso, un viaje de 14 días bloqueaba el hilo principal 869–921 ms en una sola tarea (escritorio, Chromium, modo desarrollo); en el worker, ninguna tarea larga y un temporizador cada 16 ms se retrasa como mucho 2 ms. Tarda lo mismo (0,8–1 s) y da el mismo resultado. Donde no hay workers se calcula como antes. No se ha medido en móvil, donde tardará más, pero ya sin congelar la pantalla.
 - Cada búsqueda considera como mucho 7 partes de arriba, 7 de abajo, 7 vestidos o monos, 3 capas, 3 calzados y 2 accesorios, elegidos por cómo encajan; el resto del armario aparece al pedir más propuestas.
 - Cuánto abriga una prenda se deduce de su tipo y su composición; una prenda sin tipo usa un valor medio de su categoría. Con poca ropa de abrigo a -20 °C se propone igualmente lo mejor que hay, con el aviso «Puede darte frío».
 - Las puntuaciones son reglas, no un modelo validado con usuarios.
@@ -280,7 +280,7 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [x] Guardar los planes de viaje.
 - [x] Revisar Armario, Outfits y Maleta en móvil, tableta y escritorio, con teclado (ver «Pantallas y teclado»).
 - [ ] Tendencias, con una fuente fiable y fechada.
-- [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB).
+- [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB). La inferencia (analizador de 41 kB, cargador de ONNX Runtime de 77 kB y su WebAssembly de 14,8 MB) no entra en el bloque inicial (429 kB): se pide al abrir el formulario, «Varias prendas» o «Desde un look». El service worker no precachea ni los modelos ni el WebAssembly, que se guardan en caché la primera vez que se usan.
 - [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
 - [x] Validar el generador y la maleta con armarios pequeños, grandes e incompletos, tiempo extremo y fechas fuera de la previsión.
 - [ ] Probar la usabilidad en móvil y escritorio, y medir la maleta en un móvil (ver «Validación del generador, la maleta y el tiempo»).

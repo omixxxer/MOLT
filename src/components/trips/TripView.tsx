@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy01Icon, Delete02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { forecastChanges, packingGroups, packingText, PACKING_STYLES, planDays, summarizeWeather, TRIP_KINDS, tripDates, type ForecastChange } from '../../trips/packingPlan'
+import { forecastChanges, packingGroups, packingText, PACKING_STYLES, summarizeWeather, TRIP_KINDS, tripDates, type ForecastChange } from '../../trips/packingPlan'
+import { planDaysInBackground } from '../../trips/plannerClient'
 import type { Garment, Trip, TripDay } from '../../types/domain'
 import { dayFromToday, getForecast, placeLabel } from '../../weather/openMeteo'
 import { askConfirm } from '../confirmDialog'
@@ -33,6 +34,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
   const today = dayFromToday(0)
   const [pane, setPane] = useState<'days' | 'list'>('days')
   const [refreshing, setRefreshing] = useState(false)
+  const [adjusting, setAdjusting] = useState(false)
   const [changes, setChanges] = useState<ForecastChange[]>([])
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -75,10 +77,18 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
     if (!finished && Date.now() - Date.parse(trip.fetchedAt ?? '') > REFRESH_AFTER) void refresh(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function adjustOutfits() {
-    update({ days: planDays(garments, latest.current.days, trip.style, options) })
-    setChanges([])
-    setMessage('Outfits reajustados al nuevo tiempo.')
+  async function adjustOutfits() {
+    setAdjusting(true)
+    try {
+      const days = await planDaysInBackground(garments, latest.current.days, trip.style, options)
+      update({ days })
+      setChanges([])
+      setMessage('Outfits reajustados al nuevo tiempo.')
+    } catch {
+      setError('No se pudieron reajustar los outfits.')
+    } finally {
+      setAdjusting(false)
+    }
   }
 
   function replaceDay(index: number, day: TripDay) {
@@ -125,7 +135,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
             <ul>{changes.map((change) => <li key={change.date}><span className="trip-capitalize">{dayName(change.date)}</span>: {change.text}</li>)}</ul>
           </div>
           <div className="trip-changes-actions">
-            <button type="button" className="button button-dark" onClick={adjustOutfits}>Reajustar outfits</button>
+            <button type="button" className="button button-dark" onClick={() => void adjustOutfits()} disabled={adjusting}>{adjusting ? 'Reajustando…' : 'Reajustar outfits'}</button>
             <button type="button" className="studio-link" onClick={() => setChanges([])}>Dejarlos como están</button>
           </div>
         </section>

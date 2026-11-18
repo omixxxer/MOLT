@@ -3,7 +3,8 @@ import { Add01Icon, Alert02Icon, ShuffleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { createOutfitRecord, optionsForRole, outfitKey, scoreOutfit, withGarment, type OutfitGenerationOptions } from '../../outfits/outfitGenerator'
 import { logWear } from '../../stats/wearLog'
-import { dayContext, nextOutfitForDay } from '../../trips/packingPlan'
+import { dayContext } from '../../trips/packingPlan'
+import { nextOutfitInBackground } from '../../trips/plannerClient'
 import type { Garment, GarmentRole, PackingStyle, TripDay } from '../../types/domain'
 import { dayFromToday } from '../../weather/openMeteo'
 import { GarmentThumbnail } from '../GarmentPhoto'
@@ -34,6 +35,8 @@ interface TripDayCardProps {
 export default function TripDayCard({ day, days, index, style, garments, data, options, onChange, onDataChanged, onAvailabilityChange }: TripDayCardProps) {
   const [picking, setPicking] = useState<GarmentRole>()
   const [notice, setNotice] = useState('')
+  /** A new outfit is being chosen (in the planner's worker): its controls wait. */
+  const [choosing, setChoosing] = useState(false)
   const seen = useRef(new Set<string>())
   const outfit = useMemo(() => day.garmentIds
     .map((id) => garments.find((garment) => garment.id === id))
@@ -52,25 +55,40 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
   })
   const pickerCurrent = picking && outfit.find((garment) => garment.role === picking)
 
-  function otherOutfit() {
+  async function otherOutfit() {
     seen.current.add(key)
     setNotice('')
-    let next = nextOutfitForDay(garments, days, index, style, seen.current, options)
-    if (!next && seen.current.size > 1) {
-      seen.current.clear()
-      seen.current.add(key)
-      next = nextOutfitForDay(garments, days, index, style, seen.current, options)
+    setChoosing(true)
+    try {
+      let next = await nextOutfitInBackground(garments, days, index, style, seen.current, options)
+      if (!next && seen.current.size > 1) {
+        seen.current.clear()
+        seen.current.add(key)
+        next = await nextOutfitInBackground(garments, days, index, style, seen.current, options)
+      }
+      if (next) onChange({ ...day, garmentIds: next, edited: true })
+      else setNotice('No hay otra combinación para este día.')
+    } catch {
+      setNotice('No se pudo buscar otra combinación.')
+    } finally {
+      setChoosing(false)
     }
-    if (next) onChange({ ...day, garmentIds: next.garments.map((garment) => garment.id), edited: true })
-    else setNotice('No hay otra combinación para este día.')
   }
 
-  function changeOccasion(occasion: string) {
+  async function changeOccasion(occasion: string) {
     const changed = { ...day, occasion }
     seen.current.clear()
-    const best = nextOutfitForDay(garments, days.map((item, position) => (position === index ? changed : item)), index, style, seen.current, options)
-    onChange({ ...changed, garmentIds: best?.garments.map((garment) => garment.id) ?? [], edited: true })
-    if (!best) setNotice('No hay prendas para ese plan.')
+    setNotice('')
+    setChoosing(true)
+    try {
+      const best = await nextOutfitInBackground(garments, days.map((item, position) => (position === index ? changed : item)), index, style, seen.current, options)
+      onChange({ ...changed, garmentIds: best ?? [], edited: true })
+      if (!best) setNotice('No hay prendas para ese plan.')
+    } catch {
+      setNotice('No se pudo cambiar el plan del día.')
+    } finally {
+      setChoosing(false)
+    }
   }
 
   function pick(garment: Garment) {
@@ -93,7 +111,7 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
           <p><HugeiconsIcon icon={weatherIcon(day.weather)} size={15} />{weatherSummary(day.weather)} · {day.weather.conditions[0]}{day.weather.source === 'climate' && ' (lo habitual)'}</p>
         </div>
         <label className="trip-occasion"><span className="visually-hidden">Plan del día</span>
-          <select value={day.occasion} onChange={(event) => changeOccasion(event.target.value)}>
+          <select value={day.occasion} onChange={(event) => void changeOccasion(event.target.value)} disabled={choosing}>
             {OCCASIONS.map((occasion) => <option key={occasion}>{occasion}</option>)}
           </select>
         </label>
@@ -118,7 +136,7 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
       {notice && <p className="outfit-explanation" role="status">{notice}</p>}
 
       <div className="trip-day-actions">
-        <button type="button" className="button button-outline" onClick={otherOutfit}><HugeiconsIcon icon={ShuffleIcon} size={15} />Otra opción</button>
+        <button type="button" className="button button-outline" onClick={() => void otherOutfit()} disabled={choosing}><HugeiconsIcon icon={ShuffleIcon} size={15} />{choosing ? 'Buscando…' : 'Otra opción'}</button>
         {isToday && outfit.length > 0 && <button type="button" className="button button-dark" onClick={() => void wear()} disabled={wornToday}>{wornToday ? 'Puesto hoy' : 'Me lo pongo hoy'}</button>}
         {missing.map((role) => (
           <button key={role} type="button" className="trip-add" onClick={() => setPicking(role)}><HugeiconsIcon icon={Add01Icon} size={13} />{ROLE_LABELS[role]}</button>
