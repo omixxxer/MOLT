@@ -2,7 +2,8 @@ import { Image02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useState } from 'react'
 import { analyzeGarmentImage, type ClothingAnalysisSuggestion } from '../ai/clothingAnalyzer'
-import { cutOutGarments, cutoutColors } from '../ai/cutout'
+import { cutOutGarments, cutoutColors, type LookOptions } from '../ai/cutout'
+import { lookType } from '../ai/lookType'
 import { suggestUsage } from '../ai/usageRules'
 import { database } from '../db/database'
 import { garmentRepository } from '../db/garmentRepository'
@@ -33,8 +34,9 @@ interface FoundGarment {
 }
 
 /**
- * Adds the garments of a full-body photo at once: the segmentation head finds them, SlimSAM cuts each one out,
- * the classifier names it, and the user picks which to keep. The look can be saved as an outfit worn today.
+ * Adds the garments of a full-body photo at once: the segmentation head finds them, MediaPipe's pose and body parts
+ * (body.ts) say where each one sits on the body, SlimSAM cuts each one out, the classifier names it, and the user
+ * picks which to keep. Measured on 50 looks in README («Desde un look»). The look can be saved as an outfit worn today.
  * The whole photo (with the face) is not stored; only the garment cut-outs.
  */
 export default function LookImport({ onDone, onCancel }: LookImportProps) {
@@ -57,20 +59,27 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
       const [map] = (await analyzeGarmentImage(file)).segmentations
       if (!map) throw new Error('El modelo instalado no localiza prendas en la foto.')
       setStatus('Recortando cada prenda')
-      const cutouts = await cutOutGarments(file, map, 'outfit')
+      // Without the pose (no person found, or MediaPipe cannot load) the look is cut out as before.
+      const body = await import('../ai/body').then(({ readBody }) => readBody(file)).catch((failure: unknown) => {
+        console.warn('No se pudo leer la pose de la foto:', failure)
+        return undefined
+      })
+      const look: LookOptions = body ? { body, zones: true, feet: true, merge: true, clean: 'skin' } : {}
+      const cutouts = await cutOutGarments(file, map, 'outfit', look)
       setStatus('Reconociendo cada prenda')
       const garments: FoundGarment[] = []
       for (const cutout of cutouts) {
         const suggestion = await analyzeGarmentImage(cutout.image)
         const colors = (await cutoutColors(cutout.image)).map((entry) => entry.color)
+        const type = lookType(cutout.region.classId, suggestion)
         garments.push({
           id: crypto.randomUUID(),
           image: cutout.image,
           suggestion,
           colors: colors.length ? colors : suggestion.colors,
           include: true,
-          category: suggestion.category,
-          subcategory: suggestion.subcategory
+          category: type.category,
+          subcategory: type.subcategory
         })
       }
       setFound(garments)

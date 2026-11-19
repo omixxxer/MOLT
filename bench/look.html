@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molt · evaluación de «Desde un look»</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 1.5rem; }
+      pre { background: #f3f3ee; padding: 1rem; overflow: auto; max-height: 70vh; }
+    </style>
+  </head>
+  <body>
+    <h1>Evaluación de «Desde un look»</h1>
+    <p>
+      Hace lo mismo que «Desde un look» (localizar las prendas, recortar cada una y reconocer cada recorte) con fotos
+      de cuerpo entero que traen la máscara de cada prenda, preparadas en local con
+      <code>python -m vesta_ml.look_eval</code> en <code>public/test-photos/eval-looks/</code> (no se suben al repositorio).
+      Ejemplo: <code>?set=eval-looks&amp;auto</code>, <code>&amp;limit=5</code> para una prueba corta y <code>&amp;body=zones,feet,merge,clean-skin</code> (o <code>clean-all</code>) para añadir la pose y las partes del cuerpo de MediaPipe. Para medir con
+      varios hilos y la memoria: <code>MOLT_BENCH=1 npm run build</code>, <code>npm run preview</code> y Chrome.
+    </p>
+    <p id="status">Sin ejecutar.</p>
+    <p><a id="download" hidden>Descargar resultados (JSON)</a></p>
+    <div id="output"></div>
+    <script type="module" src="./lookBench.ts"></script>
+  </body>
+</html>

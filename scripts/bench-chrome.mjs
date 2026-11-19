@@ -1,4 +1,4 @@
-// Runs bench/classifier.html in a headless Chrome of its own (new profile) and saves the result, with the memory
+// Runs bench/classifier.html or bench/look.html in a headless Chrome of its own (new profile) and saves the result, with the memory
 // the operating system gives the page's process, sampled every second (Windows only). The bench page's own figure
 // (performance.measureUserAgentSpecificMemory) does not see SlimSAM's worker (src/ai/sam.ts), so cut-out memory
 // has to be read from the OS.
@@ -23,6 +23,16 @@ if (args[0] === '--compare') {
   const counts = { same: 0, different: 0, onlyInOne: 0 }
   for (const row of a.rows) {
     const other = after.get(row.id)
+    // bench/look.html: the cut-outs of a photo, in order.
+    if (other && row.cuts) {
+      const [x, y] = [row.cuts, other.cuts ?? []].map((cuts) => cuts.map((cut) => cut.sha256).join(','))
+      if (x === y) counts.same += 1
+      else {
+        counts.different += 1
+        console.log('distinto', row.id, x, '→', y)
+      }
+      continue
+    }
     if (!other || row.cutout === undefined) continue
     if (!row.cutout !== !other.cutout) {
       counts.onlyInOne += 1
@@ -111,7 +121,7 @@ while (!result && Date.now() - started < 60 * 60 * 1000) {
   const now = await evaluate(`document.querySelector('#status')?.textContent ?? ''`).catch(() => '')
   if (now !== status) process.stdout.write(`\r${Math.round((Date.now() - started) / 1000)} s · ${(status = now).slice(0, 60)}   `)
   if (now.startsWith('Error')) break
-  result = await evaluate('window.classifierBenchResult').catch(() => undefined)
+  result = await evaluate('window.classifierBenchResult ?? window.lookBenchResult').catch(() => undefined)
 }
 console.log()
 if (result) {
@@ -127,6 +137,7 @@ if (result) {
     privateAfter15sMb: samples.at(-1)[1],
     samples: samples.map(([at, mb]) => [Math.round((at - started) / 1000), mb])
   } : null
+  result.memoryMb ??= {}
   result.memoryMb.after15s = await evaluate('performance.measureUserAgentSpecificMemory().then((m) => Math.round(m.bytes / 1048576)).catch(() => null)')
   result.masks = await evaluate(`(async () => {
     const masks = {}
@@ -143,7 +154,7 @@ if (result) {
     return masks
   })()`)
   writeFileSync(out, JSON.stringify(result))
-  console.log(JSON.stringify({ os: result.os && { ...result.os, samples: undefined }, memoryMb: result.memoryMb, latencyMs: result.latencyMs, cutoutLatencyMs: result.cutoutLatencyMs }, null, 1))
+  console.log(JSON.stringify({ os: result.os && { ...result.os, samples: undefined }, memoryMb: result.memoryMb, latencyMs: result.latencyMs, cutoutLatencyMs: result.cutoutLatencyMs, samLoadsMs: result.samLoadsMs }, null, 1))
 } else {
   sampling = false
   console.log('Sin resultado:', status)

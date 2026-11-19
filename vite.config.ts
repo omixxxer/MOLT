@@ -23,7 +23,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}']
+        globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}'],
+        // MediaPipe's WebAssembly loader is cached when first used (src/sw.ts); local test photos never ship.
+        globIgnores: ['**/vision_wasm_internal-*.js', 'test-photos/**', 'bench/**']
       },
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon-48.png', 'icons/apple-touch-icon-180.png'],
@@ -46,5 +48,5 @@ export default defineConfig({
   ],
   // MOLT_BENCH=1 also builds the measurement pages of bench/ (never in the published build), so they can run with
   // several threads in npm run preview, as the app does in production.
-  ...(process.env.MOLT_BENCH ? { build: { rollupOptions: { input: { main: 'index.html', classifier: 'bench/classifier.html', colors: 'bench/colors.html',storage: 'bench/storage.html' } } } } : {})
+  ...(process.env.MOLT_BENCH ? { build: { rollupOptions: { input: { main: 'index.html', classifier: 'bench/classifier.html', colors: 'bench/colors.html', look: 'bench/look.html', storage: 'bench/storage.html' } } } } : {})
 })

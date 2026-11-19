@@ -1,6 +1,7 @@
 import { garmentColors, toLab, type ColorShare } from './colors'
 import { encodeImage, outline, outlineAlpha, withSam } from './sam'
-import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Region, type SegmentationMap } from './segmentation'
+import { bodyClass, cleanAlpha, footPatches, footPrompt, mergeByClass, type BodyMap } from './bodyRules'
+import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Prompt, type Region, type SegmentationMap } from './segmentation'
 
 // Garments cut out of a photo with a transparent background: the coarse map says where each one is, SlimSAM
 // draws its exact outline, and anything far from the coarse region is dropped (an arm, the wall behind).
@@ -21,6 +22,8 @@ export interface GarmentCutout {
   height: number
   /** Share of the photo the garment covers. */
   coverage: number
+  /** Where the crop sits in the photo, as fractions of its width and height (to compare it with a reference mask). */
+  place: { x: number; y: number; width: number; height: number }
 }
 
 export interface Box {
@@ -308,15 +311,33 @@ export function singleGarmentRegion(map: SegmentationMap, width: number, height:
   return merged.patches.length >= 0.85 * visible ? undefined : merged
 }
 
-/**
- * single: the photo shows one garment (see singleGarmentRegion). outfit: a person wearing several, one cut-out per
- * garment found, largest first.
- */
-export function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit'): Promise<GarmentCutout[]> {
-  return withSam(() => cutOut(photo, map, mode))
+/** What the person's pose and body parts (body.ts) add to an outfit photo; each can be turned off to measure it. */
+export interface LookOptions {
+  body?: BodyMap
+  /** Rename each region by where it sits on the body (bodyRules.bodyClass). */
+  zones?: boolean
+  /** Ask SlimSAM for the shoes at the heels and toes, instead of the coarse map's footwear regions. */
+  feet?: boolean
+  /** One region per class (accessories apart), so a garment split in pieces is one cut-out. */
+  merge?: boolean
+  /** Take skin and hair out of the cut-outs ('skin'), and also what is not the person ('all'; shoes always). */
+  clean?: 'skin' | 'all'
 }
 
-async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit'): Promise<GarmentCutout[]> {
+/** Pose and body parts: under this share of a cut-out left, it was skin, hair or background, not a garment. */
+const MIN_KEPT_AFTER_CLEAN = 0.4
+
+type LookRegion = Region & { prompt?: Prompt }
+
+/**
+ * single: the photo shows one garment (see singleGarmentRegion). outfit: a person wearing several, one cut-out per
+ * garment found, largest first; `look` adds what MediaPipe says about the person.
+ */
+export function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions = {}): Promise<GarmentCutout[]> {
+  return withSam(() => cutOut(photo, map, mode, look))
+}
+
+async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions): Promise<GarmentCutout[]> {
   const bitmap = await createImageBitmap(photo, { imageOrientation: 'from-image' })
   try {
     const work = sizeWithin(bitmap.width, bitmap.height, CUTOUT_SIDE)
@@ -335,11 +356,21 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
     const transparent = own.reduce((count, value) => count + (value < 128 ? 1 : 0), 0) / own.length
     if (mode === 'single' && transparent >= 0.05 && transparent <= 0.95) {
       const box = alphaBox(own, work.width, work.height)
-      return box ? [{ region: { classId: 'garment', patches: [], confidence: 1 }, image: await crop(own, box), width: box.width, height: box.height, coverage: 1 - transparent }] : []
+      return box ? [{ region: { classId: 'garment', patches: [], confidence: 1 }, image: await crop(own, box), width: box.width, height: box.height, coverage: 1 - transparent, place: placeOf(box) }] : []
     }
 
     const single = mode === 'single' ? singleGarmentRegion(map, bitmap.width, bitmap.height) : undefined
-    const regions = mode === 'single' ? (single ? [single] : []) : garmentRegions(map, bitmap.width, bitmap.height, false)
+    let regions: LookRegion[] = mode === 'single' ? (single ? [single] : []) : garmentRegions(map, bitmap.width, bitmap.height, false)
+    const landmarks = mode === 'outfit' ? look.body?.landmarks : undefined
+    if (landmarks && look.zones) {
+      regions = regions.map((region) => ({ ...region, classId: bodyClass(region.classId, regionMask(region, map.grid, bitmap.width, bitmap.height, match.width, match.height, 0), match.width, match.height, landmarks) }))
+    }
+    const feet = landmarks && look.feet ? footPrompt(landmarks, bitmap.width, bitmap.height) : undefined
+    if (feet && landmarks) {
+      regions = regions.filter((region) => region.classId !== 'footwear')
+      regions.push({ classId: 'footwear', patches: footPatches(landmarks, map.grid, bitmap.width, bitmap.height), confidence: 1, prompt: feet })
+    }
+    if (mode === 'outfit' && look.merge) regions = mergeByClass(regions)
     if (!regions.length) return []
 
     // A single garment on a plain backdrop is cut out pixel by pixel, without SlimSAM, if the result agrees with
@@ -369,15 +400,21 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       tidyAlpha(alpha, work.width, work.height, coarse(region, 0))
       let covered = 0
       for (let i = 0; i < alpha.length; i += 1) if (alpha[i]! >= 128) covered += 1
+      if (mode === 'outfit' && look.body && look.clean) {
+        const removed = cleanAlpha(alpha, work.width, work.height, look.body, look.clean === 'all' || region.classId === 'footwear')
+        if (covered - removed < covered * MIN_KEPT_AFTER_CLEAN) continue
+        covered -= removed
+      }
       const coverage = covered / alpha.length
       const box = alphaBox(alpha, work.width, work.height)
       if (!box || coverage < MIN_COVERAGE) continue
-      cutouts.push({ region, image: await crop(alpha, box), width: box.width, height: box.height, coverage })
+      cutouts.push({ region, image: await crop(alpha, box), width: box.width, height: box.height, coverage, place: placeOf(box) })
     }
     return cutouts
 
-    async function outlineWithSam(region: Region): Promise<Uint8ClampedArray | undefined> {
+    async function outlineWithSam(region: LookRegion): Promise<Uint8ClampedArray | undefined> {
       const image = encoded ??= await encodeImage(photo)
+      if (region.prompt) return outlineFromPoints(image, region.prompt)
       // A single garment is asked for in two ways (few points, or a ring around it), and the candidate that matches
       // the region best wins: on a patterned bedspread each way fails on different photos.
       const candidates = [
@@ -390,6 +427,29 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       // Unsure (a light garment on a light background, say): better the original photo than a bad cut-out.
       if (!outlineFound(binary[index]!, coarse, match.width, match.height)) return undefined
       return outlineAlpha(candidates[index]!.logits, image, work.width, work.height)
+    }
+
+    /**
+     * The shoes, asked for at the heels and toes: the candidate with the most of those points inside and, among
+     * them, the smallest (the largest is the floor or the whole leg). The coarse map's patches are bigger than a
+     * shoe, so they cannot judge it; the floor is taken out afterwards (cleanAlpha).
+     */
+    async function outlineFromPoints(image: Awaited<ReturnType<typeof encodeImage>>, prompt: Prompt): Promise<Uint8ClampedArray | undefined> {
+      const candidates = await outline(image, prompt)
+      const masks = candidates.map((candidate) => outlineAlpha(candidate.logits, image, match.width, match.height))
+      const scored = masks.map((mask, index) => {
+        const inside = prompt.points.filter(([x, y], k) => prompt.labels[k] === 1 && mask[Math.min(match.height - 1, Math.floor(y / bitmap.height * match.height)) * match.width + Math.min(match.width - 1, Math.floor(x / bitmap.width * match.width))]! >= 128).length
+        const area = mask.reduce((sum, value) => sum + (value >= 128 ? 1 : 0), 0)
+        const binary = Uint8Array.from(mask, (value) => value >= 128 ? 1 : 0)
+        return { index, inside, area, border: borderCoverage(binary, match.width, match.height) }
+      }).filter((entry) => entry.area > 0 && entry.border <= 0.4)
+      scored.sort((a, b) => b.inside - a.inside || a.area - b.area)
+      const best = scored[0]
+      return best && best.inside > 0 ? outlineAlpha(candidates[best.index]!.logits, image, work.width, work.height) : undefined
+    }
+
+    function placeOf(box: Box) {
+      return { x: box.x / work.width, y: box.y / work.height, width: box.width / work.width, height: box.height / work.height }
     }
 
     async function crop(alpha: Uint8ClampedArray, box: Box): Promise<Blob> {

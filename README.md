@@ -36,7 +36,25 @@ El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arregl
 ### Desde un look (prototipo)
 - **Añadir prenda → «¿Llevas varias prendas en una foto?»:** con una foto de cuerpo entero, Molt localiza cada prenda, la recorta y la reconoce. Revisas el tipo, marcas cuáles añadir y, si quieres, el look se guarda también como outfit usado hoy.
 - La foto completa, con la cara, no se guarda: solo el recorte de cada prenda.
-- Aún no detecta si una prenda ya está en el armario (duplicados) y en fotos de modelo el recorte puede incluir manos o pelo.
+- **Pose y partes del cuerpo** ([`body.ts`](src/ai/body.ts), [`bodyRules.ts`](src/ai/bodyRules.ts)): MediaPipe localiza a la persona (33 puntos: hombros, cadera, rodillas, tobillos, talones, puntas de los pies) y qué es cada píxel (pelo, piel, ropa, accesorios, fondo). Con eso, cada zona de prenda se nombra por dónde está en el cuerpo (un «vestido» entero por encima de la cadera es una parte de arriba; el «calzado» por encima de las rodillas no es calzado), los zapatos se piden a SlimSAM en los talones y las puntas de los pies, los trozos de una misma prenda se unen en un recorte, y de los recortes se quitan la piel y el pelo (y de los zapatos, el suelo). El tipo de cada prenda es el de su zona, con la subcategoría que el clasificador ve más probable dentro de ese tipo. Si no hay persona en la foto o MediaPipe no carga, se recorta como antes.
+- Aún no detecta si una prenda ya está en el armario (duplicados).
+- **Medido (19-11-2026)** con [`bench/look.html`](bench/look.html): el mismo flujo que la app con 50 fotos de cuerpo entero de Fashionpedia que ningún modelo ha visto (pasarelas, alfombras rojas y calle; ningún selfie), comparando cada recorte con la máscara real de cada prenda. Una prenda cuenta como encontrada cuando sus recortes cubren al menos la mitad de ella. Antes y después de MediaPipe, con las mismas fotos:
+
+  | | Antes | Con pose y partes del cuerpo |
+  |---|---|---|
+  | Prendas encontradas | 81 de 134 | 84 de 134 |
+  | Calzado encontrado | 2 de 28 | 5 de 28 |
+  | Recortes que no son una prenda | 25 de 140 | 5 de 111 |
+  | Trozos de más de una prenda ya recortada | 31 | 19 |
+  | Coincidencia con la prenda real (IoU, mediana) | 0,67 | 0,82 |
+  | Recortes con más de un 20 % que no es la prenda | 15 | 5 |
+  | Tipo acertado (el que ve el usuario) | 49 % (recortes reconocidos solos) | 66 % (zona de la prenda) |
+  | Tiempo por look (20 fotos, mediana / p90) | 5,9 / 6,8 s | 6,2 / 8,1 s |
+  | Memoria de la página | ~1,8 GB | ~1,85 GB |
+
+  MediaPipe tarda ~0,4 s por foto (1,5 s la primera, con la carga de sus modelos: 9,4 + 16,4 MB, solo al usar «Desde un look»). Cada opción se midió también por separado: unir los trozos y quitar la piel son lo que más limpia; los puntos de los pies, lo único que sube el calzado; nombrar por la pose solo sube un punto el tipo acertado (66 % → 67 %). Quitar además el fondo de todas las prendas (no solo de los zapatos) deja recortes aún más ajustados (IoU 0,86) pero pierde dos prendas, así que no se usa. La combinación se eligió con estas mismas 50 fotos.
+  - El calzado sigue siendo lo más flojo (5 de 28), y de los accesorios (bolsos, gafas, joyas) se encuentran 5 de 17, como antes.
+  - Sin probar con selfies ni con fotos en el espejo. La pose de MediaPipe está pensada para una sola persona con la cabeza visible.
 
 ### Outfits
 - **Estudio:** al entrar ya hay un outfit para hoy según la ocasión y el tiempo. Cada pieza se puede **fijar** (no cambia), **cambiar** por la siguiente mejor o **elegir** en un selector que muestra primero lo que mejor combina con el resto. También se puede empezar de cero y dejar que Molt complete el outfit, o crear uno desde el detalle de una prenda.
@@ -136,7 +154,7 @@ Revisión de Armario, Outfits y Maleta (con sus paneles, el selector de prendas,
 ## Privacidad
 
 - Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
-- Los modelos (clasificador y lector de texto) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
+- Los modelos (clasificador, lector de texto, recorte y, en «Desde un look», la pose y las partes del cuerpo de MediaPipe) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
 - Conexiones externas, solo cuando las usas: **Open-Meteo** al consultar el tiempo (recibe la ciudad y sus coordenadas, nunca el inventario ni las fotos) y **Google Drive** si guardas o restauras allí la copia (recibe la copia completa, fotos incluidas, en tu propia cuenta).
 - La [política de privacidad](public/privacidad.html) (`/privacidad.html`, enlazada desde la cabecera y el menú **Datos**) lo explica para quien use la app. Es una página estática, fuera de la app, y una prueba ([`privacyPage.test.ts`](src/privacyPage.test.ts)) comprueba que nombra el permiso de Drive, el archivo de la copia y cada servicio externo que permite la CSP.
 - La política CSP solo permite conexiones al propio origen, a Open-Meteo (previsión, búsqueda de lugares e histórico) y a la API de Google (`www.googleapis.com`). La app no carga scripts de Google: el inicio de sesión ocurre en una ventana aparte.
@@ -235,8 +253,9 @@ Con [`bench/storage.html`](bench/storage.html) (`npm run dev` y abrir `/bench/st
     - **Al terminar:** 1.779–1.893 MB antes (2 ejecuciones) → 245–265 MB ahora (4 ejecuciones). Entre tandas de recortes también baja, a ~210–250 MB.
     - **Mientras recorta no baja:** pico de 1.849–1.950 MB antes; ahora ~2.000–2.100 MB en la mayoría de las tandas (SlimSAM ya no aprovecha la memoria del clasificador) y, en una tanda de cada ejecución, picos de 2.197–2.763 MB.
     - **Recortes:** los 40 salen idénticos píxel a píxel en todas las ejecuciones.
+    - **«Desde un look»** (19-11-2026, tras unir la pose de MediaPipe; [`bench/look.html`](bench/look.html)`?set=eval-looks&auto&body=zones,feet,merge,clean-skin`, 50 fotos, una ejecución de cada versión): al terminar, 2.075 MB antes → 626 MB ahora (MediaPipe incluido). Mientras recorta, ~2.100 MB antes y ~2.400 MB ahora (mediana), con un pico de 3.195 MB frente a 2.236 MB. Los 111 recortes y todas las métricas salen idénticos. Tiempo por foto, 10,7 s antes y 10,0 s ahora (mediana); 6 arranques del *worker*, 1,3 s de mediana.
     - **Tiempo:** cada vez que el *worker* arranca (la primera foto de una tanda) añade 0,7–5,2 s, mediana 1,2 s (12 arranques en 4 ejecuciones), a ese recorte. El tiempo de los recortes con SlimSAM, 8,7–9,0 s de mediana antes y 5,5–12,8 s ahora, no muestra diferencia por encima del ruido: el equipo tenía otros procesos y el clasificador también varió de 273 a 657 ms entre ejecuciones.
-    - **Probado y descartado:** desactivar la *arena* y el patrón de memoria de ONNX Runtime (`enableCpuMemArena`, `enableMemPattern`) en el *runtime* compartido no cambió nada (1.680 MB según la página); en el *worker* propio, picos típicos iguales y el mayor de 2.362 MB frente a 2.763 MB (2 frente a 4 ejecuciones: no es concluyente). Liberar las sesiones tras cada recorte lo empeoró (1.778 MB). Una entrada más pequeña del codificador no es posible: el modelo exportado solo acepta 1024 × 1024 (sus *embeddings* de posición son de 64 × 64).
+    - **Probado y descartado:** desactivar la *arena* y el patrón de memoria de ONNX Runtime (`enableCpuMemArena`, `enableMemPattern`) en el *runtime* compartido no cambió nada (1.680 MB según la página); en el *worker* propio, picos típicos iguales y el mayor de 2.362 MB frente a 2.763 MB (2 frente a 4 ejecuciones: no es concluyente). Liberar las sesiones tras cada recorte lo empeoró (1.778 MB). Cerrar el *worker* tras cada recorte (sin esperar 5 s) no quita los picos (2.698 MB en «Desde un look») y hace cada foto más lenta (13,5 s frente a 10,0 s de mediana), porque carga SlimSAM cada vez. Una entrada más pequeña del codificador no es posible: el modelo exportado solo acepta 1024 × 1024 (sus *embeddings* de posición son de 64 × 64).
     - La cifra de memoria de [`bench/classifier.html`](bench/classifier.html) (`performance.measureUserAgentSpecificMemory`) no ve el *worker* de SlimSAM: con él vivo daba 138 MB mientras el proceso tenía ~2 GB. Para el recorte vale la del sistema.
 
 ### Lector de texto (OCR)
@@ -246,6 +265,10 @@ Con [`bench/storage.html`](bench/storage.html) (`npm run dev` y abrir `/bench/st
 - **Talla y composición:** [`src/ai/labelParser.ts`](src/ai/labelParser.ts) extrae la talla en letras (XS–4XL, también entre marcas como «-XXL-»), en número europeo con el sistema delante o detrás («EUR 42», «42 EUR», «T. 38») o de vaquero (W32 L34), y la US, UK o MEX tal como la pone la etiqueta («38 US»), con su talla europea aproximada cuando la tabla es clara (calzado UK, mujer US/UK, pecho de hombre, cintura). Une las tablas de tallas impresas en casillas («8 | US», «41.5 | EU»), siguiendo la inclinación de la foto, y redondea a la media talla (el OCR lee a menudo «41.5» como «41.6»). Si hay varias, gana la europea; elige según la categoría: número en calzado, letra en prendas superiores. También extrae la composición en varios idiomas, traducida al español («95 % algodón, 5 % elastano»).
 - **Prueba con 6 etiquetas de muestra** (camisetas, sudadera y zapatillas, solo para evaluar): talla correcta en 5 (la «L» dentro de un círculo de Nike no la detecta), composición en las 2 que la traen y marca en las 2 que la escriben.
 - **Requisito:** necesita una foto cercana y con buena luz; si no, el campo se deja vacío.
+
+### Pose y partes del cuerpo (MediaPipe)
+- **Modelos:** Pose Landmarker *full* (BlazePose GHUM 3D, 9,4 MB) y la segmentación multiclase de personas (`selfie_multiclass_256x256`, 16,4 MB), de Google, licencia Apache 2.0 según sus fichas oficiales, en `public/models/mediapipe/` sin modificar ([NOTICE](public/models/mediapipe/NOTICE.md)). Motor: `@mediapipe/tasks-vision` 1.2.2 (Apache-2.0), con su WebAssembly servido desde el propio origen; no se conecta a ningún otro sitio y no necesita cambiar la CSP.
+- Solo se cargan en «Desde un look», en el hilo principal y con la CPU (~0,4 s por foto).
 
 ### Segmentación y recorte
 - **Cabeza de segmentación propia** en el mismo ONNX del clasificador (salida `segmentation`, misma pasada de DINOv2): para cada uno de los 16 × 16 trozos de la foto, fondo o tipo de prenda (superior, inferior, una pieza, abrigo, calzado, accesorio). Entrenada con las máscaras de 8.511 fotos de Fashionpedia con licencia comercial (`python -m vesta_ml.segment`). En validación (256 fotos): prenda frente a fondo IoU 0,69; mIoU por clase 0,51 (fondo 0,95, superior 0,58, inferior 0,51, una pieza 0,57, abrigo 0,57; calzado 0,16 y accesorios 0,22 son pequeños para la cuadrícula).
@@ -267,7 +290,8 @@ Reproducible con el código de la app en el navegador ([`bench/classifier.html`]
 1. `node scripts/eval-prepare.mjs` copia las fotos de una fuente y partición del manifiesto de `ml/` (por defecto, el test de Clothing Dataset) a `public/test-photos/<nombre>/` con su `list.json`. `--colors <archivo>` añade colores de referencia; `--source vesta --split all` prepara las fotos propias, que ya traen colores.
 2. `MOLT_BENCH=1 npm run build` y `npm run preview` (varios hilos, como en producción), y abrir `/bench/classifier.html?set=eval-clothing-dataset-test&auto`. Da exactitud, macro-F1, precisión y exhaustividad por clase, la matriz de confusión, la latencia (primera foto, mediana, p90) y la memoria (solo en Chrome con aislamiento entre orígenes; no ve el *worker* de SlimSAM), y deja descargar el JSON. `&colors` evalúa solo las fotos con colores (y las recorta, como el formulario; da también el tiempo de cada recorte y cada arranque de SlimSAM), `&limit=N` acorta y `&nocut` no recorta.
    `node scripts/bench-chrome.mjs "<url>&keepcuts" salida.json` abre la página en un Chrome sin interfaz con un perfil nuevo y guarda el resultado con la memoria privada del proceso de la página, cada segundo (solo Windows); `node scripts/bench-chrome.mjs --compare antes.json despues.json` dice si los recortes de dos versiones son iguales.
-3. [`bench/colors.html`](bench/colors.html)`?set=…` muestra las fotos con sus colores de referencia para revisarlos a mano y descarga el archivo corregido para `--colors`.
+3. «Desde un look»: `python -m vesta_ml.look_eval` (en `ml/`) prepara `public/test-photos/eval-looks/` y [`bench/look.html`](bench/look.html)`?set=eval-looks&auto` da prendas encontradas por clase, recortes de más, limpieza (IoU, parte fuera de la prenda), tipo acertado, tiempo y memoria (la memoria tampoco ve el *worker* de SlimSAM; `scripts/bench-chrome.mjs` sirve también con esta página).
+4. [`bench/colors.html`](bench/colors.html)`?set=…` muestra las fotos con sus colores de referencia para revisarlos a mano y descarga el archivo corregido para `--colors`.
 
 Los colores de referencia de las 77 fotos de Clothing Dataset están en `%LOCALAPPDATA%\vesta-ml\labels\colors-clothing-dataset-test.json`, junto a los datos de `ml/`.
 
@@ -281,10 +305,10 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - El test procede de las mismas fuentes que el entrenamiento; con fotos propias solo hay 29 de referencia.
 - En el formulario se analiza una prenda por foto; para varias, «Desde un look». Las oclusiones (chaqueta abierta sobre camiseta) y las fotos de modelo dan recortes con la persona (cabeza, manos, piernas).
 - La agrupación automática de «Varias prendas a la vez» depende de la hora EXIF: sin ella (capturas de pantalla, fotos descargadas) cada foto es una prenda; dos prendas del mismo tipo y color fotografiadas seguidas se unen y hay que separarlas en la revisión.
-- La segmentación se ha medido con fotos de Fashionpedia y la prueba de «Desde un look» se ha hecho con pocas fotos; falta probarla con selfies reales.
+- «Desde un look» encuentra el 63 % de las prendas de 50 fotos de Fashionpedia, pocas veces el calzado (5 de 28) y los accesorios (5 de 17), y acierta el tipo en dos de cada tres (medido arriba); falta probarlo con selfies reales.
 - El corte de pantalón «campana» aún no se aprende.
 - Faltan pruebas con etiquetas reales y en móviles: ni la velocidad ni la memoria del modelo se han medido en un teléfono.
-- Mientras SlimSAM recorta, la página necesita ~2 GB de memoria (hasta 2,8 GB medidos en el equipo de desarrollo); en un móvil con poca memoria el navegador podría cerrar la pestaña durante un recorte. Al acabar se libera, 5 s después del último. No se ha medido en un teléfono. El color no propone «Multicolor», y una prenda gris clara puede salir «Blanco»: en una foto con poca luz no se distinguen.
+- Mientras SlimSAM recorta, la página necesita ~2–2,5 GB de memoria (con picos de hasta 3,2 GB en «Desde un look», medidos en el equipo de desarrollo; un poco más que cuando SlimSAM compartía la memoria del clasificador); en un móvil con poca memoria el navegador podría cerrar la pestaña durante un recorte. Al acabar se libera, 5 s después del último. No se ha medido en un teléfono. El color no propone «Multicolor», y una prenda gris clara puede salir «Blanco»: en una foto con poca luz no se distinguen.
 
 ## Hoja de ruta
 
