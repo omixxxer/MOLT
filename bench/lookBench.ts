@@ -2,7 +2,7 @@
 // full-body photos with reference garment masks, prepared by `python -m vesta_ml.look_eval` (ml/). Open
 // bench/look.html?set=eval-looks&auto.
 import { analyzeGarmentImage } from '../src/ai/clothingAnalyzer'
-import { cutOutGarments, cutoutColors } from '../src/ai/cutout'
+import { cutOutGarments, cutoutColors, type LookOptions } from '../src/ai/cutout'
 import type { SegmentationMap } from '../src/ai/segmentation'
 import { taxonomy } from '../src/ml/taxonomy'
 
@@ -40,7 +40,11 @@ async function pixels(image: Blob, width: number, height: number, place?: { x: n
   return context.getImageData(0, 0, width, height).data
 }
 
-export async function run(set: string, options: { limit?: number } = {}) {
+/** `body`: what MediaPipe adds (zones, feet, merge, clean-skin or clean-all); empty, the flow as it was. */
+export async function run(set: string, options: { limit?: number; body?: string[] } = {}) {
+  const use = new Set(options.body ?? [])
+  const withBody = use.size > 0
+  const readBody = withBody ? (await import('../src/ai/body')).readBody : undefined
   const list = await (await fetch(`/test-photos/${set}/list.json`)).json() as { classes: string[]; photos: Photo[] }
   const classes = list.classes
   const photos = options.limit ? list.photos.slice(0, options.limit) : list.photos
@@ -53,7 +57,17 @@ export async function run(set: string, options: { limit?: number } = {}) {
     const t0 = performance.now()
     // As LookImport.tsx: the whole photo, then each cut-out on its own.
     const [map] = (await analyzeGarmentImage([file])).segmentations as Array<SegmentationMap | undefined>
-    const cutouts = map ? await cutOutGarments(file, map, 'outfit') : []
+    const tBody = performance.now()
+    const body = readBody ? await readBody(file) : undefined
+    const bodyMs = performance.now() - tBody
+    const look: LookOptions = body ? {
+      body,
+      zones: use.has('zones'),
+      feet: use.has('feet'),
+      merge: use.has('merge'),
+      ...(use.has('clean-all') ? { clean: 'all' as const } : use.has('clean-skin') ? { clean: 'skin' as const } : {})
+    } : {}
+    const cutouts = map ? await cutOutGarments(file, map, 'outfit', look) : []
     const recognised = []
     for (const cutout of cutouts) {
       const suggestion = await analyzeGarmentImage([cutout.image])
@@ -107,11 +121,11 @@ export async function run(set: string, options: { limit?: number } = {}) {
       const recall = coveredBy[klass]!.reduce((sum, value) => sum + value, 0) / Math.max(1, classPixels[klass]!)
       return [name, +recall.toFixed(3)]
     }))
-    rows.push({ id: photo.id, file: photo.file, ms: Math.round(ms), expected, recall: found, cuts })
+    rows.push({ id: photo.id, file: photo.file, ms: Math.round(ms), bodyMs: Math.round(bodyMs), person: !!body?.landmarks, expected, recall: found, cuts })
   }
   memory.after = await memoryMb()
   memory.every10 = every10
-  const result = { set, photos: rows.length, userAgent: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated, threads: navigator.hardwareConcurrency, ...summary(rows, classes), latencyMs: latency(rows.map((row) => row.ms)), memoryMb: memory, rows }
+  const result = { set, body: [...use], photos: rows.length, withPerson: rows.filter((row) => row.person).length, bodyMs: latency(rows.map((row) => row.bodyMs)), userAgent: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated, threads: navigator.hardwareConcurrency, ...summary(rows, classes), latencyMs: latency(rows.map((row) => row.ms)), memoryMb: memory, rows }
   render(result)
   say(`Terminado: ${rows.length} fotos.`)
   return result
@@ -119,7 +133,7 @@ export async function run(set: string, options: { limit?: number } = {}) {
 
 const latency = (times: number[]) => ({ first: times[0] ?? 0, median: percentile(times.slice(1), 0.5), p90: percentile(times.slice(1), 0.9) })
 
-type Row = { expected: string[]; recall: Record<string, number>; cuts: Array<{ truth: string; category: string; purity: number; outsideGarments: number; iou: number }> }
+type Row = { expected: string[]; recall: Record<string, number>; cuts: Array<{ truth: string; region: string; category: string; purity: number; outsideGarments: number; iou: number }> }
 
 function summary(rows: Row[], classes: string[]) {
   const byClass = Object.fromEntries(classes.slice(1).map((name) => {
@@ -146,6 +160,12 @@ function summary(rows: Row[], classes: string[]) {
       notAGarment: cuts.length - garmentCuts.length,
       perPhoto: +(cuts.length / Math.max(1, rows.length)).toFixed(2),
       categoryRight: +(garmentCuts.filter((cut) => cut.category === cut.truth).length / Math.max(1, garmentCuts.length)).toFixed(3),
+      /** The class of the region the cut-out comes from (after the body zones, when on), instead of recognising it again. */
+      regionRight: +(garmentCuts.filter((cut) => cut.region === cut.truth).length / Math.max(1, garmentCuts.length)).toFixed(3),
+      duplicates: rows.reduce((sum, row) => {
+        const classes = row.cuts.filter((cut) => cut.truth !== 'background').map((cut) => cut.truth)
+        return sum + classes.length - new Set(classes).size
+      }, 0),
       medianIou: percentile(garmentCuts.map((cut) => cut.iou * 1000), 0.5) / 1000,
       medianOutsideGarments: percentile(garmentCuts.map((cut) => cut.outsideGarments * 1000), 0.5) / 1000,
       withOver20PercentOutside: garmentCuts.filter((cut) => cut.outsideGarments > 0.2).length
@@ -167,7 +187,7 @@ window.runLookBench = run
 const params = new URLSearchParams(location.search)
 const set = params.get('set')
 if (set && params.has('auto')) {
-  void run(set, { limit: params.get('limit') ? Number(params.get('limit')) : undefined })
+  void run(set, { limit: params.get('limit') ? Number(params.get('limit')) : undefined, body: params.get('body')?.split(',').filter(Boolean) })
     .then((result) => { window.lookBenchResult = result })
     .catch((error: unknown) => say(`Error: ${String(error)}`))
 }

@@ -36,15 +36,25 @@ El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arregl
 ### Desde un look (prototipo)
 - **Añadir prenda → «¿Llevas varias prendas en una foto?»:** con una foto de cuerpo entero, Molt localiza cada prenda, la recorta y la reconoce. Revisas el tipo, marcas cuáles añadir y, si quieres, el look se guarda también como outfit usado hoy.
 - La foto completa, con la cara, no se guarda: solo el recorte de cada prenda.
-- Aún no detecta si una prenda ya está en el armario (duplicados) y en fotos de modelo el recorte puede incluir manos o pelo.
-- **Medido (19-11-2026)** con [`bench/look.html`](bench/look.html): el mismo flujo que la app con 50 fotos de cuerpo entero de Fashionpedia que ningún modelo ha visto (pasarelas, alfombras rojas y calle; ningún selfie), comparando cada recorte con la máscara real de cada prenda. Una prenda cuenta como encontrada cuando sus recortes cubren al menos la mitad de ella.
-  - **Encontradas:** 81 de 134 prendas (60 %). Vestidos y monos 20 de 20, pantalones y faldas 26 de 31, partes de arriba 17 de 23, abrigos 11 de 15, accesorios 5 de 17 y **calzado 2 de 28**: el recorte de los zapatos se queda con el suelo, la alfombra o las piernas.
-  - **Recortes:** 140 (2,8 por foto). 25 no son una prenda (17 de ellos, «calzado» que es suelo; otros, trozos del fondo) y 31 son un trozo más de una prenda que ya tenía recorte (un abrigo o un pantalón partido en dos o tres).
-  - **Limpieza:** en la mitad de los recortes de prenda, menos del 1,5 % es otra cosa (piel, pelo, fondo); 15 de 115 tienen más de un 20 %. Coincidencia con la prenda real (IoU, mediana): 0,67; partes de arriba 0,86, pantalones y faldas 0,78, abrigos 0,44.
-  - **Tipo:** al reconocer cada recorte por separado acierta 56 de 115 (49 %); la zona de la segmentación de la que sale el recorte ya acertaba 76 (66 %). Lo más frecuente: abrigo o parte de arriba tomados por accesorio (14) y vestido por parte de arriba (7).
-  - **Tiempo y memoria** (Chrome de escritorio, 16 hilos): ~11 s la primera foto, 9,6 s de mediana y 16 s el percentil 90 por look; la página se queda en ~1,8 GB (SlimSAM).
-  - Sin probar con selfies ni con fotos en el espejo.
+- **Pose y partes del cuerpo** ([`body.ts`](src/ai/body.ts), [`bodyRules.ts`](src/ai/bodyRules.ts)): MediaPipe localiza a la persona (33 puntos: hombros, cadera, rodillas, tobillos, talones, puntas de los pies) y qué es cada píxel (pelo, piel, ropa, accesorios, fondo). Con eso, cada zona de prenda se nombra por dónde está en el cuerpo (un «vestido» entero por encima de la cadera es una parte de arriba; el «calzado» por encima de las rodillas no es calzado), los zapatos se piden a SlimSAM en los talones y las puntas de los pies, los trozos de una misma prenda se unen en un recorte, y de los recortes se quitan la piel y el pelo (y de los zapatos, el suelo). El tipo de cada prenda es el de su zona, con la subcategoría que el clasificador ve más probable dentro de ese tipo. Si no hay persona en la foto o MediaPipe no carga, se recorta como antes.
+- Aún no detecta si una prenda ya está en el armario (duplicados).
+- **Medido (19-11-2026)** con [`bench/look.html`](bench/look.html): el mismo flujo que la app con 50 fotos de cuerpo entero de Fashionpedia que ningún modelo ha visto (pasarelas, alfombras rojas y calle; ningún selfie), comparando cada recorte con la máscara real de cada prenda. Una prenda cuenta como encontrada cuando sus recortes cubren al menos la mitad de ella. Antes y después de MediaPipe, con las mismas fotos:
 
+  | | Antes | Con pose y partes del cuerpo |
+  |---|---|---|
+  | Prendas encontradas | 81 de 134 | 84 de 134 |
+  | Calzado encontrado | 2 de 28 | 5 de 28 |
+  | Recortes que no son una prenda | 25 de 140 | 5 de 111 |
+  | Trozos de más de una prenda ya recortada | 31 | 19 |
+  | Coincidencia con la prenda real (IoU, mediana) | 0,67 | 0,82 |
+  | Recortes con más de un 20 % que no es la prenda | 15 | 5 |
+  | Tipo acertado (el que ve el usuario) | 49 % (recortes reconocidos solos) | 66 % (zona de la prenda) |
+  | Tiempo por look (20 fotos, mediana / p90) | 5,9 / 6,8 s | 6,2 / 8,1 s |
+  | Memoria de la página | ~1,8 GB | ~1,85 GB |
+
+  MediaPipe tarda ~0,4 s por foto (1,5 s la primera, con la carga de sus modelos: 9,4 + 16,4 MB, solo al usar «Desde un look»). Cada opción se midió también por separado: unir los trozos y quitar la piel son lo que más limpia; los puntos de los pies, lo único que sube el calzado; nombrar por la pose solo sube un punto el tipo acertado (66 % → 67 %). Quitar además el fondo de todas las prendas (no solo de los zapatos) deja recortes aún más ajustados (IoU 0,86) pero pierde dos prendas, así que no se usa. La combinación se eligió con estas mismas 50 fotos.
+  - El calzado sigue siendo lo más flojo (5 de 28), y de los accesorios (bolsos, gafas, joyas) se encuentran 5 de 17, como antes.
+  - Sin probar con selfies ni con fotos en el espejo. La pose de MediaPipe está pensada para una sola persona con la cabeza visible.
 
 ### Outfits
 - **Estudio:** al entrar ya hay un outfit para hoy según la ocasión y el tiempo. Cada pieza se puede **fijar** (no cambia), **cambiar** por la siguiente mejor o **elegir** en un selector que muestra primero lo que mejor combina con el resto. También se puede empezar de cero y dejar que Molt complete el outfit, o crear uno desde el detalle de una prenda.
@@ -144,7 +154,7 @@ Revisión de Armario, Outfits y Maleta (con sus paneles, el selector de prendas,
 ## Privacidad
 
 - Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
-- Los modelos (clasificador y lector de texto) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
+- Los modelos (clasificador, lector de texto, recorte y, en «Desde un look», la pose y las partes del cuerpo de MediaPipe) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
 - Conexiones externas, solo cuando las usas: **Open-Meteo** al consultar el tiempo (recibe la ciudad y sus coordenadas, nunca el inventario ni las fotos) y **Google Drive** si guardas o restauras allí la copia (recibe la copia completa, fotos incluidas, en tu propia cuenta).
 - La [política de privacidad](public/privacidad.html) (`/privacidad.html`, enlazada desde la cabecera y el menú **Datos**) lo explica para quien use la app. Es una página estática, fuera de la app, y una prueba ([`privacyPage.test.ts`](src/privacyPage.test.ts)) comprueba que nombra el permiso de Drive, el archivo de la copia y cada servicio externo que permite la CSP.
 - La política CSP solo permite conexiones al propio origen, a Open-Meteo (previsión, búsqueda de lugares e histórico) y a la API de Google (`www.googleapis.com`). La app no carga scripts de Google: el inicio de sesión ocurre en una ventana aparte.
@@ -248,6 +258,10 @@ Con [`bench/storage.html`](bench/storage.html) (`npm run dev` y abrir `/bench/st
 - **Prueba con 6 etiquetas de muestra** (camisetas, sudadera y zapatillas, solo para evaluar): talla correcta en 5 (la «L» dentro de un círculo de Nike no la detecta), composición en las 2 que la traen y marca en las 2 que la escriben.
 - **Requisito:** necesita una foto cercana y con buena luz; si no, el campo se deja vacío.
 
+### Pose y partes del cuerpo (MediaPipe)
+- **Modelos:** Pose Landmarker *full* (BlazePose GHUM 3D, 9,4 MB) y la segmentación multiclase de personas (`selfie_multiclass_256x256`, 16,4 MB), de Google, licencia Apache 2.0 según sus fichas oficiales, en `public/models/mediapipe/` sin modificar ([NOTICE](public/models/mediapipe/NOTICE.md)). Motor: `@mediapipe/tasks-vision` 1.2.2 (Apache-2.0), con su WebAssembly servido desde el propio origen; no se conecta a ningún otro sitio y no necesita cambiar la CSP.
+- Solo se cargan en «Desde un look», en el hilo principal y con la CPU (~0,4 s por foto).
+
 ### Segmentación y recorte
 - **Cabeza de segmentación propia** en el mismo ONNX del clasificador (salida `segmentation`, misma pasada de DINOv2): para cada uno de los 16 × 16 trozos de la foto, fondo o tipo de prenda (superior, inferior, una pieza, abrigo, calzado, accesorio). Entrenada con las máscaras de 8.511 fotos de Fashionpedia con licencia comercial (`python -m vesta_ml.segment`). En validación (256 fotos): prenda frente a fondo IoU 0,69; mIoU por clase 0,51 (fondo 0,95, superior 0,58, inferior 0,51, una pieza 0,57, abrigo 0,57; calzado 0,16 y accesorios 0,22 son pequeños para la cuadrícula).
 - **Recorte:** en fotos de producto con fondo liso, el fondo unido al borde se quita píxel a píxel si coincide con la zona que marca la cabeza (~1 s). Si no, [SlimSAM-77](public/models/sam/NOTICE.md) (Apache-2.0, 13,8 MB cuantizado, se descarga al primer recorte) dibuja el contorno a partir de puntos dentro y fuera de la prenda y se elige la máscara que mejor coincide con la zona (~5–8 s la primera vez en el equipo de desarrollo). Si el contorno no cubre la prenda o es el fondo, no se recorta.
@@ -282,7 +296,7 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - El test procede de las mismas fuentes que el entrenamiento; con fotos propias solo hay 29 de referencia.
 - En el formulario se analiza una prenda por foto; para varias, «Desde un look». Las oclusiones (chaqueta abierta sobre camiseta) y las fotos de modelo dan recortes con la persona (cabeza, manos, piernas).
 - La agrupación automática de «Varias prendas a la vez» depende de la hora EXIF: sin ella (capturas de pantalla, fotos descargadas) cada foto es una prenda; dos prendas del mismo tipo y color fotografiadas seguidas se unen y hay que separarlas en la revisión.
-- «Desde un look» encuentra el 60 % de las prendas de 50 fotos de Fashionpedia, casi nunca el calzado, parte algunas prendas en varios recortes y acierta el tipo en la mitad (medido arriba); falta probarlo con selfies reales.
+- «Desde un look» encuentra el 63 % de las prendas de 50 fotos de Fashionpedia, pocas veces el calzado (5 de 28) y los accesorios (5 de 17), y acierta el tipo en dos de cada tres (medido arriba); falta probarlo con selfies reales.
 - El corte de pantalón «campana» aún no se aprende.
 - Faltan pruebas con etiquetas reales y en móviles: ni la velocidad ni la memoria del modelo se han medido en un teléfono.
 - El recorte con SlimSAM deja la página en ~1,7 GB de memoria; en móviles con poca memoria el navegador podría cerrar la pestaña. El color no propone «Multicolor», y una prenda gris clara puede salir «Blanco»: en una foto con poca luz no se distinguen.

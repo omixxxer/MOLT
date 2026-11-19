@@ -15,7 +15,7 @@
       Hace lo mismo que «Desde un look» (localizar las prendas, recortar cada una y reconocer cada recorte) con fotos
       de cuerpo entero que traen la máscara de cada prenda, preparadas en local con
       <code>python -m vesta_ml.look_eval</code> en <code>public/test-photos/eval-looks/</code> (no se suben al repositorio).
-      Ejemplo: <code>?set=eval-looks&amp;auto</code>, y <code>&amp;limit=5</code> para una prueba corta. Para medir con
+      Ejemplo: <code>?set=eval-looks&amp;auto</code>, <code>&amp;limit=5</code> para una prueba corta y <code>&amp;body=zones,feet,merge,clean-skin</code> (o <code>clean-all</code>) para añadir la pose y las partes del cuerpo de MediaPipe. Para medir con
       varios hilos y la memoria: <code>MOLT_BENCH=1 npm run build</code>, <code>npm run preview</code> y Chrome.
     </p>
     <p id="status">Sin ejecutar.</p>
