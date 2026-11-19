@@ -21,6 +21,8 @@ export interface GarmentCutout {
   height: number
   /** Share of the photo the garment covers. */
   coverage: number
+  /** Where the crop sits in the photo, as fractions of its width and height (to compare it with a reference mask). */
+  place: { x: number; y: number; width: number; height: number }
 }
 
 export interface Box {
@@ -331,7 +333,7 @@ export async function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 's
     const transparent = own.reduce((count, value) => count + (value < 128 ? 1 : 0), 0) / own.length
     if (mode === 'single' && transparent >= 0.05 && transparent <= 0.95) {
       const box = alphaBox(own, work.width, work.height)
-      return box ? [{ region: { classId: 'garment', patches: [], confidence: 1 }, image: await crop(own, box), width: box.width, height: box.height, coverage: 1 - transparent }] : []
+      return box ? [{ region: { classId: 'garment', patches: [], confidence: 1 }, image: await crop(own, box), width: box.width, height: box.height, coverage: 1 - transparent, place: placeOf(box) }] : []
     }
 
     const single = mode === 'single' ? singleGarmentRegion(map, bitmap.width, bitmap.height) : undefined
@@ -368,7 +370,7 @@ export async function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 's
       const coverage = covered / alpha.length
       const box = alphaBox(alpha, work.width, work.height)
       if (!box || coverage < MIN_COVERAGE) continue
-      cutouts.push({ region, image: await crop(alpha, box), width: box.width, height: box.height, coverage })
+      cutouts.push({ region, image: await crop(alpha, box), width: box.width, height: box.height, coverage, place: placeOf(box) })
     }
     return cutouts
 
@@ -386,6 +388,10 @@ export async function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 's
       // Unsure (a light garment on a light background, say): better the original photo than a bad cut-out.
       if (!outlineFound(binary[index]!, coarse, match.width, match.height)) return undefined
       return outlineAlpha(candidates[index]!.logits, image, work.width, work.height)
+    }
+
+    function placeOf(box: Box) {
+      return { x: box.x / work.width, y: box.y / work.height, width: box.width / work.width, height: box.height / work.height }
     }
 
     async function crop(alpha: Uint8ClampedArray, box: Box): Promise<Blob> {

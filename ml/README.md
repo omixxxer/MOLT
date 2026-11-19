@@ -101,6 +101,8 @@ python -m vesta_ml.train     # cabezas; guarda en models/<nombre>/
 
 seg-v1 en val (256 fotos, a nivel de parche): prenda frente a fondo IoU 0,69; mIoU 0,51 (fondo 0,95, top 0,58, bottom 0,51, one-piece 0,57, outerwear 0,57, footwear 0,16, accessory 0,22). Calzado y accesorios rara vez son mayoría en un parche de 14 px; con umbral 0,25 el calzado se detecta con recall 0,97. `python -m vesta_ml.export heads-v4 --segmentation seg-v1` añade la salida `segmentation` al ONNX de la app.
 
+`python -m vesta_ml.look_eval [--count 50]` prepara en `public/test-photos/eval-looks/` (no se sube) fotos de cuerpo entero de Fashionpedia val2020 que ningún modelo ha visto (con licencia comercial, las de la validación de la segmentación; con licencia *share-alike*, que nunca se usa para entrenar, cualquiera; y en ambos casos sin recortes en el train o val del clasificador), con un PNG por foto con la clase de cada píxel. Las mide `bench/look.html` (ver el README principal).
+
 ## Exportación a la app
 
 ```sh
