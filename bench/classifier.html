@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molt · evaluación del clasificador</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 1.5rem; }
+      table { border-collapse: collapse; margin: .5rem 0; }
+      th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: right; }
+      td.hit { background: #e7f3e7; font-weight: 600; }
+      pre { background: #f3f3ee; padding: 1rem; overflow: auto; max-height: 60vh; }
+    </style>
+  </head>
+  <body>
+    <h1>Evaluación del clasificador y del color</h1>
+    <p>
+      Evalúa el modelo tal como lo usa la app (ONNX int8 en el navegador, preprocesado, calibración y color de la app)
+      con un conjunto local preparado por <code>node scripts/eval-prepare.mjs</code> en <code>public/test-photos/</code>,
+      que no se sube al repositorio. Ejemplo: <code>?set=eval-clothing-dataset-test&amp;auto</code>; añade
+      <code>&amp;colors</code> para evaluar solo las fotos con colores de referencia (también recorta, como el formulario)
+      <code>&amp;limit=20</code> para una prueba corta y <code>&amp;nocut</code> para no recortar. La memoria (de la página y sus <em>workers</em>) solo se mide en Chrome con aislamiento entre orígenes. Para medir con varios hilos, como en producción:
+      <code>MOLT_BENCH=1 npm run build</code> y <code>npm run preview</code>.
+    </p>
+    <p id="status">Sin ejecutar.</p>
+    <p><a id="download" hidden>Descargar resultados (JSON)</a></p>
+    <div id="output"></div>
+    <script type="module" src="./classifierBench.ts"></script>
+  </body>
+</html>
