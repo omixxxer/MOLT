@@ -23,7 +23,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}']
+        globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}'],
+        // MediaPipe's WebAssembly loader is cached when first used (src/sw.ts); local test photos never ship.
+        globIgnores: ['**/vision_wasm_internal-*.js', 'test-photos/**', 'bench/**']
       },
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon-48.png', 'icons/apple-touch-icon-180.png'],

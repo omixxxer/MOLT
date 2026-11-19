@@ -34,11 +34,12 @@ cleanupOutdatedCaches()
 // privacy policy (Google's consent screen links to it).
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/oauth\//, /^\/privacidad/] }))
 
-// ONNX Runtime's WebAssembly and its loader, kept once downloaded.
+// ONNX Runtime's and MediaPipe's WebAssembly and their loaders, kept once downloaded (not precached: most visits
+// never analyse a photo).
 registerRoute(
-  ({ url }) => /\.(?:wasm|mjs)$/.test(url.pathname),
+  ({ url }) => /\.(?:wasm|mjs)$/.test(url.pathname) || /\/vision_wasm_internal-[\w-]+\.js$/.test(url.pathname),
   new CacheFirst({
     cacheName: 'molt-inference-runtime',
-    plugins: [new ExpirationPlugin({ maxEntries: 3, maxAgeSeconds: 60 * 60 * 24 * 365 }), isolation]
+    plugins: [new ExpirationPlugin({ maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 365 }), isolation]
   })
 )
