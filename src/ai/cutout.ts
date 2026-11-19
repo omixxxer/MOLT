@@ -1,5 +1,5 @@
 import { garmentColors, toLab, type ColorShare } from './colors'
-import { encodeImage, outline, outlineAlpha } from './sam'
+import { encodeImage, outline, outlineAlpha, withSam } from './sam'
 import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Region, type SegmentationMap } from './segmentation'
 
 // Garments cut out of a photo with a transparent background: the coarse map says where each one is, SlimSAM
@@ -312,7 +312,11 @@ export function singleGarmentRegion(map: SegmentationMap, width: number, height:
  * single: the photo shows one garment (see singleGarmentRegion). outfit: a person wearing several, one cut-out per
  * garment found, largest first.
  */
-export async function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit'): Promise<GarmentCutout[]> {
+export function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit'): Promise<GarmentCutout[]> {
+  return withSam(() => cutOut(photo, map, mode))
+}
+
+async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit'): Promise<GarmentCutout[]> {
   const bitmap = await createImageBitmap(photo, { imageOrientation: 'from-image' })
   try {
     const work = sizeWithin(bitmap.width, bitmap.height, CUTOUT_SIDE)
