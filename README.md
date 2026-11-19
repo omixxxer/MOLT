@@ -37,6 +37,14 @@ El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arregl
 - **Añadir prenda → «¿Llevas varias prendas en una foto?»:** con una foto de cuerpo entero, Molt localiza cada prenda, la recorta y la reconoce. Revisas el tipo, marcas cuáles añadir y, si quieres, el look se guarda también como outfit usado hoy.
 - La foto completa, con la cara, no se guarda: solo el recorte de cada prenda.
 - Aún no detecta si una prenda ya está en el armario (duplicados) y en fotos de modelo el recorte puede incluir manos o pelo.
+- **Medido (19-11-2026)** con [`bench/look.html`](bench/look.html): el mismo flujo que la app con 50 fotos de cuerpo entero de Fashionpedia que ningún modelo ha visto (pasarelas, alfombras rojas y calle; ningún selfie), comparando cada recorte con la máscara real de cada prenda. Una prenda cuenta como encontrada cuando sus recortes cubren al menos la mitad de ella.
+  - **Encontradas:** 81 de 134 prendas (60 %). Vestidos y monos 20 de 20, pantalones y faldas 26 de 31, partes de arriba 17 de 23, abrigos 11 de 15, accesorios 5 de 17 y **calzado 2 de 28**: el recorte de los zapatos se queda con el suelo, la alfombra o las piernas.
+  - **Recortes:** 140 (2,8 por foto). 25 no son una prenda (17 de ellos, «calzado» que es suelo; otros, trozos del fondo) y 31 son un trozo más de una prenda que ya tenía recorte (un abrigo o un pantalón partido en dos o tres).
+  - **Limpieza:** en la mitad de los recortes de prenda, menos del 1,5 % es otra cosa (piel, pelo, fondo); 15 de 115 tienen más de un 20 %. Coincidencia con la prenda real (IoU, mediana): 0,67; partes de arriba 0,86, pantalones y faldas 0,78, abrigos 0,44.
+  - **Tipo:** al reconocer cada recorte por separado acierta 56 de 115 (49 %); la zona de la segmentación de la que sale el recorte ya acertaba 76 (66 %). Lo más frecuente: abrigo o parte de arriba tomados por accesorio (14) y vestido por parte de arriba (7).
+  - **Tiempo y memoria** (Chrome de escritorio, 16 hilos): ~11 s la primera foto, 9,6 s de mediana y 16 s el percentil 90 por look; la página se queda en ~1,8 GB (SlimSAM).
+  - Sin probar con selfies ni con fotos en el espejo.
+
 
 ### Outfits
 - **Estudio:** al entrar ya hay un outfit para hoy según la ocasión y el tiempo. Cada pieza se puede **fijar** (no cambia), **cambiar** por la siguiente mejor o **elegir** en un selector que muestra primero lo que mejor combina con el resto. También se puede empezar de cero y dejar que Molt complete el outfit, o crear uno desde el detalle de una prenda.
@@ -259,7 +267,8 @@ Reproducible con el código de la app en el navegador ([`bench/classifier.html`]
 
 1. `node scripts/eval-prepare.mjs` copia las fotos de una fuente y partición del manifiesto de `ml/` (por defecto, el test de Clothing Dataset) a `public/test-photos/<nombre>/` con su `list.json`. `--colors <archivo>` añade colores de referencia; `--source vesta --split all` prepara las fotos propias, que ya traen colores.
 2. `MOLT_BENCH=1 npm run build` y `npm run preview` (varios hilos, como en producción), y abrir `/bench/classifier.html?set=eval-clothing-dataset-test&auto`. Da exactitud, macro-F1, precisión y exhaustividad por clase, la matriz de confusión, la latencia (primera foto, mediana, p90) y la memoria (solo en Chrome con aislamiento entre orígenes), y deja descargar el JSON. `&colors` evalúa solo las fotos con colores (y las recorta, como el formulario), `&limit=N` acorta y `&nocut` no recorta.
-3. [`bench/colors.html`](bench/colors.html)`?set=…` muestra las fotos con sus colores de referencia para revisarlos a mano y descarga el archivo corregido para `--colors`.
+3. «Desde un look»: `python -m vesta_ml.look_eval` (en `ml/`) prepara `public/test-photos/eval-looks/` y [`bench/look.html`](bench/look.html)`?set=eval-looks&auto` da prendas encontradas por clase, recortes de más, limpieza (IoU, parte fuera de la prenda), tipo acertado, tiempo y memoria.
+4. [`bench/colors.html`](bench/colors.html)`?set=…` muestra las fotos con sus colores de referencia para revisarlos a mano y descarga el archivo corregido para `--colors`.
 
 Los colores de referencia de las 77 fotos de Clothing Dataset están en `%LOCALAPPDATA%\vesta-ml\labels\colors-clothing-dataset-test.json`, junto a los datos de `ml/`.
 
@@ -273,7 +282,7 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - El test procede de las mismas fuentes que el entrenamiento; con fotos propias solo hay 29 de referencia.
 - En el formulario se analiza una prenda por foto; para varias, «Desde un look». Las oclusiones (chaqueta abierta sobre camiseta) y las fotos de modelo dan recortes con la persona (cabeza, manos, piernas).
 - La agrupación automática de «Varias prendas a la vez» depende de la hora EXIF: sin ella (capturas de pantalla, fotos descargadas) cada foto es una prenda; dos prendas del mismo tipo y color fotografiadas seguidas se unen y hay que separarlas en la revisión.
-- La segmentación se ha medido con fotos de Fashionpedia y la prueba de «Desde un look» se ha hecho con pocas fotos; falta probarla con selfies reales.
+- «Desde un look» encuentra el 60 % de las prendas de 50 fotos de Fashionpedia, casi nunca el calzado, parte algunas prendas en varios recortes y acierta el tipo en la mitad (medido arriba); falta probarlo con selfies reales.
 - El corte de pantalón «campana» aún no se aprende.
 - Faltan pruebas con etiquetas reales y en móviles: ni la velocidad ni la memoria del modelo se han medido en un teléfono.
 - El recorte con SlimSAM deja la página en ~1,7 GB de memoria; en móviles con poca memoria el navegador podría cerrar la pestaña. El color no propone «Multicolor», y una prenda gris clara puede salir «Blanco»: en una foto con poca luz no se distinguen.
