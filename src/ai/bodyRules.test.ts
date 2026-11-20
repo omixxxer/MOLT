@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bodyClass, cleanAlpha, footPatches, footPrompt, mergeByClass, PART, type BodyMap, type Landmark } from './bodyRules'
+import { bodyClass, cleanAlpha, footPatches, footPrompt, hasPerson, keepClothes, mergeByClass, PART, type BodyMap, type Landmark } from './bodyRules'
 import type { Region } from './segmentation'
 
 /** A standing person: shoulders at 25 %, hips at 50 %, knees at 72 %, ankles at 92 % of the height. */
@@ -64,6 +64,30 @@ describe('body rules', () => {
     expect(merged.map((region) => region.classId)).toEqual(['bottom', 'accessory', 'accessory'])
     expect(merged[0]!.patches).toEqual([1, 2, 3, 10])
     expect(merged[0]!.confidence).toBeCloseTo(0.8)
+  })
+
+  it('sees a person only with a pose and some skin, not in a hoodie lying on a bed', () => {
+    const skin = Uint8Array.from({ length: 100 }, (_, i) => (i < 5 ? PART.bodySkin : PART.clothes))
+    const noSkin = new Uint8Array(100).fill(PART.clothes)
+    expect(hasPerson({ width: 10, height: 10, parts: skin, landmarks: standing() })).toBe(true)
+    expect(hasPerson({ width: 10, height: 10, parts: noSkin, landmarks: standing() })).toBe(false)
+    expect(hasPerson({ width: 10, height: 10, parts: skin })).toBe(false)
+    expect(hasPerson(undefined)).toBe(false)
+  })
+
+  it('takes out what is not clothes around a garment, but never opens holes inside it', () => {
+    // 6 × 6: a garment (opaque 1..4) whose middle the body parts miss, on a bedspread that is not clothes.
+    const parts = new Uint8Array(36).fill(PART.background)
+    for (let y = 1; y <= 4; y += 1) for (let x = 1; x <= 4; x += 1) parts[y * 6 + x] = PART.clothes
+    parts[2 * 6 + 2] = PART.background
+    parts[3 * 6 + 3] = PART.background
+    const alpha = new Uint8ClampedArray(36).fill(255)
+    const removed = keepClothes(alpha, 6, 6, { width: 6, height: 6, parts })
+    // The 20 bedspread pixels around go; the 2 inside stay.
+    expect(removed).toBe(20)
+    expect(alpha[2 * 6 + 2]).toBe(255)
+    expect(alpha[3 * 6 + 3]).toBe(255)
+    expect(alpha[0]).toBe(0)
   })
 
   it('takes skin and hair out of a cut-out, and the background only when asked', () => {

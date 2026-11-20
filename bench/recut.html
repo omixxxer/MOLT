@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molt · volver a recortar</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 1.5rem; background: #F8F6FB; color: #2D2838; }
+      .row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
+      figure { margin: 0; }
+      figure img, .none { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: contain; border-radius: 10px; background: repeating-conic-gradient(rgba(45, 40, 56, .07) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+      .none { display: grid; place-items: center; color: #8a8399; }
+      figcaption { font-size: 11px; color: #5d5670; }
+      h3 { margin: 18px 0 6px; font-size: 13px; }
+      pre { background: #EEEBF4; padding: 1rem; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Volver a recortar las prendas guardadas</h1>
+    <p>
+      Por prenda: su foto, el recorte guardado, el que hace hoy la app y la propuesta con MediaPipe (si hay una persona, solo la
+      zona de su tipo de prenda y sin piel ni pelo; y solo lo que MediaPipe llama ropa, salvo sobre fondo liso). «Fondo» estima qué parte del recorte tiene los colores
+      del borde de la foto (la colcha, el suelo) y no los de la prenda. Solo se leen las prendas: no se cambia nada.
+    </p>
+    <p id="status">Leyendo el armario…</p>
+    <div id="summary"></div>
+    <div id="rows"></div>
+    <script type="module" src="./recutBench.ts"></script>
+  </body>
+</html>
