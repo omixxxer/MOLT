@@ -336,7 +336,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
             <p>Suele pasar si la foto no es de cuerpo entero, hay poca luz o salen varias personas.</p>
             <div className="photo-drop-actions">
               <TakePhoto label="Hacer otra foto" ariaLabel="Hacer otra foto de cuerpo entero" disabled={busy} onTake={(files) => void choose(files?.[0])} />
-              {pickPhoto('Elegir otra foto', 'button button-dark photo-drop-choose')}
+              {pickPhoto('Elegir otra foto', 'button button-dark look-choose')}
             </div>
             <button className="look-link" type="button" onClick={restart}><HugeiconsIcon icon={Refresh01Icon} size={14} aria-hidden="true" />Volver al principio</button>
           </div>
@@ -368,7 +368,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
           <p>Hazte una foto de cuerpo entero: Molt encuentra cada prenda, la recorta y te la deja lista para tu armario.</p>
           <div className="photo-drop-actions">
             <TakePhoto label="Hacer foto" ariaLabel="Hacer una foto de cuerpo entero" disabled={busy} onTake={(files) => void choose(files?.[0])} />
-            {pickPhoto('Elegir foto', 'button button-dark photo-drop-choose')}
+            {pickPhoto('Elegir foto', 'button button-dark look-choose')}
           </div>
           <small className="look-drop-hint">O arrastra una foto aquí.</small>
           <ul className="look-tips">

@@ -999,6 +999,9 @@ button.choice-chip { font-family: inherit; }
 .look-source img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--line); border-radius: 12px; }
 .look-source .batch-add-more { justify-self: start; }
 .look-import label > input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+/* Only the button opens the file chooser (not the whole card, as .photo-drop-choose does). */
+.look-choose { position: relative; cursor: pointer; }
+@media (pointer: coarse) { .look-import .photo-drop-actions .look-choose { color: var(--ink); border-color: var(--mist); background: var(--white); } }
 .look-source small { font-size: var(--text-small); line-height: 1.45; opacity: .85; }
 .look-results-main { display: grid; gap: 14px; min-width: 0; }
 .look-hint { margin: -6px 0 2px; font-size: var(--text-body); opacity: .85; }
