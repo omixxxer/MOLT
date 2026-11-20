@@ -1,0 +1,15 @@
+// Cloudflare Workers: the app is served as static files (dist/, built by `npm run build`). With this file in the
+// repository, `wrangler deploy` uses it as it is; without it, Cloudflare tried to set the project up on every build
+// and failed on vite.config.ts (from 19-11-2026 on, nothing reached molt.omixer.workers.dev).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "molt",
+  "compatibility_date": "2026-11-18",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

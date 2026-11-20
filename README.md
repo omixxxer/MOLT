@@ -183,6 +183,7 @@ npm run preview    # previsualizar la compilación
 
 La app está publicada en <https://molt.omixer.workers.dev> como archivos estáticos de un Worker. Para conectar el repositorio: en el panel de Cloudflare, **Workers & Pages → Create application → GitHub**, elige este repositorio, usa `main` como rama de producción, `npm run build` para compilar y `dist` como carpeta de archivos.
 
+- **Configuración:** [`wrangler.jsonc`](wrangler.jsonc) dice a Cloudflare que publique `dist` como archivos estáticos (con `npx wrangler deploy` como orden de despliegue). Sin él, Cloudflare intentaba configurar el proyecto en cada compilación y, desde el 19-11-2026, fallaba al no poder modificar `vite.config.ts`: el check que dice si se publicó es «Workers Builds: molt», no `deploy` (que es el de GitHub Pages).
 - **Cabeceras:** [`public/_headers`](public/_headers) da el aislamiento que ONNX Runtime necesita para usar varios hilos. Comprueba en la consola del navegador que `crossOriginIsolated` es `true`.
 - **Tamaño:** Cloudflare admite 25 MiB por archivo. `model_quantized.onnx` ocupa 24,55 MiB; `npm run build` falla con un aviso claro si un archivo pasa de ese límite ([`check-asset-size.mjs`](scripts/check-asset-size.mjs)).
 - **Comprobaciones:** [GitHub Actions](.github/workflows/ci.yml) ejecuta las pruebas y la compilación en cada PR y en `main`.
