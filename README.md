@@ -207,7 +207,7 @@ React 19, TypeScript y Vite (pantallas, formulario, detalle de prenda y fondo an
 | `src/ml/` | Taxonomía compartida con el entrenamiento y exportación de datos |
 | `ml/` | Entrenamiento, evaluación y exportación del modelo propio (Python) |
 | `public/models/` | Modelos ONNX del clasificador y del OCR, con sus avisos de licencia |
-| `bench/` | Mediciones en el navegador: lectura del armario con armarios sintéticos, clasificador y color con un conjunto etiquetado local, y revisión de colores; no se publican |
+| `bench/` | Mediciones en el navegador: lectura del armario con armarios sintéticos, clasificador y color con un conjunto etiquetado local, revisión de colores, «Desde un look» y prendas recompuestas; no se publican |
 
 ### Base de datos
 
@@ -269,6 +269,11 @@ Con [`bench/storage.html`](bench/storage.html) (`npm run dev` y abrir `/bench/st
 - **Talla y composición:** [`src/ai/labelParser.ts`](src/ai/labelParser.ts) extrae la talla en letras (XS–4XL, también entre marcas como «-XXL-»), en número europeo con el sistema delante o detrás («EUR 42», «42 EUR», «T. 38») o de vaquero (W32 L34), y la US, UK o MEX tal como la pone la etiqueta («38 US»), con su talla europea aproximada cuando la tabla es clara (calzado UK, mujer US/UK, pecho de hombre, cintura). Une las tablas de tallas impresas en casillas («8 | US», «41.5 | EU»), siguiendo la inclinación de la foto, y redondea a la media talla (el OCR lee a menudo «41.5» como «41.6»). Si hay varias, gana la europea; elige según la categoría: número en calzado, letra en prendas superiores. También extrae la composición en varios idiomas, traducida al español («95 % algodón, 5 % elastano»).
 - **Prueba con 6 etiquetas de muestra** (camisetas, sudadera y zapatillas, solo para evaluar): talla correcta en 5 (la «L» dentro de un círculo de Nike no la detecta), composición en las 2 que la traen y marca en las 2 que la escriben.
 - **Requisito:** necesita una foto cercana y con buena luz; si no, el campo se deja vacío.
+
+### Prendas recompuestas (prototipo, aún no en la app)
+- [`recompose.ts`](src/ai/recompose.ts) hace, a partir del recorte de una prenda, una imagen más ordenada para el armario. Endereza la prenda si está claramente torcida (entre 3° y 25°, y solo si su silueta es alargada). La centra y le da un tamaño según su tipo: un abrigo, más grande que un cinturón; todas las camisetas, igual. Quita las motas sueltas del recorte. La aclara un poco si la foto entera era oscura, medido en la foto con su fondo, porque en la prenda sola una prenda negra parecía una foto oscura y se volvía gris. Y le pone una sombra suave. No genera nada: usa solo los píxeles de la prenda. No cambia la foto ni el recorte.
+- [`bench/recompose.html`](bench/recompose.html) (`npm run dev`) enseña lado a lado cómo se ven las prendas guardadas en el navegador ahora y recompuestas, sin cambiar nada.
+- **Probado (20-11-2026)** con las 20 prendas del navegador de desarrollo: 19 tienen recorte. Enderezó 5 (de 3,7° a 7°), aclaró 2 fotos oscuras de prendas grises (×1,10 y ×1,12), quitó motas en 6 (del 1,1 % al 5,2 % del recorte) y tardó ~1,1 s por prenda en el servidor de desarrollo. A ojo, el armario queda más parejo (margen, centrado, sombra), pero lo que más lo desordena son los restos de colcha estampada en los recortes, que esto no arregla (ver «Límites» del recorte). No hay una medida numérica: la del tamaño y el brillo de las imágenes nuevas contaba también su sombra.
 
 ### Pose y partes del cuerpo (MediaPipe)
 - **Modelos:** Pose Landmarker *full* (BlazePose GHUM 3D, 9,4 MB) y la segmentación multiclase de personas (`selfie_multiclass_256x256`, 16,4 MB), de Google, licencia Apache 2.0 según sus fichas oficiales, en `public/models/mediapipe/` sin modificar ([NOTICE](public/models/mediapipe/NOTICE.md)). Motor: `@mediapipe/tasks-vision` 1.2.2 (Apache-2.0), con su WebAssembly servido desde el propio origen; no se conecta a ningún otro sitio y no necesita cambiar la CSP.
