@@ -307,6 +307,53 @@ describe('wardrobe flow', () => {
     expect(saved?.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', composition: 'paddle-ocr' })
   })
 
+  it('moves a label photo chosen with the garment photos to the label, and puts it back on Deshacer', async () => {
+    const analysis = {
+      category: 'Parte superior' as const,
+      subcategory: 'Camiseta',
+      colors: ['Negro'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9, subcategory: 0.8, colors: 0.7 },
+      unknownAttributes: [],
+      modelId: 'molt/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      segmentations: [],
+      analyzedAt: '2026-11-20T12:00:00.000Z'
+    }
+    // The second photo reads like a care label: composition and «made in».
+    vi.mocked(analyzeGarmentImage).mockImplementation(async (images) => ({
+      ...analysis,
+      textByPhoto: (images as Blob[]).map((image) => (image as File).name === 'etiqueta.png'
+        ? [{ text: '100% COTTON', score: 0.95 }, { text: 'MADE IN PORTUGAL', score: 0.95 }, { text: 'M', score: 0.9 }]
+        : [])
+    }))
+    vi.mocked(readGarmentLabel).mockResolvedValue({
+      lines: [{ text: '100% COTTON', score: 0.95 }],
+      composition: { value: '100 % algodón', text: '100% COTTON', score: 0.9 }
+    })
+    const user = userEvent.setup()
+    await renderInWardrobe()
+
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    const garment = new File(['front'], 'camiseta.png', { type: 'image/png' })
+    const label = new File(['label'], 'etiqueta.png', { type: 'image/png' })
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), [garment, label])
+
+    expect(await screen.findByText(/Una de las fotos es la etiqueta/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('Composición')).toHaveValue('100 % algodón'))
+    expect(readGarmentLabel).toHaveBeenCalledWith(label)
+    // The garment is analysed again without the label.
+    await waitFor(() => expect(vi.mocked(analyzeGarmentImage).mock.lastCall?.[0]).toEqual([garment]))
+
+    await user.click(screen.getByRole('button', { name: 'Deshacer' }))
+    expect(screen.queryByText(/Una de las fotos es la etiqueta/)).not.toBeInTheDocument()
+    await waitFor(() => expect(vi.mocked(analyzeGarmentImage).mock.lastCall?.[0]).toEqual([garment, label]))
+    // Put back on purpose, it stays among the garment photos.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByText(/Una de las fotos es la etiqueta/)).not.toBeInTheDocument()
+  })
+
   it('keeps the usable photos when one of those chosen is too large', async () => {
     const user = userEvent.setup()
     await renderInWardrobe()
