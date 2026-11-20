@@ -6,7 +6,8 @@ import {
   type ClothingAnalysisSuggestion,
   type LabelReading
 } from '../ai/clothingAnalyzer'
-import { isLabelPhoto } from '../ai/batchGrouping'
+import { isLabelPhoto, SAME_GARMENT_SECONDS } from '../ai/batchGrouping'
+import { captureTime } from '../ai/photoTime'
 import { colorSwatch } from '../ai/colors'
 import { cutOutGarments, cutoutColors } from '../ai/cutout'
 import type { SegmentationMap } from '../ai/segmentation'
@@ -60,9 +61,11 @@ interface GarmentFormProps {
   onSave: (garment: GarmentWithPhotos) => Promise<void>
   onCancel: () => void
   submitLabel?: string
+  /** Adding a new garment: takes the chosen photos (and label) to «Varias prendas» when they seem several garments. */
+  onSwitchToBatch?: (files: File[]) => void
 }
 
-export default function GarmentForm({ garment, stored, onSave, onCancel, submitLabel }: GarmentFormProps) {
+export default function GarmentForm({ garment, stored, onSave, onCancel, submitLabel, onSwitchToBatch }: GarmentFormProps) {
   const fieldId = useId()
   const [name, setName] = useState(garment?.name ?? '')
   const [category, setCategory] = useState<GarmentCategory>(garment?.category ?? 'Parte superior')
@@ -104,6 +107,25 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   typed.current = { brand, size, composition, suggested, category, labelPhoto }
   // A saved garment keeps the use the user gave it; a new one follows the suggestion until the user changes it.
   const usageTouched = useRef(new Set<UsageField>(garment ? usageFields : []))
+
+  // Several photos taken minutes apart are, most likely, several garments (as «Varias prendas» groups them: photos
+  // of one garment are taken within SAME_GARMENT_SECONDS). Only a suggestion: the user decides. Without capture
+  // times (screenshots, downloaded photos) nothing is said.
+  const [severalGarments, setSeveralGarments] = useState(false)
+  useEffect(() => {
+    const files = photos.filter((photo): photo is File => photo instanceof File)
+    if (garment || !onSwitchToBatch || photos.length < 2 || files.length !== photos.length) {
+      setSeveralGarments(false)
+      return
+    }
+    let current = true
+    void Promise.all(files.map((file) => captureTime(file))).then((times) => {
+      if (!current) return
+      const known = times.filter((time): time is number => time !== undefined).sort((a, b) => a - b)
+      setSeveralGarments(known.some((time, index) => index > 0 && time - known[index - 1]! > SAME_GARMENT_SECONDS * 1000))
+    })
+    return () => { current = false }
+  }, [photos, garment, onSwitchToBatch])
 
   useEffect(() => {
     if (!analysisSuggestion || nameManuallyEdited) return
@@ -452,6 +474,18 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
             canToggleCutout={Boolean(cutout)}
             onToggleCutout={() => setUseCutout((current) => !current)}
           />
+          {severalGarments && onSwitchToBatch && (
+            <p className="moved-label" role="status">
+              <span>¿Son varias prendas? Estas fotos se hicieron con minutos de diferencia.</span>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onSwitchToBatch([...photos, ...(labelPhoto ? [labelPhoto] : [])].filter((photo): photo is File => photo instanceof File))}
+              >
+                Pasar a Varias prendas
+              </button>
+            </p>
+          )}
           {movedLabel && labelPhoto === movedLabel && (
             <p className="moved-label" role="status">
               <span>
