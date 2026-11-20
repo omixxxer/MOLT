@@ -6,6 +6,7 @@ import {
   type ClothingAnalysisSuggestion,
   type LabelReading
 } from '../ai/clothingAnalyzer'
+import { isLabelPhoto } from '../ai/batchGrouping'
 import { colorSwatch } from '../ai/colors'
 import { cutOutGarments, cutoutColors } from '../ai/cutout'
 import type { SegmentationMap } from '../ai/segmentation'
@@ -94,11 +95,13 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   const [labelReading, setLabelReading] = useState<LabelReading>()
   const [readingLabel, setReadingLabel] = useState(false)
   const [labelError, setLabelError] = useState('')
+  // A label photo chosen among the garment photos, moved to the label's own place (it can be put back).
+  const [movedLabel, setMovedLabel] = useState<Blob>()
   const analysisRequestId = useRef(0)
   const labelRequestId = useRef(0)
   // Analyses finish later; they must see what the user typed meanwhile, not the values when they started.
-  const typed = useRef({ brand, size, composition, suggested, category })
-  typed.current = { brand, size, composition, suggested, category }
+  const typed = useRef({ brand, size, composition, suggested, category, labelPhoto })
+  typed.current = { brand, size, composition, suggested, category, labelPhoto }
   // A saved garment keeps the use the user gave it; a new one follows the suggestion until the user changes it.
   const usageTouched = useRef(new Set<UsageField>(garment ? usageFields : []))
 
@@ -170,7 +173,17 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     setImageChanged(true)
     setAnalysisSuggestion(undefined)
     setAnalysisError('')
-    void analyzeImage(nextPhotos)
+    setMovedLabel(undefined)
+    void analyzeImage(nextPhotos, new Set(validFiles))
+  }
+
+  /** Puts a label photo moved by the analysis back among the garment photos, and leaves it there. */
+  function keepMovedLabelAsPhoto() {
+    if (!movedLabel) return
+    const photo = movedLabel
+    setMovedLabel(undefined)
+    if (labelPhoto === photo) removeLabelPhoto()
+    if (photos.length < maxPhotos) updatePhotos([...photos, photo])
   }
 
   function updatePhotos(nextPhotos: Blob[]) {
@@ -182,7 +195,12 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     void analyzeImage(nextPhotos)
   }
 
-  async function analyzeImage(imagesToAnalyze: Blob[] = photos) {
+  /**
+   * `fresh`: the photos just chosen. When the label has no photo yet and one of them reads like a label (as in
+   * «Varias prendas»: its composition, or label words with more text or a size), it is moved to the label's place
+   * and read there, and the rest are analysed again without it.
+   */
+  async function analyzeImage(imagesToAnalyze: Blob[] = photos, fresh?: Set<Blob>) {
     if (!imagesToAnalyze.length) {
       analysisRequestId.current += 1
       setAnalyzing(false)
@@ -194,6 +212,21 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     try {
       const suggestion = await analyzeGarmentImage(imagesToAnalyze)
       if (requestId !== analysisRequestId.current) return
+      const labelIndex = fresh && !typed.current.labelPhoto
+        ? imagesToAnalyze.findIndex((image, index) => fresh.has(image) && isLabelPhoto(suggestion.textByPhoto?.[index] ?? []))
+        : -1
+      if (labelIndex >= 0) {
+        const label = imagesToAnalyze[labelIndex]!
+        const rest = imagesToAnalyze.filter((_, index) => index !== labelIndex)
+        setCutout(undefined)
+        setPhotos(rest)
+        setLabelPhoto(label)
+        setLabelError('')
+        setMovedLabel(label)
+        void readLabel(label)
+        void analyzeImage(rest)
+        return
+      }
       const filled: SuggestedField[] = ['category', 'subcategory', 'colors']
       setAnalysisSuggestion(suggestion)
       void cutOutMainPhoto(imagesToAnalyze[0]!, suggestion.segmentations[0], requestId)
@@ -254,10 +287,12 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
       return
     }
     setLabelPhoto(file)
+    setMovedLabel(undefined)
     void readLabel(file)
   }
 
   function removeLabelPhoto() {
+    setMovedLabel(undefined)
     labelRequestId.current += 1
     setLabelPhoto(undefined)
     setLabelReading(undefined)
@@ -417,6 +452,16 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
             canToggleCutout={Boolean(cutout)}
             onToggleCutout={() => setUseCutout((current) => !current)}
           />
+          {movedLabel && labelPhoto === movedLabel && (
+            <p className="moved-label" role="status">
+              <span>
+                {hasPhotos
+                  ? 'Una de las fotos es la etiqueta: la hemos pasado a su apartado y se lee de ahí.'
+                  : 'Esta foto es la etiqueta: la hemos pasado a su apartado. Añade una foto de la prenda.'}
+              </span>
+              <button type="button" onClick={keepMovedLabelAsPhoto} disabled={saving}>Deshacer</button>
+            </p>
+          )}
         </aside>
 
         {hasPhotos && (

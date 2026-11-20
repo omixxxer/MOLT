@@ -286,6 +286,9 @@ button.photo-stage-pill { text-decoration: underline; }
 .label-slot-actions { display: flex; gap: 12px; }
 .label-slot-actions button { padding: 0; border: 0; background: transparent; color: var(--ink); font-size: var(--text-label); text-decoration: underline; }
 .label-slot-change { position: relative; color: var(--ink); font-size: var(--text-label); text-decoration: underline; cursor: pointer; }
+.moved-label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--lavender); border-radius: 8px; background: var(--soft-surface); font-size: var(--text-label); line-height: 1.5; }
+.moved-label button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--mist); border-radius: 16px; background: var(--white); font-size: var(--text-label); font-weight: 650; }
+.moved-label button:hover { background: var(--mist); }
 .label-slot-change input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .label-slot-change:focus-within { outline: 2px solid var(--lavender); outline-offset: 2px; }
 .detail-photo-list > button.label-thumb { border-style: dashed; }
