@@ -254,6 +254,76 @@ export function splitPhoto(garmentId: string, photoId: string) {
   queueCutout(alone.id)
 }
 
+/** Dragged onto another card: the garment joins that one (its photos and labels after the others'). */
+export function mergeInto(sourceId: string, targetId: string) {
+  const source = state.garments.find((garment) => garment.id === sourceId)
+  const target = state.garments.find((garment) => garment.id === targetId)
+  if (!source || !target || source === target) return
+  const gainsMain = !target.photoIds.length && source.photoIds.length > 0
+  const merged: BatchGarment = {
+    ...target,
+    photoIds: [...target.photoIds, ...source.photoIds],
+    labelIds: [...target.labelIds, ...source.labelIds],
+    ...(gainsMain ? { category: source.category, colors: source.colors, cutoutStatus: 'waiting' as const } : {})
+  }
+  set({ garments: state.garments.filter((garment) => garment !== source).map((garment) => garment === target ? merged : garment) })
+  if (gainsMain) queueCutout(merged.id)
+}
+
+/**
+ * Dragged photo: it leaves its garment and goes to another one, as a garment photo or as its label, or ('new') it
+ * becomes a garment of its own right after the one it left. A garment left with nothing is removed; one that loses
+ * its main photo is cut out again from the next.
+ */
+export function movePhoto(fromId: string, photoId: string, to: string | 'new', as: 'photo' | 'label') {
+  const from = state.garments.find((garment) => garment.id === fromId)
+  const photo = photoById(photoId)
+  if (!from || !photo || !(from.photoIds.includes(photoId) || from.labelIds.includes(photoId))) return
+  if (to === fromId) {
+    // On its own card: only a change between garment photo and label.
+    if ((as === 'label') !== from.labelIds.includes(photoId)) toggleLabel(fromId, photoId)
+    return
+  }
+  const lostMain = from.photoIds[0] === photoId
+  const left: BatchGarment = {
+    ...from,
+    photoIds: from.photoIds.filter((id) => id !== photoId),
+    labelIds: from.labelIds.filter((id) => id !== photoId),
+    ...(lostMain ? { cutout: undefined, cutoutStatus: 'waiting' as const } : {})
+  }
+  const queue: string[] = []
+  if (lostMain && left.photoIds.length) queue.push(left.id)
+  let garments = state.garments.map((garment) => garment === from ? left : garment)
+  if (to === 'new') {
+    const alone: BatchGarment = {
+      id: crypto.randomUUID(),
+      photoIds: as === 'photo' ? [photoId] : [],
+      labelIds: as === 'label' ? [photoId] : [],
+      category: photo.suggestion?.category ?? from.category,
+      colors: photo.suggestion?.colors ?? from.colors,
+      include: true,
+      cutoutStatus: as === 'photo' ? 'waiting' : 'none',
+      colorsEdited: false
+    }
+    const index = garments.indexOf(left)
+    garments = [...garments.slice(0, index + 1), alone, ...garments.slice(index + 1)]
+    if (as === 'photo') queue.push(alone.id)
+  } else {
+    const target = garments.find((garment) => garment.id === to)
+    if (!target) return
+    const gainsMain = as === 'photo' && !target.photoIds.length
+    garments = garments.map((garment) => garment !== target ? garment : {
+      ...target,
+      photoIds: as === 'photo' ? [...target.photoIds, photoId] : target.photoIds,
+      labelIds: as === 'label' ? [...target.labelIds, photoId] : target.labelIds,
+      ...(gainsMain ? { category: photo.suggestion?.category ?? target.category, colors: photo.suggestion?.colors ?? target.colors, cutoutStatus: 'waiting' as const } : {})
+    })
+    if (gainsMain) queue.push(target.id)
+  }
+  set({ garments: garments.filter((garment) => garment.photoIds.length || garment.labelIds.length) })
+  for (const id of queue) queueCutout(id)
+}
+
 /** Another photo of the garment becomes the main one, which is the one cut out and shown in the wardrobe. */
 export function makeMain(garmentId: string, photoId: string) {
   const garment = state.garments.find((entry) => entry.id === garmentId)

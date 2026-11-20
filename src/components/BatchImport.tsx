@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Add01Icon, Camera01Icon, Image02Icon, Tag01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import BatchCard from './batchImport/BatchCard'
+import { CardDragProvider, useCardDrag } from './batchImport/cardDrag'
 import {
   addPhotos,
   clearBatch,
@@ -192,10 +193,15 @@ export default function BatchImport({ onDone }: BatchImportProps) {
       {onlyDoubtful && !shown.length
         ? <p className="batch-none">{batch.running ? 'Por ahora, nada dudoso.' : 'Nada dudoso: puedes guardar.'}</p>
         : (
+            <CardDragProvider>
+            {shown.filter((garment) => garment.photoIds.length).length > 1 && (
+              <p className="batch-drag-hint">Arrastra una prenda sobre otra para unirlas, o una de sus fotos a otra prenda{typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? ' (mantén pulsado y arrastra)' : ''}.</p>
+            )}
             <ul className="batch-grid">
               {shown.map((garment) => (
                 <BatchCard key={garment.id} garment={garment} photos={photos} canMerge={!onlyDoubtful && batch.garments[0]?.id !== garment.id} disabled={saving} />
               ))}
+              <NewGarmentDrop />
               {!onlyDoubtful && current && (
                 <li className="batch-card batch-card-pending" aria-hidden="true">
                   <div className="batch-card-image">
@@ -209,6 +215,7 @@ export default function BatchImport({ onDone }: BatchImportProps) {
                 </li>
               )}
             </ul>
+            </CardDragProvider>
           )}
 
       <div className="batch-dock">
@@ -238,5 +245,17 @@ export default function BatchImport({ onDone }: BatchImportProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** While a photo is dragged: the place to drop it to make it a garment of its own. */
+function NewGarmentDrop() {
+  const { dragging } = useCardDrag()
+  if (dragging?.item.kind !== 'photo') return null
+  return (
+    <li className="batch-card card-drop-new" data-drop-new="" {...(dragging.over?.zone === 'new' ? { 'data-drop-over': 'new' } : {})}>
+      <HugeiconsIcon icon={Add01Icon} size={22} />
+      <span>Suelta aquí para que sea otra prenda</span>
+    </li>
   )
 }

@@ -7,7 +7,9 @@ import {
   clearBatch,
   garmentSize,
   getBatch,
+  mergeInto,
   mergeWithPrevious,
+  movePhoto,
   savable,
   saveBatch,
   splitPhoto,
@@ -102,6 +104,44 @@ describe('many garments at once', () => {
     toggleLabel(first!.id, first!.labelIds[0]!)
     expect(getBatch().garments[0]).toMatchObject({ labelIds: [] })
     expect(getBatch().garments[0]!.photoIds).toHaveLength(2)
+  })
+
+  it('regroups by dragging: a garment onto any other, a photo to another garment, its label or a new one', async () => {
+    await addPhotos([
+      photo('Parte superior|Camiseta|Blanco|0'),
+      photo('Parte inferior|Vaqueros|Azul|100'),
+      photo('Parte superior|Camiseta|Blanco|200'),
+      photo('Calzado|Zapatillas|Negro|300')
+    ])
+    await analysed()
+    const [shirt, jeans, back, shoes] = getBatch().garments
+    expect(getBatch().garments).toHaveLength(4)
+
+    // The back of the shirt, two cards away, onto the shirt.
+    mergeInto(back!.id, shirt!.id)
+    expect(getBatch().garments.map((garment) => garment.id)).toEqual([shirt!.id, jeans!.id, shoes!.id])
+    expect(getBatch().garments[0]!.photoIds).toEqual([...shirt!.photoIds, ...back!.photoIds])
+
+    // The shoes' photo is the jeans' label after all: the shoes card, left empty, goes.
+    movePhoto(shoes!.id, shoes!.photoIds[0]!, jeans!.id, 'label')
+    expect(getBatch().garments).toHaveLength(2)
+    expect(getBatch().garments[1]).toMatchObject({ photoIds: jeans!.photoIds, labelIds: shoes!.photoIds })
+
+    // The back photo out to a garment of its own, right after the shirt.
+    movePhoto(shirt!.id, back!.photoIds[0]!, 'new', 'photo')
+    await analysed()
+    const garments = getBatch().garments
+    expect(garments.map((garment) => garment.photoIds.length)).toEqual([1, 1, 1])
+    expect(garments[1]!.photoIds).toEqual(back!.photoIds)
+    expect(garments[1]!.cutoutStatus).toBe('done')
+
+    // The main photo leaves: the garment is cut out again from the next one.
+    mergeInto(garments[1]!.id, garments[0]!.id)
+    movePhoto(shirt!.id, shirt!.photoIds[0]!, jeans!.id, 'photo')
+    await analysed()
+    const regrouped = getBatch().garments
+    expect(regrouped[0]).toMatchObject({ photoIds: back!.photoIds, cutoutStatus: 'done' })
+    expect(regrouped[1]!.photoIds).toEqual([...jeans!.photoIds, ...shirt!.photoIds])
   })
 
   it('saves the chosen garments with their photos, label, cut-out and what the label says', async () => {

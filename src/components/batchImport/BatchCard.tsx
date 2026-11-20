@@ -20,6 +20,7 @@ import {
   type BatchGarment,
   type BatchPhoto
 } from './batchQueue'
+import { useCardDrag } from './cardDrag'
 
 const OTHER = 'other'
 
@@ -39,11 +40,19 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
   const [selected, setSelected] = useState<string>()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [writingOther, setWritingOther] = useState(false)
+  const { dragging, handle } = useCardDrag()
   const main = garment.photoIds[0] ? photos.get(garment.photoIds[0]) : undefined
+  // What dragging shows on this card: it is the one being moved, or the one the pointer is over.
+  const dragProps = {
+    'data-drop-garment': garment.id,
+    ...(dragging?.over?.garmentId === garment.id && dragging.item.garmentId !== garment.id ? { 'data-drop-over': dragging.over.zone } : {}),
+    ...(dragging?.item.kind === 'garment' && dragging.item.garmentId === garment.id ? { 'data-drag-source': '' } : {})
+  }
+  const draggingPhoto = dragging?.item.kind === 'photo'
 
   if (!main) {
     return (
-      <li className="batch-card batch-orphan">
+      <li className="batch-card batch-orphan" {...dragProps}>
         <p>Esta etiqueta se unirá a la siguiente prenda que analices.</p>
         {canMerge && <MergeButton id={garment.id} disabled={disabled} />}
       </li>
@@ -65,9 +74,15 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
   const chosenIsLabel = chosen ? garment.labelIds.includes(chosen) : false
 
   return (
-    <li className="batch-card" {...(garment.include ? {} : { 'data-off': '' })}>
-      <div className="batch-card-image" {...(showCutout ? { 'data-cutout': '' } : {})}>
+    <li className="batch-card" {...(garment.include ? {} : { 'data-off': '' })} {...dragProps}>
+      <div
+        className="batch-card-image"
+        {...(showCutout ? { 'data-cutout': '' } : {})}
+        {...handle({ kind: 'garment', garmentId: garment.id, image: showCutout ? garment.cutout! : main.file }, disabled)}
+        title="Arrastra sobre otra prenda para unirlas"
+      >
         <GarmentPhoto image={showCutout ? garment.cutout! : main.file} alt={subcategory || garment.category} />
+        {draggingPhoto && <span className="card-drop-label" data-drop-label={garment.id}><HugeiconsIcon icon={Tag01Icon} size={13} />Como etiqueta</span>}
         <label className="batch-check" title={garment.include ? 'Se añadirá al armario' : 'No se añadirá'}>
           <input
             type="checkbox"
@@ -94,7 +109,16 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
             const isLabel = garment.labelIds.includes(id)
             return (
               <li key={id}>
-                <button type="button" className="batch-thumb" aria-pressed={chosen === id} onClick={() => setSelected(chosen === id ? undefined : id)} aria-label={isLabel ? 'Foto de la etiqueta' : 'Otra foto de la prenda'}>
+                <button
+                  type="button"
+                  className="batch-thumb"
+                  aria-pressed={chosen === id}
+                  onClick={() => setSelected(chosen === id ? undefined : id)}
+                  aria-label={isLabel ? 'Foto de la etiqueta' : 'Otra foto de la prenda'}
+                  title="Tócala para ver qué hacer, o arrástrala a otra prenda"
+                  {...handle({ kind: 'photo', garmentId: garment.id, photoId: id, image: photo.file }, disabled)}
+                  {...(dragging?.item.kind === 'photo' && dragging.item.photoId === id ? { 'data-drag-source': '' } : {})}
+                >
                   <GarmentPhoto image={photo.file} alt="" />
                   {isLabel && <span className="batch-thumb-label"><HugeiconsIcon icon={Tag01Icon} size={11} /></span>}
                 </button>

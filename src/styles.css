@@ -903,6 +903,23 @@ button.choice-chip { font-family: inherit; }
 .batch-thumb-actions { display: flex; flex-wrap: wrap; gap: 5px; padding: 7px 10px 0; }
 .batch-thumb-actions button { min-height: 28px; padding: 0 9px; border: 1px solid var(--mist); border-radius: 14px; background: var(--white); font-size: var(--text-caption); font-weight: 650; }
 .batch-thumb-actions button:hover { background: var(--mist); }
+/* Regrouping by dragging (batchImport/cardDrag.tsx): the card's photo and each thumbnail can be picked up. */
+.batch-card-image, .batch-thumb { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.batch-card-image { cursor: grab; }
+.batch-card-image img, .batch-thumb img { -webkit-user-drag: none; }
+.batch-card[data-drag-source] { opacity: .4; }
+.batch-thumb[data-drag-source] { opacity: .35; }
+.batch-card[data-drop-over] { border-color: var(--lavender); box-shadow: 0 0 0 3px rgba(138, 121, 178, .35); }
+.card-drop-label { position: absolute; z-index: 2; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; border: 1.5px dashed var(--lavender); border-radius: 10px; background: rgba(248, 246, 251, .94); font-size: var(--text-label); font-weight: 650; }
+.batch-card[data-drop-over=label] .card-drop-label { border-style: solid; border-color: var(--ink); color: var(--white); background: var(--ink); }
+.card-drop-new { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 180px; padding: 16px; border: 1.5px dashed var(--lavender); background: var(--soft-surface); color: var(--ink); font-size: var(--text-label); font-weight: 650; text-align: center; }
+.card-drop-new[data-drop-over] { border-style: solid; background: #E4DFF0; }
+.card-drag-ghost { position: fixed; z-index: 1000; top: 0; left: 0; display: grid; justify-items: center; gap: 6px; margin: -44px 0 0 -44px; pointer-events: none; }
+.card-drag-ghost img { width: 88px; height: 88px; padding: 6px; object-fit: contain; border: 1px solid var(--line); border-radius: 12px; background: var(--white); box-shadow: 0 10px 28px rgba(45, 40, 56, .28); transform: rotate(-4deg); }
+.card-drag-ghost span { padding: 4px 10px; border-radius: 12px; color: var(--white); background: var(--ink); font-size: var(--text-small); font-weight: 650; white-space: nowrap; }
+.batch-drag-hint { margin: 0; font-size: var(--text-small); opacity: .8; }
+html:has(.card-drag-ghost), html:has(.card-drag-ghost) * { cursor: grabbing !important; user-select: none; }
+
 
 .batch-card-body { display: grid; gap: 6px; padding: 10px 12px 12px; }
 .batch-reason { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--error); font-size: var(--text-small); font-weight: 650; }
