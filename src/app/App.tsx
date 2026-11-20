@@ -62,8 +62,26 @@ function getGarmentLabel(garment: Garment) {
   return garment.name.trim() || garment.subcategory || garment.category
 }
 
+type AddPage = 'add' | 'batch' | 'look'
+const isAddPage = (page: Page): page is AddPage => page === 'add' || page === 'batch' || page === 'look'
+/** The way of adding used last: «＋ Añadir prendas» opens it again (a convenience of this browser only). */
+const LAST_ADD_KEY = 'molt-last-add-mode'
+
+function lastAddPage(): AddPage {
+  try {
+    const stored = localStorage.getItem(LAST_ADD_KEY) as Page | null
+    return stored && isAddPage(stored) ? stored : 'add'
+  } catch {
+    return 'add'
+  }
+}
+
 function App() {
   const [page, setPage] = useState<Page>('home')
+  useEffect(() => {
+    if (!isAddPage(page)) return
+    try { localStorage.setItem(LAST_ADD_KEY, page) } catch { /* private window: it opens «Una prenda» next time */ }
+  }, [page])
   const [garments, setGarments] = useState<Garment[]>([])
   const [displayCount, setDisplayCount] = useState(40)
   const [loading, setLoading] = useState(true)
@@ -225,8 +243,7 @@ function App() {
                 </div>
                 <div className="page-actions">
                   {menu}
-                  <button className="button button-outline" type="button" onClick={() => setPage('batch')}>Añadir varias</button>
-                  <button className="button button-dark" type="button" onClick={() => setPage('add')}>＋ Añadir prenda</button>
+                  <button className="button button-dark" type="button" onClick={() => setPage(lastAddPage())}>＋ Añadir prendas</button>
                 </div>
               </div>
               {notices}
@@ -294,6 +311,11 @@ function App() {
                   onSave={createGarment}
                   onCancel={() => setPage('wardrobe')}
                   submitLabel="Guardar prenda"
+                  onSwitchToBatch={(files) => {
+                    // Loaded here, not with the app: the batch brings the analyser.
+                    void import('../components/batchImport/batchQueue').then(({ addPhotos }) => addPhotos(files))
+                    setPage('batch')
+                  }}
                 />
               </Suspense>
             </section>

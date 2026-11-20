@@ -16,6 +16,14 @@ vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
 
 vi.mock('../components/PatternWaves.jsx', () => ({ default: () => null }))
 
+// A test photo named «name|seconds.jpg» was taken at that second; others have no capture time.
+vi.mock('../ai/photoTime', () => ({
+  captureTime: vi.fn(async (photo: Blob) => {
+    const seconds = (photo as File).name?.match(/\|(\d+)\./)?.[1]
+    return seconds ? Date.UTC(2026, 10, 20, 12, 0, Number(seconds)) : undefined
+  })
+}))
+
 // Reading and writing backups is tested in wardrobeBackup.test.ts with real Blobs; here only the flow.
 vi.mock('../db/wardrobeBackup', () => ({
   readWardrobeBackup: vi.fn(),
@@ -438,6 +446,48 @@ describe('wardrobe flow', () => {
     await user.click(screen.getByRole('button', { name: 'Todas 2' }))
     await user.type(screen.getByLabelText('Buscar prendas'), 'zzz')
     expect(await screen.findByText('No encontramos esa prenda.')).toBeInTheDocument()
+  })
+
+  it('has one button to add garments, which opens the way used last', async () => {
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    expect(screen.queryByRole('button', { name: 'Añadir varias' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: '＋ Añadir prendas' }))
+    expect(await screen.findByRole('heading', { name: /^añadir prenda/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Varias prendas' }))
+    await user.click(screen.getByRole('link', { name: /Armario/ }))
+    await user.click(await screen.findByRole('button', { name: '＋ Añadir prendas' }))
+    expect(await screen.findByRole('heading', { name: /añadir varias prendas/i })).toBeInTheDocument()
+  })
+
+  it('suggests «Varias prendas» when the photos of one garment were taken minutes apart', async () => {
+    vi.mocked(analyzeGarmentImage).mockResolvedValue({
+      category: 'Parte superior',
+      subcategory: 'Camiseta',
+      colors: ['Negro'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9 },
+      unknownAttributes: [],
+      modelId: 'molt/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      segmentations: [],
+      analyzedAt: '2026-11-20T12:00:00.000Z'
+    })
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    const upload = await screen.findByLabelText('Seleccionar fotografía de la prenda')
+
+    // Two photos 10 s apart: one garment, nothing is said.
+    await user.upload(upload, [new File(['a'], 'a|0.jpg', { type: 'image/jpeg' }), new File(['b'], 'b|10.jpg', { type: 'image/jpeg' })])
+    await waitFor(() => expect(vi.mocked(analyzeGarmentImage)).toHaveBeenCalled())
+    expect(screen.queryByText(/¿Son varias prendas\?/)).not.toBeInTheDocument()
+
+    // A third one five minutes later.
+    await user.upload(screen.getByLabelText('Seleccionar fotografía de la prenda'), new File(['c'], 'c|310.jpg', { type: 'image/jpeg' }))
+    await user.click(await screen.findByRole('button', { name: 'Pasar a Varias prendas' }))
+    expect(await screen.findByRole('heading', { name: /añadir varias prendas/i })).toBeInTheDocument()
   })
 
   it('offers the three ways of adding garments as tabs', async () => {
