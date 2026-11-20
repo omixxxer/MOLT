@@ -199,7 +199,7 @@ export default function BatchImport({ onDone }: BatchImportProps) {
             )}
             <ul className="batch-grid">
               {shown.map((garment) => (
-                <BatchCard key={garment.id} garment={garment} photos={photos} canMerge={!onlyDoubtful && batch.garments[0]?.id !== garment.id} disabled={saving} />
+                <BatchCard key={garment.id} garment={garment} photos={photos} disabled={saving} />
               ))}
               <NewGarmentDrop />
               {!onlyDoubtful && current && (

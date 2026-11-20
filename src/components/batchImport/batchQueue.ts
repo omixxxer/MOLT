@@ -217,22 +217,6 @@ export function editGarment(id: string, update: Pick<Partial<BatchGarment>, 'cat
   updateGarment(id, { ...update, ...(update.colors ? { colorsEdited: true } : {}) })
 }
 
-/** The garment joins the one before it (its photos and labels after the others). */
-export function mergeWithPrevious(id: string) {
-  const index = state.garments.findIndex((garment) => garment.id === id)
-  if (index < 1) return
-  const previous = state.garments[index - 1]!
-  const garment = state.garments[index]!
-  const merged: BatchGarment = {
-    ...previous,
-    photoIds: [...previous.photoIds, ...garment.photoIds],
-    labelIds: [...previous.labelIds, ...garment.labelIds],
-    ...(previous.photoIds.length ? {} : { category: garment.category, colors: garment.colors, cutoutStatus: 'waiting' as const })
-  }
-  set({ garments: [...state.garments.slice(0, index - 1), merged, ...state.garments.slice(index + 1)] })
-  if (!previous.photoIds.length && merged.photoIds.length) queueCutout(merged.id)
-}
-
 /** A photo that is not the main one becomes a garment of its own, right after this one. */
 export function splitPhoto(garmentId: string, photoId: string) {
   const index = state.garments.findIndex((garment) => garment.id === garmentId)

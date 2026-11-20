@@ -930,7 +930,6 @@ html:has(.card-drag-ghost), html:has(.card-drag-ghost) * { cursor: grabbing !imp
 .batch-category { width: 100%; min-width: 0; padding: 2px 0; margin-top: -4px; border: 0; background: transparent; color: var(--ink); font-size: var(--text-small); opacity: .85; cursor: pointer; }
 .batch-colors-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 3px 0; border: 0; background: transparent; font-size: var(--text-small); text-align: left; }
 .batch-read { margin: 0; font-size: var(--text-small); line-height: 1.45; opacity: .85; }
-.batch-merge { display: flex; align-items: center; gap: 5px; justify-self: start; margin-top: 2px; padding: 3px 0; border: 0; background: transparent; font-size: var(--text-small); text-align: left; text-decoration: underline; }
 
 .batch-card-pending .batch-card-image > img { filter: saturate(.3); opacity: .45; }
 .batch-pending-note { margin: 0; padding: 9px 12px 11px; font-size: var(--text-small); line-height: 1.45; }

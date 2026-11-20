@@ -8,7 +8,6 @@ import {
   garmentSize,
   getBatch,
   mergeInto,
-  mergeWithPrevious,
   movePhoto,
   savable,
   saveBatch,
@@ -92,7 +91,7 @@ describe('many garments at once', () => {
     expect(getBatch().garments.map((garment) => garment.photoIds.length)).toEqual([1, 1])
 
     const [first, second] = getBatch().garments
-    mergeWithPrevious(second!.id)
+    mergeInto(second!.id, first!.id)
     expect(getBatch().garments).toHaveLength(1)
     const merged = getBatch().garments[0]!
     expect(merged.photoIds).toHaveLength(2)

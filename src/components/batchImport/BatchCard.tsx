@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert02Icon, Link01Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../../ai/colors'
 import { categoryIdForLabel, taxonomy } from '../../ml/taxonomy'
@@ -13,7 +13,6 @@ import {
   garmentSubcategory,
   mainSuggestion,
   makeMain,
-  mergeWithPrevious,
   reviewReasons,
   splitPhoto,
   toggleLabel,
@@ -27,8 +26,6 @@ const OTHER = 'other'
 interface BatchCardProps {
   garment: BatchGarment
   photos: Map<string, BatchPhoto>
-  /** There is a garment before this one to join. */
-  canMerge: boolean
   disabled: boolean
 }
 
@@ -36,7 +33,7 @@ interface BatchCardProps {
  * One garment to review. It reads as a finished garment, not as a form: the type is edited in place, the colours
  * open a palette, and the actions on a photo appear when its thumbnail is touched.
  */
-export default function BatchCard({ garment, photos, canMerge, disabled }: BatchCardProps) {
+export default function BatchCard({ garment, photos, disabled }: BatchCardProps) {
   const [selected, setSelected] = useState<string>()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [writingOther, setWritingOther] = useState(false)
@@ -53,8 +50,7 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
   if (!main) {
     return (
       <li className="batch-card batch-orphan" {...dragProps}>
-        <p>Esta etiqueta se unirá a la siguiente prenda que analices.</p>
-        {canMerge && <MergeButton id={garment.id} disabled={disabled} />}
+        <p>Esta etiqueta se unirá a la siguiente prenda que analices, o arrastra aquí la prenda a la que pertenece.</p>
       </li>
     )
   }
@@ -192,17 +188,7 @@ export default function BatchCard({ garment, photos, canMerge, disabled }: Batch
           <ColorPalette values={garment.colors} onChange={(colors) => editGarment(garment.id, { colors })} disabled={disabled} />
         )}
         {read && <p className="batch-read">{read}</p>}
-        {canMerge && <MergeButton id={garment.id} disabled={disabled} />}
       </div>
     </li>
-  )
-}
-
-function MergeButton({ id, disabled }: { id: string; disabled: boolean }) {
-  return (
-    <button type="button" className="batch-merge" onClick={() => mergeWithPrevious(id)} disabled={disabled}>
-      <HugeiconsIcon icon={Link01Icon} size={13} />
-      Es la misma que la anterior
-    </button>
   )
 }
