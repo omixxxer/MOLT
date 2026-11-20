@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy01Icon, Delete02Icon, Image02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
+import { Copy01Icon, Delete02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { forecastChanges, packingGroups, packingText, PACKING_STYLES, summarizeWeather, TRIP_KINDS, tripDates, type ForecastChange } from '../../trips/packingPlan'
 import { coverImage, findDestinationPhoto, forgetCover } from '../../trips/destinationPhoto'
 import { planDaysInBackground } from '../../trips/plannerClient'
 import { sceneFor } from '../../trips/tripScene'
-import type { Garment, PackingStyle, Trip, TripDay } from '../../types/domain'
+import type { Garment, PackingStyle, Trip, TripCover, TripDay } from '../../types/domain'
 import { dayFromToday, getForecast, placeLabel } from '../../weather/openMeteo'
 import { askConfirm } from '../confirmDialog'
 import { garmentLabel } from '../OutfitBoard'
@@ -18,6 +18,8 @@ import { useObjectUrl } from '../useObjectUrl'
 
 const weekday = new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric' })
 const REFRESH_AFTER = 3 * 3_600_000
+/** A place Wikipedia had no free photo of is looked for again after this long. */
+const COVER_RETRY_MS = 30 * 86_400_000
 
 export function dayName(day: string, format: Intl.DateTimeFormat = weekday) {
   return format.format(new Date(`${day}T12:00:00`))
@@ -54,7 +56,11 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
   const finished = trip.endDate < today
 
   function update(change: Partial<Trip>) {
-    void onChange({ ...latest.current, ...change, updatedAt: new Date().toISOString() })
+    // Changes can come close together (the weather, the outfits, the photo, all on opening): each one builds on the
+    // last, even before the screen has shown it, so none undoes another.
+    const next = { ...latest.current, ...change, updatedAt: new Date().toISOString() }
+    latest.current = next
+    void onChange(next)
   }
 
   async function refresh(force: boolean) {
@@ -131,44 +137,30 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
     await onDelete(trip)
   }
 
-  // The header's picture: the drawn scene, or the real photo the user asked for.
+  // The header's picture: a photo of the destination, looked for on Wikipedia when the trip is opened; the drawn
+  // scene while it loads and when there is none. A place without a free photo is not asked again for a while.
   const scene = useMemo(() => sceneFor(trip), [trip.kind, trip.days, trip.place]) // eslint-disable-line react-hooks/exhaustive-deps
   const [coverBlob, setCoverBlob] = useState<Blob>()
-  const [findingPhoto, setFindingPhoto] = useState(false)
   const coverUrl = useObjectUrl(coverBlob)
   useEffect(() => {
     setCoverBlob(undefined)
-    if (!trip.cover) return
     let current = true
-    coverImage(trip.cover).then((blob) => { if (current) setCoverBlob(blob) }, () => undefined)
-    return () => { current = false }
-  }, [trip.cover?.imageUrl]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function findPhoto() {
-    setFindingPhoto(true)
-    setError('')
-    setMessage('')
-    try {
-      const cover = await findDestinationPhoto(trip.place)
-      if (!cover) {
-        setMessage(`Wikipedia no tiene una foto libre de ${trip.place.name}; se queda el dibujo.`)
-        return
-      }
-      setCoverBlob(await coverImage(cover))
-      update({ cover })
-    } catch {
-      setError('No se pudo buscar la foto del destino. Comprueba la conexión.')
-    } finally {
-      setFindingPhoto(false)
+    const show = (cover: TripCover) => coverImage(cover).then((blob) => { if (current) setCoverBlob(blob) })
+    if (trip.cover) {
+      show(trip.cover).catch(() => undefined)
+    } else if (!(Date.now() - Date.parse(trip.coverCheckedAt ?? '') < COVER_RETRY_MS)) {
+      findDestinationPhoto(trip.place).then(async (cover) => {
+        if (!current) return
+        if (!cover) {
+          update({ coverCheckedAt: new Date().toISOString() })
+          return
+        }
+        await show(cover)
+        if (current) update({ cover })
+      }).catch(() => undefined)
     }
-  }
-
-  async function removePhoto() {
-    const cover = latest.current.cover
-    update({ cover: undefined })
-    setCoverBlob(undefined)
-    await forgetCover(cover)
-  }
+    return () => { current = false }
+  }, [trip.id, trip.cover?.imageUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const kindLabel = TRIP_KINDS.find((item) => item.id === trip.kind)?.label
   const fetched = trip.fetchedAt ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(trip.fetchedAt)) : undefined
@@ -196,22 +188,11 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
           <button type="button" className="icon-button" onClick={() => void copyList()} aria-label="Copiar la lista" title="Copiar la lista"><HugeiconsIcon icon={Copy01Icon} size={16} /></button>
           <button type="button" className="icon-button" onClick={() => void remove()} aria-label="Eliminar el viaje" title="Eliminar el viaje"><HugeiconsIcon icon={Delete02Icon} size={16} /></button>
         </div>
-        <div className="trip-cover-bar">
-          {trip.cover && coverUrl
-            ? (
-                <>
-                  <small className="trip-credit">
-                    Foto: <a href={trip.cover.pageUrl} target="_blank" rel="noreferrer">{trip.cover.author}</a> · {trip.cover.licenseUrl ? <a href={trip.cover.licenseUrl} target="_blank" rel="noreferrer">{trip.cover.license}</a> : trip.cover.license} · Wikimedia Commons
-                  </small>
-                  <button type="button" className="trip-cover-button" onClick={() => void removePhoto()}>Volver al dibujo</button>
-                </>
-              )
-            : (
-                <button type="button" className="trip-cover-button" onClick={() => void findPhoto()} disabled={findingPhoto} title="Busca la foto principal del destino en Wikipedia: solo se envía el nombre del lugar">
-                  <HugeiconsIcon icon={Image02Icon} size={14} />{findingPhoto ? 'Buscando…' : 'Foto real del destino'}
-                </button>
-              )}
-        </div>
+        {trip.cover && coverUrl && (
+          <small className="trip-credit" title={`${trip.cover.title} · ${trip.cover.author} · ${trip.cover.license} · Wikimedia Commons`}>
+            <a href={trip.cover.pageUrl} target="_blank" rel="noreferrer">© {trip.cover.author}</a>, {trip.cover.licenseUrl ? <a href={trip.cover.licenseUrl} target="_blank" rel="noreferrer">{trip.cover.license}</a> : trip.cover.license}
+          </small>
+        )}
       </header>
 
       {error && <p className="form-error" role="alert">{error}</p>}
