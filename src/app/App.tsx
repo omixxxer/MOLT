@@ -319,7 +319,7 @@ function App() {
             <section className="form-screen" aria-labelledby="look-title">
                             <h1 id="look-title">Desde un look<span>.</span></h1>
               {addModes}
-              <p className="page-intro">Una foto de cuerpo entero: Molt busca cada prenda, la recorta y la reconoce. Es un prototipo; revisa lo que encuentre.</p>
+              <p className="page-intro">Añade de una vez todo lo que llevas puesto con una sola foto.</p>
               <Suspense fallback={<ScreenLoader />}>
                 <LookImport
                   onDone={(added) => {
