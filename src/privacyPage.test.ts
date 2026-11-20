@@ -20,7 +20,7 @@ describe('privacy policy page', () => {
     const connect = /connect-src ([^;"]+)/.exec(app)![1]!.split(/\s+/).filter((source) => source.startsWith('https://'))
     expect(connect.length).toBeGreaterThan(0)
     for (const host of connect) {
-      const service = host.includes('open-meteo') ? 'Open-Meteo' : host.includes('googleapis') ? 'Google Drive' : host
+      const service = host.includes('open-meteo') ? 'Open-Meteo' : host.includes('googleapis') ? 'Google Drive' : host.replace('https://', '')
       expect(page, host).toContain(service)
     }
   })
