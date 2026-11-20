@@ -126,12 +126,14 @@ describe('TripPlanner', () => {
     await waitFor(async () => expect((await database.trips.toArray())[0]?.style).toBe('light'))
   })
 
-  it('shows a drawing of the destination, and a real photo with its credit only when asked', async () => {
+  it('looks for a photo of the destination on opening, with a small credit, and keeps the drawing without one', async () => {
     const service = stubService()
     const weather = service.getMockImplementation()!
+    let photos = [{ title: 'Archivo:Bandera.svg', type: 'image' }, { title: 'Archivo:Plaza_de_Valencia.jpg', type: 'image' }]
     service.mockImplementation(async (input: string | URL | Request) => {
       const url = new URL(String(input))
-      if (url.pathname.includes('/media-list/')) return new Response(JSON.stringify({ items: [{ title: 'Archivo:Bandera.svg', type: 'image' }, { title: 'Archivo:Plaza_de_Valencia.jpg', type: 'image' }] }))
+      if (url.pathname.includes('/media-list/')) return new Response(JSON.stringify({ items: photos }))
+      if (url.searchParams.get('gsrsearch')) return new Response(JSON.stringify({ query: { pages: {} } }))
       if (url.hostname === 'es.wikipedia.org') {
         return new Response(JSON.stringify({ query: { pages: { '-1': { imageinfo: [{
           thumburl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/p/pl/Plaza_de_Valencia.jpg/1280px-Plaza_de_Valencia.jpg',
@@ -142,20 +144,30 @@ describe('TripPlanner', () => {
       if (url.hostname === 'upload.wikimedia.org') return new Response(new Blob(['jpeg'], { type: 'image/jpeg' }))
       return weather(input)
     })
-    const { user } = setup()
+    const { user, unmount } = setup()
     await createTrip(user)
-    // Nothing goes to Wikipedia until the user asks.
-    expect(service.mock.calls.some(([input]) => String(input).includes('wikipedia'))).toBe(false)
-    expect(document.querySelector('.trip-scene')).not.toBeNull()
-
-    await user.click(screen.getByRole('button', { name: /Foto real del destino/ }))
-    expect(await screen.findByRole('link', { name: 'Ana Silva' })).toHaveAttribute('href', 'https://commons.wikimedia.org/wiki/File:Plaza_de_Valencia.jpg')
+    // No button: the photo comes on its own, credited in a corner; nothing else is asked of Wikipedia.
+    expect(await screen.findByRole('link', { name: '© Ana Silva' })).toHaveAttribute('href', 'https://commons.wikimedia.org/wiki/File:Plaza_de_Valencia.jpg')
     expect(screen.getByText(/CC BY-SA 4.0/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Foto real|Volver al dibujo/ })).not.toBeInTheDocument()
     await waitFor(async () => expect((await database.trips.toArray())[0]?.cover?.author).toBe('Ana Silva'))
+    for (const [input] of service.mock.calls) if (String(input).includes('wikipedia.org/')) expect(String(input)).not.toMatch(/start_date|garment/)
 
-    await user.click(screen.getByRole('button', { name: 'Volver al dibujo' }))
-    await waitFor(async () => expect((await database.trips.toArray())[0]?.cover).toBeUndefined())
+    // Another trip, to a place without a free photo: the drawing stays, and it is not asked again on reopening.
+    unmount()
+    await database.trips.clear()
+    photos = [{ title: 'Archivo:Bandera.svg', type: 'image' }]
+    const again = setup()
+    await createTrip(again.user)
+    await waitFor(async () => expect((await database.trips.toArray())[0]?.coverCheckedAt).toBeDefined())
     expect(document.querySelector('.trip-scene')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: /©/ })).not.toBeInTheDocument()
+    again.unmount()
+    const asked = service.mock.calls.length
+    setup()
+    expect(await screen.findByRole('heading', { name: 'Valencia' })).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(service.mock.calls.slice(asked).some(([input]) => String(input).includes('wikipedia'))).toBe(false)
   })
 
   it('ticks garments and extras, adds and removes extras, and remembers it all', async () => {

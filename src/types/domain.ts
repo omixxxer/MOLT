@@ -167,7 +167,7 @@ export interface TripExtra {
 }
 
 /**
- * A real photo of the destination the user asked for (Wikimedia Commons, through Wikipedia). Only the credits and
+ * A real photo of the destination (Wikimedia Commons, through Wikipedia), looked for when the trip is opened. Only the credits and
  * where the image is are kept with the trip (and in backups); the image itself is in the browser's cache.
  */
 export interface TripCover {
@@ -185,6 +185,8 @@ export interface Trip {
   id: string
   place: Place
   cover?: TripCover
+  /** When Wikipedia was last asked and had no photo of the place (so it is not asked every time). */
+  coverCheckedAt?: string
   startDate: string
   endDate: string
   kind: string
