@@ -166,9 +166,25 @@ export interface TripExtra {
   packed: boolean
 }
 
+/**
+ * A real photo of the destination the user asked for (Wikimedia Commons, through Wikipedia). Only the credits and
+ * where the image is are kept with the trip (and in backups); the image itself is in the browser's cache.
+ */
+export interface TripCover {
+  imageUrl: string
+  /** The file's page on Wikimedia Commons, linked from the credit. */
+  pageUrl: string
+  title: string
+  author: string
+  license: string
+  licenseUrl?: string
+  fetchedAt: string
+}
+
 export interface Trip {
   id: string
   place: Place
+  cover?: TripCover
   startDate: string
   endDate: string
   kind: string

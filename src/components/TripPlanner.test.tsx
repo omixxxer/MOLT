@@ -115,6 +115,49 @@ describe('TripPlanner', () => {
     expect(screen.getByRole('button', { name: /Valencia/, pressed: true })).toBeInTheDocument()
   })
 
+  it('changes the kind of suitcase of a trip and plans the days again', async () => {
+    stubService()
+    const { user } = setup()
+    await createTrip(user)
+    expect(screen.getByRole('button', { name: /equilibrada/i, pressed: true })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /ligera/i }))
+    expect(await screen.findByText(/Maleta ligera: outfits elegidos de nuevo/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ligera/i, pressed: true })).toBeInTheDocument()
+    await waitFor(async () => expect((await database.trips.toArray())[0]?.style).toBe('light'))
+  })
+
+  it('shows a drawing of the destination, and a real photo with its credit only when asked', async () => {
+    const service = stubService()
+    const weather = service.getMockImplementation()!
+    service.mockImplementation(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname.includes('/media-list/')) return new Response(JSON.stringify({ items: [{ title: 'Archivo:Bandera.svg', type: 'image' }, { title: 'Archivo:Plaza_de_Valencia.jpg', type: 'image' }] }))
+      if (url.hostname === 'es.wikipedia.org') {
+        return new Response(JSON.stringify({ query: { pages: { '-1': { imageinfo: [{
+          thumburl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/p/pl/Plaza_de_Valencia.jpg/1280px-Plaza_de_Valencia.jpg',
+          descriptionurl: 'https://commons.wikimedia.org/wiki/File:Plaza_de_Valencia.jpg',
+          extmetadata: { Artist: { value: 'Ana Silva' }, LicenseShortName: { value: 'CC BY-SA 4.0' } }
+        }] } } } }))
+      }
+      if (url.hostname === 'upload.wikimedia.org') return new Response(new Blob(['jpeg'], { type: 'image/jpeg' }))
+      return weather(input)
+    })
+    const { user } = setup()
+    await createTrip(user)
+    // Nothing goes to Wikipedia until the user asks.
+    expect(service.mock.calls.some(([input]) => String(input).includes('wikipedia'))).toBe(false)
+    expect(document.querySelector('.trip-scene')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /Foto real del destino/ }))
+    expect(await screen.findByRole('link', { name: 'Ana Silva' })).toHaveAttribute('href', 'https://commons.wikimedia.org/wiki/File:Plaza_de_Valencia.jpg')
+    expect(screen.getByText(/CC BY-SA 4.0/)).toBeInTheDocument()
+    await waitFor(async () => expect((await database.trips.toArray())[0]?.cover?.author).toBe('Ana Silva'))
+
+    await user.click(screen.getByRole('button', { name: 'Volver al dibujo' }))
+    await waitFor(async () => expect((await database.trips.toArray())[0]?.cover).toBeUndefined())
+    expect(document.querySelector('.trip-scene')).not.toBeNull()
+  })
+
   it('ticks garments and extras, adds and removes extras, and remembers it all', async () => {
     stubService()
     const { user, unmount } = setup()
