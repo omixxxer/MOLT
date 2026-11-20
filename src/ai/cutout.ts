@@ -1,6 +1,6 @@
 import { garmentColors, toLab, type ColorShare } from './colors'
 import { encodeImage, outline, outlineAlpha, withSam } from './sam'
-import { bodyClass, cleanAlpha, footPatches, footPrompt, mergeByClass, type BodyMap } from './bodyRules'
+import { bodyClass, cleanAlpha, footPatches, footPrompt, hasPerson, keepClothes, mergeByClass, type BodyMap } from './bodyRules'
 import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Prompt, type Region, type SegmentationMap } from './segmentation'
 
 // Garments cut out of a photo with a transparent background: the coarse map says where each one is, SlimSAM
@@ -322,7 +322,23 @@ export interface LookOptions {
   merge?: boolean
   /** Take skin and hair out of the cut-outs ('skin'), and also what is not the person ('all'; shoes always). */
   clean?: 'skin' | 'all'
+  /**
+   * Keep only what the body parts call clothes or accessories, when that keeps most of the cut-out (a garment on a
+   * patterned bedspread: the bedspread is not clothes). Being measured in bench/recut.html.
+   */
+  clothes?: boolean
+  /**
+   * The garment's category id (top, bottom…), for one garment worn by a person: only the coarse map's regions of
+   * that category are cut out (the trousers, not the whole outfit), named by where they sit on the body.
+   */
+  focus?: string
 }
+
+/** One worn garment is cut out alone when its regions are at least this share of everything worn found. */
+const MIN_FOCUS_SHARE = 0.25
+
+/** «Only clothes» applies when it keeps at least this share of the cut-out; less, and it was wrong about the garment. */
+const MIN_CLOTHES_KEPT = 0.6
 
 /** Pose and body parts: under this share of a cut-out left, it was skin, hair or background, not a garment. */
 const MIN_KEPT_AFTER_CLEAN = 0.4
@@ -359,7 +375,20 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       return box ? [{ region: { classId: 'garment', patches: [], confidence: 1 }, image: await crop(own, box), width: box.width, height: box.height, coverage: 1 - transparent, place: placeOf(box) }] : []
     }
 
-    const single = mode === 'single' ? singleGarmentRegion(map, bitmap.width, bitmap.height) : undefined
+    let single = mode === 'single' ? singleGarmentRegion(map, bitmap.width, bitmap.height) : undefined
+    // One garment worn by someone: its own regions only, joined, instead of everything they wear.
+    const person = hasPerson(look.body)
+    if (single && look.focus && person && look.body?.landmarks) {
+      const pose = look.body.landmarks
+      const own = garmentRegions(map, bitmap.width, bitmap.height, false)
+        .map((region) => ({ ...region, classId: bodyClass(region.classId, regionMask(region, map.grid, bitmap.width, bitmap.height, match.width, match.height, 0), match.width, match.height, pose) }))
+        .filter((region) => region.classId === look.focus)
+      const patches = own.flatMap((region) => region.patches)
+      // Most of what was found must be that garment; a sliver means the map or the pose was wrong about it.
+      if (patches.length >= single.patches.length * MIN_FOCUS_SHARE) {
+        single = { classId: look.focus, patches: patches.sort((a, b) => a - b), confidence: Math.max(...own.map((region) => region.confidence)) }
+      }
+    }
     let regions: LookRegion[] = mode === 'single' ? (single ? [single] : []) : garmentRegions(map, bitmap.width, bitmap.height, false)
     const landmarks = mode === 'outfit' ? look.body?.landmarks : undefined
     if (landmarks && look.zones) {
@@ -384,10 +413,14 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
     for (const region of regions) {
       const near = regionMask(region, map.grid, bitmap.width, bitmap.height, work.width, work.height, 1)
       let alpha: Uint8ClampedArray | undefined
+      let fromPlain = false
       if (plain) {
         const { recall, precision } = agreement(plain, near)
         // High precision: on a model photo the fill keeps the person (head, arms, the other garments) too.
-        if (recall >= 0.4 && precision >= 0.92) alpha = plain.slice()
+        if (recall >= 0.4 && precision >= 0.92) {
+          alpha = plain.slice()
+          fromPlain = true
+        }
         // A light garment on a light backdrop loses pieces to the fill: SlimSAM's outline is added to what it kept.
         if (alpha && mode === 'single' && lightOnLight(pixels.data, work.width, work.height, coarse(region, -1))) {
           const outlined = await outlineWithSam(region)
@@ -400,10 +433,20 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       tidyAlpha(alpha, work.width, work.height, coarse(region, 0))
       let covered = 0
       for (let i = 0; i < alpha.length; i += 1) if (alpha[i]! >= 128) covered += 1
-      if (mode === 'outfit' && look.body && look.clean) {
+      // A single garment is cleaned only when a person is in the photo (worn, or held up).
+      if (look.body && look.clean && (mode === 'outfit' || person)) {
         const removed = cleanAlpha(alpha, work.width, work.height, look.body, look.clean === 'all' || region.classId === 'footwear')
         if (covered - removed < covered * MIN_KEPT_AFTER_CLEAN) continue
         covered -= removed
+      }
+      // Not on a plain backdrop: the fill is exact there, and the body parts once took a piece of a light sleeve.
+      if (look.body && look.clothes && !fromPlain) {
+        const trial = alpha.slice()
+        const removed = keepClothes(trial, work.width, work.height, look.body)
+        if (covered - removed >= covered * MIN_CLOTHES_KEPT) {
+          alpha.set(trial)
+          covered -= removed
+        }
       }
       const coverage = covered / alpha.length
       const box = alphaBox(alpha, work.width, work.height)

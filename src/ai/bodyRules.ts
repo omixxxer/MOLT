@@ -151,3 +151,63 @@ export function cleanAlpha(alpha: Uint8ClampedArray, width: number, height: numb
   }
   return removed
 }
+
+/**
+ * Takes out of a cut-out what the body parts do not call clothes or accessories, but only what is reached from
+ * outside it (a bedspread around a jacket, the floor under trousers): what they miss inside the garment (a dark
+ * blazer's lining, a crease) stays, as cutting it opened holes (bench/recut.html, 20-11-2026). Returns how many
+ * opaque pixels were taken out.
+ */
+export function keepClothes(alpha: Uint8ClampedArray, width: number, height: number, body: BodyMap): number {
+  const size = width * height
+  const notClothes = new Uint8Array(size)
+  for (let y = 0; y < height; y += 1) {
+    const row = Math.min(body.height - 1, Math.floor((y + 0.5) * body.height / height)) * body.width
+    for (let x = 0; x < width; x += 1) {
+      const part = body.parts[row + Math.min(body.width - 1, Math.floor((x + 0.5) * body.width / width))]!
+      if (part !== PART.clothes && part !== PART.others) notClothes[y * width + x] = 1
+    }
+  }
+  // From everything transparent and the photo's edge, through what is not clothes.
+  const reached = new Uint8Array(size)
+  const stack: number[] = []
+  const open = (i: number) => !reached[i] && (alpha[i]! < 128 || notClothes[i])
+  for (let i = 0; i < size; i += 1) {
+    const x = i % width
+    const y = (i - x) / width
+    if ((alpha[i]! < 128 || x === 0 || y === 0 || x === width - 1 || y === height - 1) && open(i)) {
+      reached[i] = 1
+      stack.push(i)
+    }
+  }
+  while (stack.length) {
+    const i = stack.pop()!
+    const x = i % width
+    for (const next of [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, i - width, i + width]) {
+      if (next < 0 || next >= size || !open(next)) continue
+      reached[next] = 1
+      stack.push(next)
+    }
+  }
+  let removed = 0
+  for (let i = 0; i < size; i += 1) {
+    if (!alpha[i] || !notClothes[i] || !reached[i]) continue
+    if (alpha[i]! >= 128) removed += 1
+    alpha[i] = 0
+  }
+  return removed
+}
+
+/** Share of the photo that must be skin (face or body) for the pose to be a person, not a garment's shape. */
+const MIN_SKIN = 0.01
+
+/**
+ * Someone is in the photo: the pose found a person and the body parts see their skin. A hoodie lying on a bed can
+ * look like a torso to the pose alone (tried on 20-11-2026).
+ */
+export function hasPerson(body: BodyMap | undefined): boolean {
+  if (!body?.landmarks) return false
+  let skin = 0
+  for (const part of body.parts) if (part === PART.bodySkin || part === PART.faceSkin) skin += 1
+  return skin >= body.parts.length * MIN_SKIN
+}
