@@ -941,16 +941,105 @@ button.choice-chip { font-family: inherit; }
   .batch-dock-actions .button { flex: 1; padding: 0 10px; }
   .batch-dock-actions .button-dark { flex: 2; }
 }
-.look-import { display: grid; gap: 16px; }
-.look-status { padding: 10px 0; }
-.look-intro { margin: 0; color: var(--ink); font-size: var(--text-label); }
-.look-garments { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.look-garments li { display: grid; min-width: 0; gap: 7px; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--soft-surface); }
-.look-garments select, .look-garments input:not([type=checkbox]) { width: 100%; min-width: 0; box-sizing: border-box; }
-.look-garments li.excluded { opacity: .5; }
-.look-garments img { width: 100%; height: 170px; object-fit: contain; background: repeating-conic-gradient(rgba(45, 40, 56, .06) 0 25%, transparent 0 50%) 0 0 / 14px 14px; border-radius: 4px; }
-.look-garments small { color: var(--ink); font-size: var(--text-caption); }
-.look-include, .look-save-outfit { display: flex; gap: 7px; align-items: center; font-size: var(--text-label); font-weight: 650; }
+/* «Desde un look»: before the photo (what it does and how to take it), while it is analysed (the photo with a scan
+   and the steps), and the garments found (cards as in «Varias prendas», the photo beside them, a dock to save). */
+.look-import { display: grid; gap: 22px; }
+.look-title { margin: 0; font-family: var(--serif); font-size: 26px; font-weight: 500; line-height: 1.2; }
+
+.look-hero { display: grid; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); align-items: center; gap: 28px; padding: 26px 32px; border: 1px dashed var(--ink); border-radius: 16px; background: var(--soft-surface); transition: background-color .18s ease, border-color .18s ease; }
+.look-hero[data-dragging] { border-color: var(--lavender); background: #E4DFF0; }
+.look-hero:focus-within { outline: 2px solid var(--lavender); outline-offset: 3px; }
+.look-hero-art { display: grid; place-items: center; }
+.look-hero-text { display: grid; justify-items: start; gap: 10px; }
+.look-hero-text > p { max-width: 440px; margin: 0; font-size: var(--text-body); line-height: 1.65; }
+.look-hero-title { margin: 0; font-family: var(--serif); font-size: 30px; font-weight: 500; line-height: 1.15; }
+.look-hero .photo-drop-actions { justify-content: flex-start; margin: 6px 0 0; }
+.look-badge { padding: 3px 10px; border-radius: 11px; color: var(--ink); background: rgba(138, 121, 178, .28); font-size: var(--text-caption); font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+.look-drop-hint { font-size: var(--text-small); opacity: .75; }
+@media (pointer: coarse) { .look-drop-hint { display: none; } }
+.look-tips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.look-tips li { display: flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); font-size: var(--text-label); font-weight: 600; }
+.look-tips svg { color: var(--lavender); }
+
+.look-art { width: 100%; max-width: 280px; height: auto; overflow: visible; }
+.look-art-frame { fill: var(--white); stroke: var(--line); }
+.look-art-skin { fill: var(--mist); }
+.look-art-top { fill: var(--lavender-soft); }
+.look-art-bottom { fill: var(--ink); }
+.look-art-shoe { fill: var(--lavender); }
+.look-art-outline { fill: none; stroke: var(--lavender); stroke-width: 2; stroke-dasharray: 6 5; animation: look-dash 1.8s linear infinite; }
+.look-art-tag line { stroke: var(--lavender); stroke-width: 1.5; }
+.look-art-tag rect { fill: var(--ink); }
+.look-art-tag text { fill: var(--white); font-size: 11px; font-weight: 650; text-anchor: middle; }
+.look-hero:hover .look-art-tag rect { fill: var(--lavender); }
+@keyframes look-dash { to { stroke-dashoffset: -22; } }
+
+.look-analysis { display: grid; grid-template-columns: minmax(180px, 280px) minmax(0, 1fr); align-items: center; gap: 32px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
+.look-scan { position: relative; margin: 0; overflow: hidden; border-radius: 12px; background: var(--soft-surface); aspect-ratio: 3 / 4; }
+.look-scan img { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(.85); }
+.look-scan::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(138, 121, 178, .18), rgba(45, 40, 56, .12)); }
+.look-scan-line { position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: 22%; background: linear-gradient(180deg, transparent, rgba(179, 166, 211, .5) 80%, rgba(248, 246, 251, .85) 97%, transparent); animation: look-scan 2.4s ease-in-out infinite alternate; }
+@keyframes look-scan { from { transform: translateY(-100%); } to { transform: translateY(450%); } }
+.look-analysis-text { display: grid; gap: 16px; }
+.look-progress { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.look-progress li { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 12px; padding: 10px 0; transition: opacity .25s ease; }
+.look-progress li[data-state=pending] { opacity: .45; }
+.look-progress li > span:last-child { display: grid; gap: 2px; }
+.look-progress strong { font-size: var(--text-body); }
+.look-progress small { font-size: var(--text-small); opacity: .8; }
+.look-progress-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 1.5px solid var(--mist); border-radius: 50%; background: var(--white); color: var(--white); }
+.look-progress li[data-state=done] .look-progress-mark { border-color: var(--ink); background: var(--ink); }
+.look-progress li[data-state=current] .look-progress-mark { border-color: var(--lavender); box-shadow: 0 0 0 4px rgba(138, 121, 178, .2); animation: look-pulse 1.2s ease-in-out infinite; }
+.look-progress li[data-state=current] .look-progress-mark::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--lavender); }
+@keyframes look-pulse { 50% { box-shadow: 0 0 0 8px rgba(138, 121, 178, .08); } }
+.look-note { margin: 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--text-small); line-height: 1.55; opacity: .85; }
+
+.look-results { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 28px; }
+.look-source { position: sticky; top: 96px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.look-source img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--line); border-radius: 12px; }
+.look-source .batch-add-more { justify-self: start; }
+.look-import label > input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.look-source small { font-size: var(--text-small); line-height: 1.45; opacity: .85; }
+.look-results-main { display: grid; gap: 14px; min-width: 0; }
+.look-hint { margin: -6px 0 2px; font-size: var(--text-body); opacity: .85; }
+.look-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.look-grid .batch-card-image { aspect-ratio: 1; }
+/* A tall cut-out (trousers, a coat) must not stretch the square: the image fills it instead of sizing it. */
+.look-grid .batch-card-image > img { position: absolute; inset: 0; }
+.look-colors { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--text-small); }
+.look-colors > span { display: inline-flex; align-items: center; gap: 5px; }
+.look-outfit { position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 16px 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); cursor: pointer; transition: border-color .18s ease, background-color .18s ease; }
+.look-outfit[data-on] { border-color: var(--lavender); background: #F1EEF8; }
+.look-outfit input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--ink); }
+.look-outfit-stack { display: flex; flex: none; padding-left: 12px; }
+.look-outfit-stack img { width: 44px; height: 44px; margin-left: -12px; padding: 3px; object-fit: contain; border: 1px solid var(--line); border-radius: 50%; background: var(--white); }
+.look-outfit-text { display: grid; gap: 2px; min-width: 0; }
+.look-outfit-text strong { font-size: var(--text-body); }
+.look-outfit-text small { font-size: var(--text-small); opacity: .8; }
+
+.look-empty { display: flex; align-items: center; gap: 24px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
+.look-empty img { flex: none; width: 140px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; filter: grayscale(.6); opacity: .8; }
+.look-empty > div { display: grid; justify-items: start; gap: 10px; }
+.look-empty p { margin: 0; font-size: var(--text-body); line-height: 1.6; }
+.look-empty .photo-drop-actions { justify-content: flex-start; margin: 4px 0 0; }
+.look-link { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; font-size: var(--text-label); text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .look-title { font-size: 22px; }
+  .look-hero { grid-template-columns: 1fr; gap: 14px; padding: 20px 16px; text-align: left; }
+  .look-hero-art .look-art { max-width: 150px; }
+  .look-hero-title { font-size: 25px; }
+  .look-hero .photo-drop-actions { width: 100%; }
+  .look-hero .photo-drop-actions .button { flex: 1; }
+  .look-analysis { grid-template-columns: 1fr; gap: 18px; padding: 16px; }
+  .look-scan { width: min(220px, 70%); justify-self: center; }
+  .look-results { grid-template-columns: 1fr; gap: 16px; }
+  .look-source { position: static; grid-template-columns: 72px minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 6px; }
+  .look-source img { grid-row: span 2; width: 72px; }
+  .look-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .look-empty { flex-direction: column; align-items: flex-start; padding: 16px; }
+  .look-empty img { width: 110px; }
+}
 
 /* Anything used with a finger (phones, and tablets in the wider layout too): everything tapped at least 40 px high. */
 @media (max-width: 720px), (pointer: coarse) {
