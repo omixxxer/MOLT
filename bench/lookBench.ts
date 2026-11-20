@@ -18,6 +18,11 @@ const status = document.querySelector('#status')!
 const output = document.querySelector('#output')!
 const say = (text: string) => { status.textContent = text }
 
+async function fingerprint(image: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await image.arrayBuffer())
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('').slice(0, 16)
+}
+
 async function memoryMb(): Promise<number | null> {
   const measure = (performance as Performance & { measureUserAgentSpecificMemory?: () => Promise<{ bytes: number }> }).measureUserAgentSpecificMemory
   if (!measure || !self.crossOriginIsolated) return null
@@ -112,7 +117,9 @@ export async function run(set: string, options: { limit?: number; body?: string[
         /** Share of the cut-out that is its garment; the rest is other garments, skin, hair or background. */
         purity: +ownGarment.toFixed(3),
         outsideGarments: +(perClass[0]! / Math.max(1, total)).toFixed(3),
-        iou: +(perClass[dominant]! / Math.max(1, union)).toFixed(3)
+        iou: +(perClass[dominant]! / Math.max(1, union)).toFixed(3),
+        /** Fingerprint of the cut-out's image, to compare two versions (the same pixels give the same one). */
+        sha256: await fingerprint(entry.cutout.image)
       })
     }
     const expected = classes.slice(1).filter((name) => (photo.classes[name] ?? 0) >= MIN_SHARE)
@@ -125,7 +132,7 @@ export async function run(set: string, options: { limit?: number; body?: string[
   }
   memory.after = await memoryMb()
   memory.every10 = every10
-  const result = { set, body: [...use], photos: rows.length, withPerson: rows.filter((row) => row.person).length, bodyMs: latency(rows.map((row) => row.bodyMs)), userAgent: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated, threads: navigator.hardwareConcurrency, ...summary(rows, classes), latencyMs: latency(rows.map((row) => row.ms)), memoryMb: memory, rows }
+  const result = { set, body: [...use], photos: rows.length, withPerson: rows.filter((row) => row.person).length, bodyMs: latency(rows.map((row) => row.bodyMs)), userAgent: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated, threads: navigator.hardwareConcurrency, ...summary(rows, classes), latencyMs: latency(rows.map((row) => row.ms)), samLoadsMs: performance.getEntriesByName('molt:sam-load').map((entry) => Math.round(entry.duration)), memoryMb: memory, rows }
   render(result)
   say(`Terminado: ${rows.length} fotos.`)
   return result

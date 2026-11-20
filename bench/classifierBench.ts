@@ -25,6 +25,14 @@ interface Row {
   colors?: string[]
   analysisColors: string[]
   cutoutColors?: string[]
+  /** Time of the cut-out alone, and a fingerprint of its image to compare runs (the same pixels give the same one). */
+  cutoutMs?: number
+  cutout?: { width: number; height: number; coverage: number; sha256: string } | null
+}
+
+async function fingerprint(image: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await image.arrayBuffer())
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('').slice(0, 16)
 }
 
 const categoryId = new Map(taxonomy.categories.map((entry) => [entry.label as string, entry.id as string]))
@@ -113,18 +121,26 @@ export async function run(set: string, options: { limit?: number; colorsOnly?: b
     // Colours as the form ends up with them: from the cut-out when there is one, else from the analysis.
     if (photo.colors?.length && options.cutouts !== false) {
       const map = suggestion.segmentations[0] as SegmentationMap | undefined
+      const t1 = performance.now()
       const [cut] = map ? await cutOutGarments(blob, map, 'single') : []
+      row.cutoutMs = Math.round(performance.now() - t1)
+      row.cutout = cut ? { width: cut.width, height: cut.height, coverage: +cut.coverage.toFixed(4), sha256: await fingerprint(cut.image) } : null
+      if (cut && keepCutouts) cutoutImages.set(photo.id, cut.image)
       row.cutoutColors = cut ? (await cutoutColors(cut.image)).map((entry) => entry.color) : suggestion.colors
     }
     rows.push(row)
   }
   memory.after = await memoryMb()
   const times = rows.map((row) => row.ms)
+  const cutTimes = rows.flatMap((row) => row.cutoutMs === undefined ? [] : [row.cutoutMs])
   const withSub = rows.filter((row) => row.subcategory)
   const result = {
     set, source: list.source, split: list.split, photos: rows.length,
     userAgent: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated, threads: navigator.hardwareConcurrency,
     latencyMs: { first: times[0] ?? 0, median: percentile(times.slice(1), 0.5), p90: percentile(times.slice(1), 0.9), totalSeconds: Math.round((performance.now() - started) / 1000) },
+    cutoutLatencyMs: cutTimes.length ? { first: cutTimes[0]!, median: percentile(cutTimes.slice(1), 0.5), p90: percentile(cutTimes.slice(1), 0.9), n: cutTimes.length } : null,
+    /** Each start of SlimSAM (src/ai/sam.ts): its worker is ended 5 s after the last cut-out and started again. */
+    samLoadsMs: performance.getEntriesByName('molt:sam-load').map((entry) => Math.round(entry.duration)),
     memoryMb: { ...memory, every10: memoryEvery10 },
     category: scores(rows.map((row) => row.category), rows.map((row) => row.predictedCategory)),
     subcategory: scores(withSub.map((row) => row.subcategory!), withSub.map((row) => row.predictedSubcategory ?? '(ninguna)')),
@@ -152,8 +168,13 @@ function render(result: Awaited<ReturnType<typeof run>>) {
   link.hidden = false
 }
 
-declare global { interface Window { runClassifierBench: typeof run; classifierBenchResult?: unknown } }
+/** With ?keepcuts the cut-outs stay here by photo id, to compare their pixels between two versions. */
+const cutoutImages = new Map<string, Blob>()
+const keepCutouts = new URLSearchParams(location.search).has('keepcuts')
+
+declare global { interface Window { runClassifierBench: typeof run; classifierBenchResult?: unknown; benchCutouts: Map<string, Blob> } }
 window.runClassifierBench = run
+window.benchCutouts = cutoutImages
 const params = new URLSearchParams(location.search)
 const set = params.get('set')
 if (set && params.has('auto')) {

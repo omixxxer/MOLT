@@ -1,5 +1,5 @@
 import { garmentColors, toLab, type ColorShare } from './colors'
-import { encodeImage, outline, outlineAlpha } from './sam'
+import { encodeImage, outline, outlineAlpha, withSam } from './sam'
 import { bodyClass, cleanAlpha, footPatches, footPrompt, mergeByClass, type BodyMap } from './bodyRules'
 import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Prompt, type Region, type SegmentationMap } from './segmentation'
 
@@ -333,7 +333,11 @@ type LookRegion = Region & { prompt?: Prompt }
  * single: the photo shows one garment (see singleGarmentRegion). outfit: a person wearing several, one cut-out per
  * garment found, largest first; `look` adds what MediaPipe says about the person.
  */
-export async function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions = {}): Promise<GarmentCutout[]> {
+export function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions = {}): Promise<GarmentCutout[]> {
+  return withSam(() => cutOut(photo, map, mode, look))
+}
+
+async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions): Promise<GarmentCutout[]> {
   const bitmap = await createImageBitmap(photo, { imageOrientation: 'from-image' })
   try {
     const work = sizeWithin(bitmap.width, bitmap.height, CUTOUT_SIDE)
