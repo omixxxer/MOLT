@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molt · re-recorte y recompuesto</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 1.5rem; background: #F8F6FB; color: #2D2838; }
+      .row { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+      figure { margin: 0; display: grid; gap: 2px; font-size: 11px; }
+      figure img, figure .none { width: 100%; aspect-ratio: 4 / 5; object-fit: contain; border-radius: 8px; box-sizing: border-box; }
+      .cut img { background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+      .none { display: grid; place-items: center; background: #EFECF5; color: #8a8399; }
+      .changed { outline: 2px solid #7a5cff; }
+      h3 { margin: 1.25rem 0 0.25rem; font-size: 13px; }
+      pre { background: #EEEBF4; padding: 1rem; overflow: auto; }
+      .head { position: sticky; top: 0; background: #F8F6FB; font-weight: 600; font-size: 12px; padding: 4px 0; z-index: 1; }
+    </style>
+  </head>
+  <body>
+    <h1>Re-recorte y recompuesto (prototipo)</h1>
+    <p>
+      Cada prenda con el recorte guardado, el que hace hoy la app (A) y el de hoy con un segundo pase de SlimSAM (B,
+      <code>src/ai/refine.ts</code>), el mismo repaso sabiendo dónde ve la prenda el mapa de segmentación (C), y cada uno recompuesto (<code>src/ai/recompose.ts</code>). Solo se lee: no se cambia
+      nada. Las prendas salen de este navegador o de una copia del armario: <code>?zip=/test-photos/molt-armario.zip</code>
+      o el selector de abajo. <code>&amp;limit=5</code> para una prueba corta. «Fondo» es la parte del recorte con colores que
+      abundan justo alrededor del recorte de hoy y no dentro de la prenda (la misma idea guía a B, así que con B la cifra le favorece:
+      hay que mirarlo).
+    </p>
+    <p><input type="file" id="zip" accept=".zip" /> <span id="status">Sin ejecutar.</span></p>
+    <div id="summary"></div>
+    <div class="row head"><span>Foto</span><span>Guardado</span><span>Recompuesto</span><span>A (hoy)</span><span>Recompuesto</span><span>B (con repaso)</span><span>Recompuesto</span><span>C (repaso con el mapa)</span><span>Recompuesto</span></div>
+    <div id="rows"></div>
+    <script type="module" src="./recutBench.ts"></script>
+  </body>
+</html>

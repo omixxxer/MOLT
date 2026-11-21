@@ -1,5 +1,6 @@
 import { garmentColors, toLab, type ColorShare } from './colors'
 import { encodeImage, outline, outlineAlpha, withSam } from './sam'
+import { chooseRefined, MIN_SUSPICIOUS, refinePrompt, refineView } from './refine'
 import { bodyClass, cleanAlpha, footPatches, footPrompt, mergeByClass, type BodyMap } from './bodyRules'
 import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Prompt, type Region, type SegmentationMap } from './segmentation'
 
@@ -285,6 +286,15 @@ function agreement(alpha: Uint8ClampedArray, region: Uint8Array): { recall: numb
   return { recall: inRegion ? both / inRegion : 0, precision: opaque ? both / opaque : 0 }
 }
 
+function canvasOf(width: number, height: number) {
+  const element = document.createElement('canvas')
+  element.width = width
+  element.height = height
+  const context = element.getContext('2d', { willReadFrequently: true })
+  if (!context) throw new Error('El navegador no permite procesar la imagen.')
+  return { element, context }
+}
+
 function sizeWithin(width: number, height: number, side: number) {
   const scale = Math.min(1, side / Math.max(width, height))
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
@@ -322,7 +332,31 @@ export interface LookOptions {
   merge?: boolean
   /** Take skin and hair out of the cut-outs ('skin'), and also what is not the person ('all'; shoes always). */
   clean?: 'skin' | 'all'
+  /**
+   * One garment not on a plain backdrop: ask SlimSAM again around the cut-out to take out pieces with the
+   * backdrop's colour (refine.ts); 'map' also tells it where the segmentation map sees the garment. Prototype,
+   * unused by the app; measured in bench/recut.html.
+   */
+  refine?: boolean | 'map'
+  /** What the second pass did, for bench/recut.html. */
+  onRefine?: (report: RefineReport) => void
 }
+
+export interface RefineReport {
+  /** Why it stopped, or 'replaced'. */
+  outcome: 'plain' | 'few-suspicious' | 'no-prompt' | 'no-candidate' | 'replaced'
+  suspicious?: number
+  positives?: number
+  negatives?: number
+  /**
+   * Per candidate: share of the trusted part kept, of the suspicious pixels taken out, of what it takes out that is
+   * suspicious, and border coverage.
+   */
+  candidates?: Array<{ kept: number; leakRemoved: number; removedSuspicious: number; border: number }>
+}
+
+/** Side at which the second pass judges the cut-out and places its points. */
+const REFINE_SIDE = 256
 
 /** Pose and body parts: under this share of a cut-out left, it was skin, hair or background, not a garment. */
 const MIN_KEPT_AFTER_CLEAN = 0.4
@@ -384,10 +418,14 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
     for (const region of regions) {
       const near = regionMask(region, map.grid, bitmap.width, bitmap.height, work.width, work.height, 1)
       let alpha: Uint8ClampedArray | undefined
+      let fromPlain = false
       if (plain) {
         const { recall, precision } = agreement(plain, near)
         // High precision: on a model photo the fill keeps the person (head, arms, the other garments) too.
-        if (recall >= 0.4 && precision >= 0.92) alpha = plain.slice()
+        if (recall >= 0.4 && precision >= 0.92) {
+          alpha = plain.slice()
+          fromPlain = true
+        }
         // A light garment on a light backdrop loses pieces to the fill: SlimSAM's outline is added to what it kept.
         if (alpha && mode === 'single' && lightOnLight(pixels.data, work.width, work.height, coarse(region, -1))) {
           const outlined = await outlineWithSam(region)
@@ -398,6 +436,15 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       if (!alpha) continue
       for (let i = 0; i < alpha.length; i += 1) if (!near[i]) alpha[i] = 0
       tidyAlpha(alpha, work.width, work.height, coarse(region, 0))
+      if (look.refine && mode === 'single' && fromPlain) look.onRefine?.({ outcome: 'plain' })
+      if (look.refine && mode === 'single' && !fromPlain) {
+        // SlimSAM's new outline only takes pixels out of the cut-out.
+        const refined = await refineWithSam(alpha, region)
+        if (refined) {
+          for (let i = 0; i < refined.length; i += 1) if (refined[i]! < 128) alpha[i] = 0
+          tidyAlpha(alpha, work.width, work.height, coarse(region, 0))
+        }
+      }
       let covered = 0
       for (let i = 0; i < alpha.length; i += 1) if (alpha[i]! >= 128) covered += 1
       if (mode === 'outfit' && look.body && look.clean) {
@@ -427,6 +474,73 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       // Unsure (a light garment on a light background, say): better the original photo than a bad cut-out.
       if (!outlineFound(binary[index]!, coarse, match.width, match.height)) return undefined
       return outlineAlpha(candidates[index]!.logits, image, work.width, work.height)
+    }
+
+    /** The second pass of refine.ts over a cut-out (alpha at work size); undefined when it leaves it as it was. */
+    async function refineWithSam(alpha: Uint8ClampedArray, region: Region): Promise<Uint8ClampedArray | undefined> {
+      const small = sizeWithin(work.width, work.height, REFINE_SIDE)
+      const view = canvasOf(small.width, small.height)
+      view.context.drawImage(bitmap, 0, 0, small.width, small.height)
+      const data = view.context.getImageData(0, 0, small.width, small.height).data
+      const mask = new Uint8Array(small.width * small.height)
+      for (let y = 0; y < small.height; y += 1) {
+        for (let x = 0; x < small.width; x += 1) {
+          const source = Math.min(work.height - 1, Math.floor((y + 0.5) * work.height / small.height)) * work.width + Math.min(work.width - 1, Math.floor((x + 0.5) * work.width / small.width))
+          mask[y * small.width + x] = alpha[source]! >= 128 ? 1 : 0
+        }
+      }
+      const hint = look.refine === 'map'
+        ? { region: regionMask(region, map.grid, bitmap.width, bitmap.height, small.width, small.height, 0), interior: regionMask(region, map.grid, bitmap.width, bitmap.height, small.width, small.height, -1) }
+        : undefined
+      const judged = refineView(data, mask, small.width, small.height, hint)
+      const area = mask.reduce((sum, value) => sum + value, 0)
+      const suspicious = judged.suspicious.reduce((sum, value) => sum + value, 0) / Math.max(1, area)
+      if (suspicious < MIN_SUSPICIOUS) {
+        look.onRefine?.({ outcome: 'few-suspicious', suspicious })
+        return undefined
+      }
+      const prompt = refinePrompt(judged, small.width, small.height)
+      if (!prompt) {
+        look.onRefine?.({ outcome: 'no-prompt', suspicious })
+        return undefined
+      }
+      const image = encoded ??= await encodeImage(photo)
+      const toPhoto: Prompt = {
+        points: prompt.points.map(([x, y]) => [x * bitmap.width / small.width, y * bitmap.height / small.height]),
+        labels: prompt.labels
+      }
+      const candidates = await outline(image, toPhoto)
+      const binary = candidates.map((candidate) => Uint8Array.from(outlineAlpha(candidate.logits, image, small.width, small.height), (value) => (value >= 128 ? 1 : 0)))
+      const index = chooseRefined(binary, judged, small.width, small.height)
+      if (look.onRefine) {
+        const trusted = judged.trusted.reduce((sum, value) => sum + value, 0)
+        look.onRefine({
+          outcome: index === undefined ? 'no-candidate' : 'replaced',
+          suspicious,
+          positives: prompt.labels.filter((label) => label === 1).length,
+          negatives: prompt.labels.filter((label) => label === 0).length,
+          candidates: binary.map((candidate) => {
+            let kept = 0
+            let removed = 0
+            let removedSuspicious = 0
+            for (let i = 0; i < candidate.length; i += 1) {
+              if (!mask[i]) continue
+              if (candidate[i]) kept += judged.trusted[i]!
+              else {
+                removed += 1
+                removedSuspicious += judged.suspicious[i]!
+              }
+            }
+            return {
+              kept: kept / Math.max(1, trusted),
+              leakRemoved: removedSuspicious / Math.max(1, suspicious * area),
+              removedSuspicious: removedSuspicious / Math.max(1, removed),
+              border: borderCoverage(candidate, small.width, small.height)
+            }
+          })
+        })
+      }
+      return index === undefined ? undefined : outlineAlpha(candidates[index]!.logits, image, work.width, work.height)
     }
 
     /**
