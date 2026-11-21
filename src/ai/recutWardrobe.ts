@@ -53,7 +53,7 @@ export async function recutWardrobe(garments: Garment[], onProgress: (done: numb
         onPerson: (report) => { if (report.person) improved = true }
       })
       if (!cut || !improved) continue
-      const { thumbnail, width, height } = await createThumbnail(cut.image)
+      const { thumbnail, width, height } = await createThumbnail(cut.image, { transparent: true })
       result.changed.push({ id: garment.id, cutout: stored.cutout, thumbnail: stored.thumbnail, width: stored.width, height: stored.height, updatedAt: stored.updatedAt })
       await garmentRepository.update({ ...stored, cutout: cut.image, thumbnail, width, height, updatedAt: new Date().toISOString() })
     } catch (error) {

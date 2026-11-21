@@ -1,7 +1,7 @@
 {
   "format": "vesta-model",
   "name": "heads-v4",
-  "taxonomyVersion": 4,
+  "taxonomyVersion": 5,
   "preprocessing": {
     "backbone": "facebook/dinov2-small",
     "inputSize": 224,

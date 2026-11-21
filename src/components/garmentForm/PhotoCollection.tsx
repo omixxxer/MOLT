@@ -5,6 +5,7 @@ import { MAX_PHOTO_MB } from '../../db/photoLimits'
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
 import TakePhoto from '../TakePhoto'
+import PhotoEditor from './PhotoEditor'
 
 interface PhotoCollectionProps {
   photos: Blob[]
@@ -23,11 +24,12 @@ interface PhotoCollectionProps {
 
 /**
  * The garment's photos: before the first one, a place to drop them; then the photo in large with the others as
- * thumbnails. The first is the main one; the one in view can be made main or removed.
+ * thumbnails. The first is the main one; the one in view can be made main, edited (turned and cropped) or removed.
  */
 export default function PhotoCollection({ photos, max, disabled, onAdd, onChange, cutout, cuttingOut, canToggleCutout, onToggleCutout }: PhotoCollectionProps) {
   const [viewed, setViewed] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const [editing, setEditing] = useState(false)
   const index = Math.min(viewed, Math.max(0, photos.length - 1))
   const isMain = index === 0
   const photo = photos[index]
@@ -92,8 +94,19 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
           {isMain && canToggleCutout && !cuttingOut && (
             <button type="button" className="photo-stage-pill" onClick={onToggleCutout} disabled={disabled}>{cutout ? 'Ver con fondo' : 'Quitar fondo'}</button>
           )}
+          <button type="button" className="photo-stage-pill" onClick={() => setEditing(true)} disabled={disabled} aria-label={`Editar foto ${index + 1}: recortar o girar`}>Editar</button>
         </div>
       </div>
+      {editing && (
+        <PhotoEditor
+          photo={photo}
+          onCancel={() => setEditing(false)}
+          onApply={(edited) => {
+            setEditing(false)
+            onChange(photos.map((entry, photoIndex) => (photoIndex === index ? edited : entry)))
+          }}
+        />
+      )}
       <div className="photo-strip">
         {photos.length > 1 && photos.map((entry, photoIndex) => (
           <button type="button" className="photo-thumb" key={`${photoIndex}-${entry.size}-${entry.type}`} aria-pressed={photoIndex === index} aria-label={`Mostrar foto ${photoIndex + 1}`} onClick={() => setViewed(photoIndex)}>

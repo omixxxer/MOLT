@@ -389,7 +389,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
       // The gallery shows the cut-out when there is one; its thumbnail and size come from it.
       const savedCutout = useCutout ? cutout : undefined
       const processedImage = imageChanged || savedCutout !== stored?.cutout || !garment || !stored?.thumbnail || !garment.width || !garment.height
-        ? await createThumbnail(savedCutout ?? image)
+        ? await createThumbnail(savedCutout ?? image, { transparent: Boolean(savedCutout) })
         : {
             thumbnail: stored.thumbnail,
             width: garment.width,
