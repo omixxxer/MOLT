@@ -17,8 +17,21 @@
 // sleeve this time. Left: a bedspread band above the grey jumper, the orange flowers next to the orange sweatshirt
 // (its own colour) and the plaid jacket, whose best outline takes out too little or a bit of the jacket. Background
 // left, by the figure that flatters B and C: 9.9 % stored, 10.1 % A, 7.4 % B, 4.5 % C.
+//
+// 42 garments (21-11-2026, the same 13 and shop photos, many with a model). B is no longer shown: C does all it did.
+// On plain backdrops (17 photos) nothing changes. D = C, plus, when MediaPipe sees a person (a pose, some skin, and
+// little skin inside the garment itself), only the garment's own regions of its type and without skin and hair. 9
+// photos with a model: the head, neck, hands and the trousers under it go in the white sweatshirt, the Rocky
+// T-shirt, the rugby jersey, the red and the navy long-sleeved T-shirts; the trousers lose the shirt and shoes but
+// get bites where the hands were; the Levi's sweatshirt loses the hair on its shoulders as notches and keeps the
+// jeans. Tan leather boots passed for a person (MediaPipe made up a pose and took the leather for skin, 35 % of the
+// boots) and lost half their leather until the skin inside the garment was checked. Median ~3.5 s per garment for
+// A, C and D alike (MediaPipe's ~0.4 s apart).
 import { analyzeGarmentImage } from '../src/ai/clothingAnalyzer'
-import { cutOutGarments, type GarmentCutout, type RefineReport } from '../src/ai/cutout'
+import { readBody } from '../src/ai/body'
+import { hasPerson, PART } from '../src/ai/bodyRules'
+import { cutOutGarments, type GarmentCutout, type LookOptions, type RefineReport } from '../src/ai/cutout'
+import { categoryIdForLabel } from '../src/ml/taxonomy'
 import { recompose } from '../src/ai/recompose'
 import { backdropColours, distanceInside } from '../src/ai/refine'
 import type { SegmentationMap } from '../src/ai/segmentation'
@@ -31,8 +44,10 @@ const say = (text: string) => { status.textContent = text }
 const SIDE = 256
 const params = new URLSearchParams(location.search)
 const limit = Number(params.get('limit') ?? Infinity)
+/** Only these garments (0-based positions, comma separated), to look again at a few. */
+const only = params.get('only')?.split(',').map(Number)
 
-type Variant = 'guardado' | 'A' | 'B' | 'C'
+type Variant = 'guardado' | 'A' | 'C' | 'D'
 interface Source { garment: Garment; photo: Blob; cutout?: Blob }
 
 async function pixels(image: Blob, width: number, height: number) {
@@ -104,9 +119,9 @@ async function sources(): Promise<Source[]> {
 }
 
 export async function run(list?: Source[]) {
-  const all = (list ?? await sources()).slice(0, limit)
+  const all = (list ?? await sources()).filter((_, index) => !only || only.includes(index)).slice(0, limit)
   document.querySelector('#rows')!.replaceChildren()
-  const rows: Array<{ name: string; category: string; leak: Partial<Record<Variant, number>>; changed: Partial<Record<'B' | 'C', boolean>>; areaVsA: Partial<Record<'B' | 'C', number>>; ms: Partial<Record<Variant, number>>; refine: Partial<Record<'B' | 'C', RefineReport>> }> = []
+  const rows: Array<{ name: string; category: string; person: boolean; bodyStats?: unknown; leak: Partial<Record<Variant, number>>; changed: Partial<Record<'C' | 'D', boolean>>; areaVsA: Partial<Record<'C' | 'D', number>>; ms: Partial<Record<Variant, number>>; refine: Partial<Record<'C' | 'D', RefineReport>> }> = []
   for (const [index, { garment, photo, cutout: stored }] of all.entries()) {
     const name = garment.name || garment.subcategory || garment.category
     say(`${index + 1}/${all.length}: ${name}`)
@@ -114,19 +129,27 @@ export async function run(list?: Source[]) {
     if (!map) continue
     const cut: Partial<Record<Variant, GarmentCutout>> = {}
     const ms: Partial<Record<Variant, number>> = {}
-    const refine: Partial<Record<'B' | 'C', RefineReport>> = {}
-    for (const variant of ['A', 'B', 'C'] as const) {
+    const refine: Partial<Record<'C' | 'D', RefineReport>> = {}
+    // D: the pose and body parts of MediaPipe, used only when a person is clearly in the photo (hasPerson).
+    const body = await readBody(photo).catch(() => undefined)
+    let person = false
+    let skinInGarment = 0
+    const share = (part: number) => body ? body.parts.reduce((sum, value) => sum + (value === part ? 1 : 0), 0) / body.parts.length : 0
+    const bodyStats = body ? { pose: hasPerson(body), faceSkin: share(PART.faceSkin), bodySkin: share(PART.bodySkin), visibility: Object.fromEntries([0, 11, 12, 23, 24].map((k) => [k, Number((body.landmarks?.[k]?.visibility ?? 0).toFixed(2))])) } : undefined
+    for (const variant of ['A', 'C', 'D'] as const) {
       const started = performance.now()
-      const options = variant === 'A' ? {} : { refine: variant === 'C' ? 'map' as const : true, onRefine: (report: RefineReport) => { refine[variant] = report } }
+      const onRefine = (report: RefineReport) => { refine[variant as 'C' | 'D'] = report }
+      const options: LookOptions = variant === 'A' ? {} : variant === 'C' ? { refine: 'map', onRefine }
+        : { refine: 'map', onRefine, ...(body ? { body, clean: 'skin' as const, focus: categoryIdForLabel(garment.category), onPerson: (report) => { person = report.person; skinInGarment = report.skinInGarment } } : {}) }
       ;[cut[variant]] = await cutOutGarments(photo, map, 'single', options)
       ms[variant] = Math.round(performance.now() - started)
     }
-    const images: Partial<Record<Variant, Blob>> = { ...(stored ? { guardado: stored } : {}), ...(cut.A ? { A: cut.A.image } : {}), ...(cut.B ? { B: cut.B.image } : {}), ...(cut.C ? { C: cut.C.image } : {}) }
+    const images: Partial<Record<Variant, Blob>> = { ...(stored ? { guardado: stored } : {}), ...(cut.A ? { A: cut.A.image } : {}), ...(cut.C ? { C: cut.C.image } : {}), ...(cut.D ? { D: cut.D.image } : {}) }
 
     // Colours of the photo's border against those well inside today's cut-out.
     const leak: Partial<Record<Variant, number>> = {}
-    const areaVsA: Partial<Record<'B' | 'C', number>> = {}
-    const changed: Partial<Record<'B' | 'C', boolean>> = {}
+    const areaVsA: Partial<Record<'C' | 'D', number>> = {}
+    const changed: Partial<Record<'C' | 'D', boolean>> = {}
     if (cut.A) {
       const size = await sizeOf(photo)
       const scale = Math.min(1, SIDE / Math.max(size.width, size.height))
@@ -140,7 +163,7 @@ export async function run(list?: Source[]) {
       if (!core.some(Boolean)) core = maskA
       const isBackdrop = backdropColours(data, maskA, core, width, height)
       for (const variant of Object.keys(images) as Variant[]) leak[variant] = await leakOf(images[variant]!, isBackdrop)
-      for (const variant of ['B', 'C'] as const) {
+      for (const variant of ['C', 'D'] as const) {
         const other = cut[variant]
         if (!other) continue
         const maskOther = await maskInPhoto(other, width, height)
@@ -158,19 +181,19 @@ export async function run(list?: Source[]) {
 
     const caption = (variant: Variant) => leak[variant] === undefined ? '' : `fondo ${(leak[variant]! * 100).toFixed(1)} %`
     const title = document.createElement('h3')
-    const changes = (['B', 'C'] as const).filter((variant) => changed[variant]).map((variant) => ` · ${variant} cambia (${((areaVsA[variant] ?? 1) * 100).toFixed(0)} % del área de A)`).join('')
-    title.textContent = `${index + 1}. ${name} · ${garment.category}${changes}`
+    const changes = (['C', 'D'] as const).filter((variant) => changed[variant]).map((variant) => ` · ${variant} cambia (${((areaVsA[variant] ?? 1) * 100).toFixed(0)} % del área de A)`).join('')
+    title.textContent = `${index + 1}. ${name} · ${garment.category}${person ? ' · con persona' : ''}${changes}`
     const line = document.createElement('div')
     line.className = 'row'
     line.append(
       figure(photo, 'foto', 'photo'),
       figure(images.guardado, caption('guardado'), 'cut'), figure(tidy.guardado, '', 'tidy'),
       figure(images.A, `${caption('A')} · ${ms.A} ms`, 'cut'), figure(tidy.A, '', 'tidy'),
-      figure(images.B, `${caption('B')} · ${ms.B} ms`, 'cut', changed.B), figure(tidy.B, '', 'tidy', changed.B),
-      figure(images.C, `${caption('C')} · ${ms.C} ms`, 'cut', changed.C), figure(tidy.C, '', 'tidy', changed.C)
+      figure(images.C, `${caption('C')} · ${ms.C} ms`, 'cut', changed.C), figure(tidy.C, '', 'tidy', changed.C),
+      figure(images.D, `${caption('D')} · ${ms.D} ms`, 'cut', changed.D), figure(tidy.D, '', 'tidy', changed.D)
     )
     document.querySelector('#rows')!.append(title, line)
-    rows.push({ name, category: garment.category, leak, changed, areaVsA, ms, refine })
+    rows.push({ name, category: garment.category, person, ...(bodyStats ? { bodyStats: { ...bodyStats, skinInGarment } } : {}), leak, changed, areaVsA, ms, refine })
   }
 
   const mean = (variant: Variant) => {
@@ -181,12 +204,13 @@ export async function run(list?: Source[]) {
   const both = rows.filter((row) => row.leak.guardado !== undefined && row.leak.A !== undefined)
   const summary = {
     garments: rows.length,
-    backgroundLeftMeanPercent: { guardado: mean('guardado'), A: mean('A'), B: mean('B'), C: mean('C') },
+    backgroundLeftMeanPercent: { guardado: mean('guardado'), A: mean('A'), C: mean('C'), D: mean('D') },
+    withPerson: rows.filter((row) => row.person).map((row) => row.name),
     aCleanerThanStored: both.filter((row) => row.leak.A! < row.leak.guardado! - 0.02).map((row) => row.name),
     aDirtierThanStored: both.filter((row) => row.leak.A! > row.leak.guardado! + 0.02).map((row) => row.name),
-    bChanged: rows.filter((row) => row.changed.B).map((row) => `${row.name} (${((row.areaVsA.B ?? 1) * 100).toFixed(0)} %)`),
     cChanged: rows.filter((row) => row.changed.C).map((row) => `${row.name} (${((row.areaVsA.C ?? 1) * 100).toFixed(0)} %)`),
-    msMedian: { A: median(rows.map((row) => row.ms.A ?? 0)), B: median(rows.map((row) => row.ms.B ?? 0)), C: median(rows.map((row) => row.ms.C ?? 0)) }
+    dChanged: rows.filter((row) => row.changed.D).map((row) => `${row.name} (${((row.areaVsA.D ?? 1) * 100).toFixed(0)} %)`),
+    msMedian: { A: median(rows.map((row) => row.ms.A ?? 0)), C: median(rows.map((row) => row.ms.C ?? 0)), D: median(rows.map((row) => row.ms.D ?? 0)) }
   }
   document.querySelector('#summary')!.innerHTML = `<pre>${JSON.stringify(summary, null, 1)}</pre>`
   say(`Listo: ${rows.length} prendas.`)

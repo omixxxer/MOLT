@@ -4,6 +4,7 @@ import type { DriveSync } from '../cloud/useDriveSync'
 import { backupReminderSnoozedUntil, isStorageFull, lastFileBackup, recordFileBackup, shouldRemindBackup, snoozeBackupReminder, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import { garmentRepository } from '../db/garmentRepository'
 import type { ImportMode, WardrobeBackup } from '../db/wardrobeBackup'
+import type { PreviousCutout } from '../ai/recutWardrobe'
 import type { Garment } from '../types/domain'
 import { askConfirm } from './confirmDialog'
 
@@ -43,6 +44,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState<{ backup: WardrobeBackup; name: string; remote?: DriveRestore['remote'] }>()
   const [backupNoticeHidden, setBackupNoticeHidden] = useState(false)
+  const [recutUndo, setRecutUndo] = useState<PreviousCutout[]>()
 
   function closeMenu() {
     if (menu.current) menu.current.open = false
@@ -146,6 +148,47 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     }
   }
 
+  /** «Mejorar los recortes»: the stored garments cut out again the app's way; only those that change are saved. */
+  async function improveCutouts() {
+    closeMenu()
+    const withCutout = garments.filter((garment) => garment.hasCutout).length
+    if (!await askConfirm(`Se volverá a quitar el fondo de ${plural(withCutout, 'prenda', 'prendas')} (unos ${Math.max(1, Math.round(withCutout * 5 / 60))} min, en este dispositivo): restos de colcha o suelo y, en fotos de tienda, la persona que lleva la prenda. Solo se cambian las que mejoran y podrás deshacerlo.`, 'Mejorar')) return
+    setBusy('Mejorando recortes…')
+    setMessage('')
+    setRecutUndo(undefined)
+    try {
+      const { recutWardrobe } = await import('../ai/recutWardrobe')
+      const result = await recutWardrobe(garments, (done, total) => setBusy(`Mejorando recortes… ${done}/${total}`))
+      await onImported()
+      setRecutUndo(result.changed.length ? result.changed : undefined)
+      setMessage(result.changed.length
+        ? `Recortes mejorados en ${plural(result.changed.length, 'prenda', 'prendas')} de ${result.checked}; las demás se quedan como estaban.${result.failed ? ` ${plural(result.failed, 'no se pudo', 'no se pudieron')} procesar.` : ''}`
+        : `Ningún recorte ha cambiado: los de tus ${plural(result.checked, 'prenda', 'prendas')} ya eran los mejores que Molt sabe hacer.${result.failed ? ` ${plural(result.failed, 'no se pudo', 'no se pudieron')} procesar.` : ''}`)
+    } catch (error) {
+      console.error('No se pudieron mejorar los recortes:', error)
+      setMessage(isStorageFull(error) ? STORAGE_FULL_MESSAGE : 'No se pudieron mejorar los recortes. Comprueba la conexión si es la primera vez (se descargan los modelos) y el espacio del dispositivo.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function undoImproveCutouts() {
+    if (!recutUndo) return
+    setBusy('Deshaciendo…')
+    try {
+      const { undoRecut } = await import('../ai/recutWardrobe')
+      await undoRecut(recutUndo)
+      await onImported()
+      setRecutUndo(undefined)
+      setMessage(`Recortes devueltos a como estaban en ${plural(recutUndo.length, 'prenda', 'prendas')}.`)
+    } catch (error) {
+      console.error('No se pudieron deshacer los recortes:', error)
+      setMessage('No se pudieron deshacer los recortes.')
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function exportTrainingData() {
     closeMenu()
     setBusy('Preparando exportación…')
@@ -196,6 +239,11 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
           ) : (
             <p className="data-menu-note">Google Drive no está configurado en esta instalación.</p>
           )}
+          <p className="data-menu-heading">Recortes</p>
+          <button type="button" onClick={() => void improveCutouts()} disabled={Boolean(busy) || !garments.some((garment) => garment.hasCutout)}>
+            Mejorar los recortes
+            <small>Quita restos de colcha o suelo y la persona de las fotos de tienda</small>
+          </button>
           <p className="data-menu-heading">Modelo de Molt</p>
           <button type="button" onClick={() => void exportTrainingData()} disabled={Boolean(busy) || garments.length === 0}>
             Exportar datos de entrenamiento
@@ -286,6 +334,11 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
         </section>
       )}
       {message && <p className="export-note" role="status">{message}</p>}
+      {recutUndo && !busy && (
+        <div className="import-panel-actions">
+          <button className="button button-outline" type="button" onClick={() => void undoImproveCutouts()}>Deshacer los recortes</button>
+        </div>
+      )}
     </>
   )
 

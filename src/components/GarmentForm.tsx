@@ -10,6 +10,7 @@ import { isLabelPhoto, SAME_GARMENT_SECONDS } from '../ai/batchGrouping'
 import { captureTime } from '../ai/photoTime'
 import { colorSwatch } from '../ai/colors'
 import { cutOutGarments, cutoutColors } from '../ai/cutout'
+import { appCutoutOptions } from '../ai/cutoutOptions'
 import type { SegmentationMap } from '../ai/segmentation'
 import { suggestUsage } from '../ai/usageRules'
 import { createThumbnail, reducePhoto } from '../db/imageProcessing'
@@ -251,7 +252,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
       }
       const filled: SuggestedField[] = ['category', 'subcategory', 'colors']
       setAnalysisSuggestion(suggestion)
-      void cutOutMainPhoto(imagesToAnalyze[0]!, suggestion.segmentations[0], requestId)
+      void cutOutMainPhoto(imagesToAnalyze[0]!, suggestion.segmentations[0], suggestion.category, requestId)
       setCategory(suggestion.category)
       setSubcategory(suggestion.subcategory)
       setColors(suggestion.colors)
@@ -280,11 +281,11 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   }
 
   /** Cuts the main photo out in the background; a newer analysis (other photos) makes this result obsolete. */
-  async function cutOutMainPhoto(photo: Blob, map: SegmentationMap | undefined, requestId: number) {
+  async function cutOutMainPhoto(photo: Blob, map: SegmentationMap | undefined, suggestedCategory: GarmentCategory, requestId: number) {
     if (!map) return
     setCuttingOut(true)
     try {
-      const [main] = await cutOutGarments(photo, map, 'single')
+      const [main] = await cutOutGarments(photo, map, 'single', appCutoutOptions(suggestedCategory))
       if (requestId !== analysisRequestId.current) return
       setCutout(main?.image)
       // The cut-out's own pixels give the colours more exactly than the coarse map; only if the user kept them.

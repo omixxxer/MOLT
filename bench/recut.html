@@ -20,16 +20,16 @@
   <body>
     <h1>Re-recorte y recompuesto (prototipo)</h1>
     <p>
-      Cada prenda con el recorte guardado, el que hace hoy la app (A) y el de hoy con un segundo pase de SlimSAM (B,
-      <code>src/ai/refine.ts</code>), el mismo repaso sabiendo dónde ve la prenda el mapa de segmentación (C), y cada uno recompuesto (<code>src/ai/recompose.ts</code>). Solo se lee: no se cambia
+      Cada prenda con el recorte guardado, el que hace hoy la app (A) y el de hoy con un segundo pase de SlimSAM que sabe dónde ve la prenda el mapa de segmentación (C,
+      <code>src/ai/refine.ts</code>), C quitando además la piel y el pelo y quedándose con la prenda de su tipo cuando MediaPipe ve a una persona (D), y cada uno recompuesto (<code>src/ai/recompose.ts</code>). Solo se lee: no se cambia
       nada. Las prendas salen de este navegador o de una copia del armario: <code>?zip=/test-photos/molt-armario.zip</code>
       o el selector de abajo. <code>&amp;limit=5</code> para una prueba corta. «Fondo» es la parte del recorte con colores que
-      abundan justo alrededor del recorte de hoy y no dentro de la prenda (la misma idea guía a B, así que con B la cifra le favorece:
+      abundan justo alrededor del recorte de hoy y no dentro de la prenda (la misma idea guía a C y D, así que la cifra les favorece:
       hay que mirarlo).
     </p>
     <p><input type="file" id="zip" accept=".zip" /> <span id="status">Sin ejecutar.</span></p>
     <div id="summary"></div>
-    <div class="row head"><span>Foto</span><span>Guardado</span><span>Recompuesto</span><span>A (hoy)</span><span>Recompuesto</span><span>B (con repaso)</span><span>Recompuesto</span><span>C (repaso con el mapa)</span><span>Recompuesto</span></div>
+    <div class="row head"><span>Foto</span><span>Guardado</span><span>Recompuesto</span><span>A (hoy)</span><span>Recompuesto</span><span>C (repaso con el mapa)</span><span>Recompuesto</span><span>D (C y sin la persona)</span><span>Recompuesto</span></div>
     <div id="rows"></div>
     <script type="module" src="./recutBench.ts"></script>
   </body>
