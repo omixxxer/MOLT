@@ -50,7 +50,7 @@ export interface BatchState {
   runAnalyzed: number
 }
 
-type Job = { kind: 'analyze'; photoId: string } | { kind: 'cutout'; garmentId: string }
+type Job = { kind: 'analyze'; photoId: string } | { kind: 'reanalyze'; photoId: string } | { kind: 'cutout'; garmentId: string }
 
 let state: BatchState = { photos: [], garments: [], running: false, runAnalyzed: 0 }
 const listeners = new Set<() => void>()
@@ -135,6 +135,7 @@ async function run() {
     while (jobs.length && current === generation) {
       const job = jobs.shift()!
       if (job.kind === 'analyze') await analyze(job.photoId, current)
+      else if (job.kind === 'reanalyze') await reanalyze(job.photoId, current)
       else await cutOut(job.garmentId, current)
     }
   } finally {
@@ -177,6 +178,54 @@ async function analyze(photoId: string, current: number) {
   }
 }
 
+/**
+ * A photo edited in the review (turned or cropped, PhotoEditor): it replaces the original and is analysed again,
+ * first in the queue, without leaving its garment. If it is a garment's main photo, the garment takes the new type
+ * and colours (those the user has not changed) and is cut out again.
+ */
+export function replacePhoto(photoId: string, edited: Blob) {
+  const photo = photoById(photoId)
+  if (!photo) return
+  const file = new File([edited], photo.file.name, { type: edited.type || photo.file.type })
+  // Not analysed yet: its first analysis, still in the queue, will read the edited photo.
+  if (photo.status === 'waiting' && jobs.some((job) => job.kind === 'analyze' && job.photoId === photoId)) {
+    updatePhoto(photoId, { file })
+    return
+  }
+  updatePhoto(photoId, { file, status: 'waiting' })
+  const owner = state.garments.find((garment) => garment.photoIds[0] === photoId)
+  if (owner) updateGarment(owner.id, { cutout: undefined, cutoutStatus: 'waiting' })
+  jobs = jobs.filter((job) => !(job.kind === 'reanalyze' && job.photoId === photoId))
+  jobs.unshift({ kind: 'reanalyze', photoId })
+  void run()
+}
+
+async function reanalyze(photoId: string, current: number) {
+  const photo = photoById(photoId)
+  if (!photo) return
+  updatePhoto(photoId, { status: 'analyzing' })
+  try {
+    const suggestion = await analyzeGarmentImage(photo.file)
+    if (current !== generation) return
+    const lines = suggestion.textByPhoto?.[0] ?? []
+    // Where it is (garment photo or label) stays as the user left it.
+    updatePhoto(photoId, { status: 'done', suggestion, lines })
+    const owner = state.garments.find((garment) => garment.photoIds[0] === photoId)
+    if (owner) {
+      updateGarment(owner.id, {
+        ...(owner.subcategory === undefined ? { category: suggestion.category } : {}),
+        ...(owner.colorsEdited ? {} : { colors: suggestion.colors })
+      })
+      jobs.unshift({ kind: 'cutout', garmentId: owner.id })
+    }
+  } catch (error) {
+    console.error('No se pudo analizar de nuevo una foto editada:', error)
+    if (current === generation) updatePhoto(photoId, { status: 'failed' })
+  } finally {
+    if (current === generation) set({ runAnalyzed: state.runAnalyzed + 1 })
+  }
+}
+
 /** Estimated milliseconds left, from the pace of the current run; undefined until a photo is done. */
 export function timeLeft(batch: BatchState, now: number): number | undefined {
   const waiting = batch.photos.filter((photo) => photo.status === 'waiting' || photo.status === 'analyzing').length
@@ -199,8 +248,8 @@ async function cutOut(garmentId: string, current: number) {
     const colors = cutout ? (await cutoutColors(cutout.image)).map((entry) => entry.color) : []
     if (current !== generation) return
     const latest = state.garments.find((entry) => entry.id === garmentId)
-    // The main photo may have changed meanwhile (photos moved by the user): that cut-out no longer applies.
-    if (!latest || latest.photoIds[0] !== main.id) return
+    // The main photo may have changed meanwhile (photos moved, or edited, by the user): that cut-out no longer applies.
+    if (!latest || latest.photoIds[0] !== main.id || photoById(main.id)?.file !== main.file) return
     updateGarment(garmentId, {
       cutoutStatus: cutout ? 'done' : 'none',
       ...(cutout ? { cutout: cutout.image } : {}),

@@ -239,6 +239,8 @@ h1, h2, p { margin-top: 0; }
 .photo-stage-bar { position: absolute; right: 9px; bottom: 9px; left: 9px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .photo-stage-pill { min-height: 28px; display: inline-flex; align-items: center; padding: 0 10px; border: 0; border-radius: 14px; background: rgba(248, 246, 251, .94); font-size: var(--text-small); font-weight: 650; }
 button.photo-stage-pill { text-decoration: underline; }
+/* The pencil that opens the photo editor: an icon, a round button of the pills' height. */
+.photo-stage-pill.photo-stage-icon { justify-content: center; width: 28px; padding: 0; text-decoration: none; }
 .photo-strip { display: flex; gap: 7px; padding: 1px; overflow-x: auto; scrollbar-width: thin; }
 .photo-thumb { position: relative; flex: none; display: block; width: 58px; height: 58px; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--garment-surface); }
 .photo-thumb[aria-pressed=true] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
@@ -936,6 +938,10 @@ button.choice-chip { font-family: inherit; }
 .batch-thumb-actions { display: flex; flex-wrap: wrap; gap: 5px; padding: 7px 10px 0; }
 .batch-thumb-actions button { min-height: 28px; padding: 0 9px; border: 1px solid var(--mist); border-radius: 14px; background: var(--white); font-size: var(--text-caption); font-weight: 650; }
 .batch-thumb-actions button:hover { background: var(--mist); }
+/* The pencil that opens the photo editor, on the main photo and among a thumbnail's actions. */
+.batch-edit-photo { position: absolute; top: 9px; right: 9px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: rgba(248, 246, 251, .94); color: var(--ink); }
+.batch-edit-photo:hover { background: var(--white); }
+.batch-thumb-actions .batch-thumb-edit { display: grid; place-items: center; width: 28px; padding: 0; }
 /* Regrouping by dragging (batchImport/cardDrag.tsx): the card's photo and each thumbnail can be picked up. */
 .batch-card-image, .batch-thumb { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .batch-card-image { cursor: grab; }

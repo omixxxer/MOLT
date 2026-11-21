@@ -9,6 +9,7 @@ import {
   getBatch,
   mergeInto,
   movePhoto,
+  replacePhoto,
   savable,
   saveBatch,
   splitPhoto,
@@ -141,6 +142,40 @@ describe('many garments at once', () => {
     const regrouped = getBatch().garments
     expect(regrouped[0]).toMatchObject({ photoIds: back!.photoIds, cutoutStatus: 'done' })
     expect(regrouped[1]!.photoIds).toEqual([...jeans!.photoIds, ...shirt!.photoIds])
+  })
+
+  it('replaces an edited photo and analyses it again without moving it, cutting the main one out again', async () => {
+    const { cutOutGarments } = await import('../../ai/cutout')
+    // Black, like the colour the cut-out mock measures, so both photos stay one garment.
+    await addPhotos([
+      photo('Parte superior|Camiseta|Negro|0'),
+      photo('Parte superior|Camiseta|Negro|8')
+    ])
+    await analysed()
+    const [shirt] = getBatch().garments
+    expect(shirt!.photoIds).toHaveLength(2)
+    const [mainId, backId] = shirt!.photoIds
+    const calls = vi.mocked(cutOutGarments).mock.calls.length
+
+    // The main photo, cropped: the same garment, the new file, cut out again.
+    replacePhoto(mainId!, new Blob(['cropped'], { type: 'image/jpeg' }))
+    expect(getBatch().garments[0]).toMatchObject({ cutoutStatus: 'waiting' })
+    await analysed()
+    const edited = getBatch().photos.find((entry) => entry.id === mainId)!
+    expect(edited.file.size).toBe(7)
+    expect(edited.file.name).toBe('Parte superior|Camiseta|Negro|0')
+    expect(edited.status).toBe('done')
+    expect(getBatch().garments).toHaveLength(1)
+    expect(getBatch().garments[0]).toMatchObject({ photoIds: [mainId, backId], cutoutStatus: 'done' })
+    expect(vi.mocked(cutOutGarments).mock.calls.length).toBe(calls + 1)
+    expect(vi.mocked(cutOutGarments).mock.calls.at(-1)![0]).toBe(edited.file)
+
+    // Another photo: analysed again, no new cut-out.
+    replacePhoto(backId!, new Blob(['turned!'], { type: 'image/jpeg' }))
+    await analysed()
+    expect(getBatch().photos.find((entry) => entry.id === backId)!.file.size).toBe(7)
+    expect(getBatch().garments[0]!.photoIds).toEqual([mainId, backId])
+    expect(vi.mocked(cutOutGarments).mock.calls.length).toBe(calls + 1)
   })
 
   it('saves the chosen garments with their photos, label, cut-out and what the label says', async () => {

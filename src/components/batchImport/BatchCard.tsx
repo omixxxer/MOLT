@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Alert02Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, PencilEdit02Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../../ai/colors'
 import { categoryIdForLabel, taxonomy } from '../../ml/taxonomy'
 import { garmentCategories, type GarmentCategory } from '../../types/domain'
 import ColorPalette from '../ColorPalette'
 import GarmentPhoto from '../GarmentPhoto'
+import PhotoEditor from '../garmentForm/PhotoEditor'
 import {
   editGarment,
   garmentLabel,
@@ -13,6 +14,7 @@ import {
   garmentSubcategory,
   mainSuggestion,
   makeMain,
+  replacePhoto,
   reviewReasons,
   splitPhoto,
   toggleLabel,
@@ -37,6 +39,8 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
   const [selected, setSelected] = useState<string>()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [writingOther, setWritingOther] = useState(false)
+  /** The photo being turned or cropped (PhotoEditor). */
+  const [editing, setEditing] = useState<string>()
   const { dragging, handle } = useCardDrag()
   const main = garment.photoIds[0] ? photos.get(garment.photoIds[0]) : undefined
   // What dragging shows on this card: it is the one being moved, or the one the pointer is over.
@@ -95,6 +99,17 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
             {garment.keepBackground ? 'Quitar fondo' : 'Ver con fondo'}
           </button>
         )}
+        <button
+          type="button"
+          className="batch-edit-photo"
+          onClick={() => setEditing(main.id)}
+          onPointerDown={(event) => event.stopPropagation()}
+          disabled={disabled}
+          aria-label={`Editar la foto principal de ${subcategory || garment.category}: recortar o girar`}
+          title="Recortar o girar la foto"
+        >
+          <HugeiconsIcon icon={PencilEdit02Icon} size={15} />
+        </button>
       </div>
 
       {others.length > 0 && (
@@ -125,6 +140,9 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
       )}
       {chosen && (
         <div className="batch-thumb-actions">
+          <button type="button" className="batch-thumb-edit" onClick={() => setEditing(chosen)} disabled={disabled} aria-label={chosenIsLabel ? 'Editar la foto de la etiqueta: recortar o girar' : 'Editar esta foto: recortar o girar'} title="Recortar o girar la foto">
+            <HugeiconsIcon icon={PencilEdit02Icon} size={14} />
+          </button>
           {chosenIsLabel
             ? <button type="button" onClick={() => toggleLabel(garment.id, chosen)} disabled={disabled}>No es la etiqueta</button>
             : (
@@ -189,6 +207,16 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
         )}
         {read && <p className="batch-read">{read}</p>}
       </div>
+      {editing && photos.get(editing) && (
+        <PhotoEditor
+          photo={photos.get(editing)!.file}
+          onCancel={() => setEditing(undefined)}
+          onApply={(edited) => {
+            replacePhoto(editing, edited)
+            setEditing(undefined)
+          }}
+        />
+      )}
     </li>
   )
 }
