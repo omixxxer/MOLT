@@ -343,6 +343,8 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
 - [x] Validar el generador y la maleta con armarios pequeños, grandes e incompletos, tiempo extremo y fechas fuera de la previsión.
 - [ ] Probar la usabilidad en móvil y escritorio, y medir la maleta en un móvil (ver «Validación del generador, la maleta y el tiempo»).
+- [ ] Lápiz de editar la foto más visible: cambiarle el color para que destaque sobre la foto y hacerlo un poco más grande, en «Una prenda» y en «Varias prendas»; y añadirlo también en «Desde un look».
+- [ ] Que el modelo detecte solo anillos, collares, pulseras y pendientes: reunir fotos, reentrenar y publicar (detalle en [`ml/README.md`](ml/README.md), «Por hacer más adelante»).
 
 ## Licencia
 
