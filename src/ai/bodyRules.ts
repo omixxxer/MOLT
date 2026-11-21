@@ -151,3 +151,17 @@ export function cleanAlpha(alpha: Uint8ClampedArray, width: number, height: numb
   }
   return removed
 }
+
+/** Share of the photo that must be skin (face or body) for the pose to be a person, not a garment's shape. */
+const MIN_SKIN = 0.01
+
+/**
+ * Someone is in the photo: the pose found a person and the body parts see their skin. A hoodie lying on a bed can
+ * look like a torso to the pose alone (tried on 20-11-2026).
+ */
+export function hasPerson(body: BodyMap | undefined): boolean {
+  if (!body?.landmarks) return false
+  let skin = 0
+  for (const part of body.parts) if (part === PART.bodySkin || part === PART.faceSkin) skin += 1
+  return skin >= body.parts.length * MIN_SKIN
+}

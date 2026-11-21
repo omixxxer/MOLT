@@ -3,13 +3,14 @@ import { addPhoto, isLabelPhoto, type PhotoGroup } from '../../ai/batchGrouping'
 import { analyzeGarmentImage, labelSize, type ClothingAnalysisSuggestion, type LabelReading } from '../../ai/clothingAnalyzer'
 import { findBrand } from '../../ai/brands'
 import { cutOutGarments, cutoutColors } from '../../ai/cutout'
+import { appCutoutOptions } from '../../ai/cutoutOptions'
 import { findComposition } from '../../ai/labelParser'
 import { captureTime } from '../../ai/photoTime'
 import type { TextLine } from '../../ai/textReader'
 import { suggestUsage } from '../../ai/usageRules'
 import { garmentRepository } from '../../db/garmentRepository'
 import { createThumbnail, reducePhoto } from '../../db/imageProcessing'
-import { roleByCategory, type GarmentCategory } from '../../types/domain'
+import { garmentCategories, roleByCategory, type GarmentCategory } from '../../types/domain'
 import { analysisRecord } from '../garmentForm/analysisRecord'
 import { createSuggestedGarmentName } from '../garmentForm/garmentName'
 
@@ -193,7 +194,7 @@ async function cutOut(garmentId: string, current: number) {
   }
   updateGarment(garmentId, { cutoutStatus: 'working' })
   try {
-    const [cutout] = await cutOutGarments(main.file, map, 'single')
+    const [cutout] = await cutOutGarments(main.file, map, 'single', appCutoutOptions(garmentCategories.includes(garment.category as GarmentCategory) ? garment.category as GarmentCategory : undefined))
     if (current !== generation) return
     const colors = cutout ? (await cutoutColors(cutout.image)).map((entry) => entry.color) : []
     if (current !== generation) return

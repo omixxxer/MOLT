@@ -1,6 +1,7 @@
 import { garmentColors, toLab, type ColorShare } from './colors'
 import { encodeImage, outline, outlineAlpha, withSam } from './sam'
-import { bodyClass, cleanAlpha, footPatches, footPrompt, mergeByClass, type BodyMap } from './bodyRules'
+import { chooseRefined, MIN_SUSPICIOUS, refinePrompt, refineView } from './refine'
+import { bodyClass, cleanAlpha, footPatches, footPrompt, hasPerson, mergeByClass, PART, type BodyMap } from './bodyRules'
 import { bestMatch, borderCoverage, garmentRegions, patchCenter, promptFor, regionMask, ringPromptFor, type Prompt, type Region, type SegmentationMap } from './segmentation'
 
 // Garments cut out of a photo with a transparent background: the coarse map says where each one is, SlimSAM
@@ -285,6 +286,15 @@ function agreement(alpha: Uint8ClampedArray, region: Uint8Array): { recall: numb
   return { recall: inRegion ? both / inRegion : 0, precision: opaque ? both / opaque : 0 }
 }
 
+function canvasOf(width: number, height: number) {
+  const element = document.createElement('canvas')
+  element.width = width
+  element.height = height
+  const context = element.getContext('2d', { willReadFrequently: true })
+  if (!context) throw new Error('El navegador no permite procesar la imagen.')
+  return { element, context }
+}
+
 function sizeWithin(width: number, height: number, side: number) {
   const scale = Math.min(1, side / Math.max(width, height))
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
@@ -322,7 +332,53 @@ export interface LookOptions {
   merge?: boolean
   /** Take skin and hair out of the cut-outs ('skin'), and also what is not the person ('all'; shoes always). */
   clean?: 'skin' | 'all'
+  /**
+   * One garment not on a plain backdrop: ask SlimSAM again around the cut-out to take out pieces with the
+   * backdrop's colour (refine.ts); 'map' also tells it where the segmentation map sees the garment (the app's way,
+   * cutoutOptions.ts). Measured in bench/recut.html.
+   */
+  refine?: boolean | 'map'
+  /**
+   * One garment: read the pose and body parts with MediaPipe (loaded on demand) when `body` is not given, so that a
+   * garment worn by someone is cut out without them (with `clean` and `focus`). Without MediaPipe (it fails to
+   * load), the cut-out is made as without a person.
+   */
+  person?: boolean
+  /**
+   * The garment's category id (top, bottom…), for one garment worn by a person (hasPerson): only the coarse map's
+   * regions of that category are cut out (the trousers, not the whole outfit), named by where they sit on the body.
+   */
+  focus?: string
+  /** Whether a person was taken to be in the photo, for bench/recut.html. */
+  onPerson?: (report: { person: boolean; skinInGarment: number }) => void
+  /** What the second pass did, for bench/recut.html. */
+  onRefine?: (report: RefineReport) => void
 }
+
+export interface RefineReport {
+  /** Why it stopped, or 'replaced'. */
+  outcome: 'plain' | 'few-suspicious' | 'no-prompt' | 'no-candidate' | 'replaced'
+  suspicious?: number
+  positives?: number
+  negatives?: number
+  /**
+   * Per candidate: share of the trusted part kept, of the suspicious pixels taken out, of what it takes out that is
+   * suspicious, and border coverage.
+   */
+  candidates?: Array<{ kept: number; leakRemoved: number; removedSuspicious: number; border: number }>
+}
+
+/**
+ * Above this share of the garment's coarse region called skin by the body parts, the skin is the garment's. Measured
+ * 21-11-2026: tan and black leather boots 31–35 %, garments worn by a model 0–6 %.
+ */
+const MAX_SKIN_IN_GARMENT = 0.15
+
+/** One worn garment is cut out alone when its regions are at least this share of everything worn found. */
+const MIN_FOCUS_SHARE = 0.25
+
+/** Side at which the second pass judges the cut-out and places its points. */
+const REFINE_SIDE = 256
 
 /** Pose and body parts: under this share of a cut-out left, it was skin, hair or background, not a garment. */
 const MIN_KEPT_AFTER_CLEAN = 0.4
@@ -335,6 +391,19 @@ type LookRegion = Region & { prompt?: Prompt }
  */
 export function cutOutGarments(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions = {}): Promise<GarmentCutout[]> {
   return withSam(() => cutOut(photo, map, mode, look))
+}
+
+/** Share of a region of the coarse map that the body parts call skin (face or body). */
+function skinShare(body: BodyMap, region: Region, grid: number, imageWidth: number, imageHeight: number): number {
+  const mask = regionMask(region, grid, imageWidth, imageHeight, body.width, body.height, 0)
+  let inside = 0
+  let skin = 0
+  for (let i = 0; i < mask.length; i += 1) {
+    if (!mask[i]) continue
+    inside += 1
+    if (body.parts[i] === PART.bodySkin || body.parts[i] === PART.faceSkin) skin += 1
+  }
+  return inside ? skin / inside : 0
 }
 
 async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfit', look: LookOptions): Promise<GarmentCutout[]> {
@@ -358,8 +427,32 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       const box = alphaBox(own, work.width, work.height)
       return box ? [{ region: { classId: 'garment', patches: [], confidence: 1 }, image: await crop(own, box), width: box.width, height: box.height, coverage: 1 - transparent, place: placeOf(box) }] : []
     }
+    if (mode === 'single' && look.person && !look.body) {
+      const body = await import('./body').then(({ readBody }) => readBody(photo)).catch((error: unknown) => {
+        console.warn('No se pudo leer la pose de la foto; se recorta sin buscar a una persona:', error)
+        return undefined
+      })
+      if (body) look = { ...look, body }
+    }
 
-    const single = mode === 'single' ? singleGarmentRegion(map, bitmap.width, bitmap.height) : undefined
+    let single = mode === 'single' ? singleGarmentRegion(map, bitmap.width, bitmap.height) : undefined
+    // One garment worn by someone: its own regions only, joined, instead of everything they wear. Not when much of
+    // the garment itself is what the body parts call skin: then the "skin" is the garment (tan leather boots, with a
+    // pose MediaPipe made up for them; 21-11-2026).
+    const skinInGarment = single && look.body ? skinShare(look.body, single, map.grid, bitmap.width, bitmap.height) : 0
+    const person = hasPerson(look.body) && skinInGarment < MAX_SKIN_IN_GARMENT
+    if (look.body && mode === 'single') look.onPerson?.({ person, skinInGarment })
+    if (single && look.focus && person && look.body?.landmarks) {
+      const pose = look.body.landmarks
+      const own = garmentRegions(map, bitmap.width, bitmap.height, false)
+        .map((region) => ({ ...region, classId: bodyClass(region.classId, regionMask(region, map.grid, bitmap.width, bitmap.height, match.width, match.height, 0), match.width, match.height, pose) }))
+        .filter((region) => region.classId === look.focus)
+      const patches = own.flatMap((region) => region.patches)
+      // Most of what was found must be that garment; a sliver means the map or the pose was wrong about it.
+      if (patches.length >= single.patches.length * MIN_FOCUS_SHARE) {
+        single = { classId: look.focus, patches: patches.sort((a, b) => a - b), confidence: Math.max(...own.map((region) => region.confidence)) }
+      }
+    }
     let regions: LookRegion[] = mode === 'single' ? (single ? [single] : []) : garmentRegions(map, bitmap.width, bitmap.height, false)
     const landmarks = mode === 'outfit' ? look.body?.landmarks : undefined
     if (landmarks && look.zones) {
@@ -384,10 +477,14 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
     for (const region of regions) {
       const near = regionMask(region, map.grid, bitmap.width, bitmap.height, work.width, work.height, 1)
       let alpha: Uint8ClampedArray | undefined
+      let fromPlain = false
       if (plain) {
         const { recall, precision } = agreement(plain, near)
         // High precision: on a model photo the fill keeps the person (head, arms, the other garments) too.
-        if (recall >= 0.4 && precision >= 0.92) alpha = plain.slice()
+        if (recall >= 0.4 && precision >= 0.92) {
+          alpha = plain.slice()
+          fromPlain = true
+        }
         // A light garment on a light backdrop loses pieces to the fill: SlimSAM's outline is added to what it kept.
         if (alpha && mode === 'single' && lightOnLight(pixels.data, work.width, work.height, coarse(region, -1))) {
           const outlined = await outlineWithSam(region)
@@ -398,9 +495,19 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       if (!alpha) continue
       for (let i = 0; i < alpha.length; i += 1) if (!near[i]) alpha[i] = 0
       tidyAlpha(alpha, work.width, work.height, coarse(region, 0))
+      if (look.refine && mode === 'single' && fromPlain) look.onRefine?.({ outcome: 'plain' })
+      if (look.refine && mode === 'single' && !fromPlain) {
+        // SlimSAM's new outline only takes pixels out of the cut-out.
+        const refined = await refineWithSam(alpha, region)
+        if (refined) {
+          for (let i = 0; i < refined.length; i += 1) if (refined[i]! < 128) alpha[i] = 0
+          tidyAlpha(alpha, work.width, work.height, coarse(region, 0))
+        }
+      }
       let covered = 0
       for (let i = 0; i < alpha.length; i += 1) if (alpha[i]! >= 128) covered += 1
-      if (mode === 'outfit' && look.body && look.clean) {
+      // A single garment is cleaned only when a person is in the photo (worn, or held up).
+      if (look.body && look.clean && (mode === 'outfit' || person)) {
         const removed = cleanAlpha(alpha, work.width, work.height, look.body, look.clean === 'all' || region.classId === 'footwear')
         if (covered - removed < covered * MIN_KEPT_AFTER_CLEAN) continue
         covered -= removed
@@ -427,6 +534,73 @@ async function cutOut(photo: Blob, map: SegmentationMap, mode: 'single' | 'outfi
       // Unsure (a light garment on a light background, say): better the original photo than a bad cut-out.
       if (!outlineFound(binary[index]!, coarse, match.width, match.height)) return undefined
       return outlineAlpha(candidates[index]!.logits, image, work.width, work.height)
+    }
+
+    /** The second pass of refine.ts over a cut-out (alpha at work size); undefined when it leaves it as it was. */
+    async function refineWithSam(alpha: Uint8ClampedArray, region: Region): Promise<Uint8ClampedArray | undefined> {
+      const small = sizeWithin(work.width, work.height, REFINE_SIDE)
+      const view = canvasOf(small.width, small.height)
+      view.context.drawImage(bitmap, 0, 0, small.width, small.height)
+      const data = view.context.getImageData(0, 0, small.width, small.height).data
+      const mask = new Uint8Array(small.width * small.height)
+      for (let y = 0; y < small.height; y += 1) {
+        for (let x = 0; x < small.width; x += 1) {
+          const source = Math.min(work.height - 1, Math.floor((y + 0.5) * work.height / small.height)) * work.width + Math.min(work.width - 1, Math.floor((x + 0.5) * work.width / small.width))
+          mask[y * small.width + x] = alpha[source]! >= 128 ? 1 : 0
+        }
+      }
+      const hint = look.refine === 'map'
+        ? { region: regionMask(region, map.grid, bitmap.width, bitmap.height, small.width, small.height, 0), interior: regionMask(region, map.grid, bitmap.width, bitmap.height, small.width, small.height, -1) }
+        : undefined
+      const judged = refineView(data, mask, small.width, small.height, hint)
+      const area = mask.reduce((sum, value) => sum + value, 0)
+      const suspicious = judged.suspicious.reduce((sum, value) => sum + value, 0) / Math.max(1, area)
+      if (suspicious < MIN_SUSPICIOUS) {
+        look.onRefine?.({ outcome: 'few-suspicious', suspicious })
+        return undefined
+      }
+      const prompt = refinePrompt(judged, small.width, small.height)
+      if (!prompt) {
+        look.onRefine?.({ outcome: 'no-prompt', suspicious })
+        return undefined
+      }
+      const image = encoded ??= await encodeImage(photo)
+      const toPhoto: Prompt = {
+        points: prompt.points.map(([x, y]) => [x * bitmap.width / small.width, y * bitmap.height / small.height]),
+        labels: prompt.labels
+      }
+      const candidates = await outline(image, toPhoto)
+      const binary = candidates.map((candidate) => Uint8Array.from(outlineAlpha(candidate.logits, image, small.width, small.height), (value) => (value >= 128 ? 1 : 0)))
+      const index = chooseRefined(binary, judged, small.width, small.height)
+      if (look.onRefine) {
+        const trusted = judged.trusted.reduce((sum, value) => sum + value, 0)
+        look.onRefine({
+          outcome: index === undefined ? 'no-candidate' : 'replaced',
+          suspicious,
+          positives: prompt.labels.filter((label) => label === 1).length,
+          negatives: prompt.labels.filter((label) => label === 0).length,
+          candidates: binary.map((candidate) => {
+            let kept = 0
+            let removed = 0
+            let removedSuspicious = 0
+            for (let i = 0; i < candidate.length; i += 1) {
+              if (!mask[i]) continue
+              if (candidate[i]) kept += judged.trusted[i]!
+              else {
+                removed += 1
+                removedSuspicious += judged.suspicious[i]!
+              }
+            }
+            return {
+              kept: kept / Math.max(1, trusted),
+              leakRemoved: removedSuspicious / Math.max(1, suspicious * area),
+              removedSuspicious: removedSuspicious / Math.max(1, removed),
+              border: borderCoverage(candidate, small.width, small.height)
+            }
+          })
+        })
+      }
+      return index === undefined ? undefined : outlineAlpha(candidates[index]!.logits, image, work.width, work.height)
     }
 
     /**

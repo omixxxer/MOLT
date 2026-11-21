@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Molt · prendas recompuestas</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 1.5rem; background: #F8F6FB; color: #2D2838; }
+      .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+      .card { display: grid; gap: 4px; font-size: 11px; }
+      .card-image { aspect-ratio: 4 / 5; overflow: hidden; border-radius: 12px; background: #EFECF5; }
+      .card-image img { display: block; width: 100%; height: 100%; padding: 12px; box-sizing: border-box; object-fit: contain; mix-blend-mode: multiply; }
+      .note { color: #6b6480; }
+      pre { background: #EEEBF4; padding: 1rem; overflow: auto; }
+      @media (max-width: 720px) { .columns { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>Prendas recompuestas (prototipo)</h1>
+    <p>
+      Tus prendas guardadas en este navegador, como se ven ahora en el armario y recompuestas
+      (<code>src/ai/recompose.ts</code>): enderezadas si están torcidas, centradas y con un tamaño según su tipo, un poco más
+      de luz si la foto es oscura, sin motas y con una sombra suave. Solo se leen: no se cambia nada.
+    </p>
+    <p id="status">Leyendo el armario…</p>
+    <div id="summary"></div>
+    <div class="columns">
+      <section><h2>Ahora</h2><ul class="grid" id="before"></ul></section>
+      <section><h2>Recompuesto</h2><ul class="grid" id="after"></ul></section>
+    </div>
+    <script type="module" src="./recomposeBench.ts"></script>
+  </body>
+</html>
