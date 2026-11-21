@@ -10,6 +10,7 @@ import PillNav from '../components/PillNav.jsx'
 import WardrobeData from '../components/WardrobeData'
 import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment, type GarmentWithPhotos } from '../types/domain'
+import { reloadThumbnails } from '../components/useGarmentImages'
 import { ClickSpark, Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
 type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
@@ -113,11 +114,24 @@ function App() {
     return list
   }, [])
 
+  /** Cut-out thumbnails saved as JPEGs on white are remade with their transparency, in the background. */
+  const upgradeThumbnails = useCallback((list: Garment[]) => {
+    void import('../db/thumbnailUpgrade')
+      .then(({ upgradeCutoutThumbnails }) => upgradeCutoutThumbnails(list))
+      .then((changed) => { if (changed) reloadThumbnails() })
+      .catch((error: unknown) => console.warn('No se pudieron rehacer las miniaturas:', error))
+  }, [])
+
   useEffect(() => {
     void refreshGarments()
+      .then(upgradeThumbnails)
       .catch(() => setError('No se pudo abrir el armario. Comprueba el almacenamiento de este navegador.'))
       .finally(() => setLoading(false))
-  }, [refreshGarments])
+  }, [refreshGarments, upgradeThumbnails])
+
+  const afterImport = useCallback(async () => {
+    upgradeThumbnails(await refreshGarments())
+  }, [refreshGarments, upgradeThumbnails])
 
   // Only once there is something to protect: some browsers ask the user, and an empty app has no reason to.
   const hasGarments = garments.length > 0
@@ -234,7 +248,7 @@ function App() {
 
           {page === 'wardrobe' && (
             <section aria-labelledby="wardrobe-title">
-              <WardrobeData garments={garments} onImported={refreshGarments} drive={drive}>
+              <WardrobeData garments={garments} onImported={afterImport} drive={drive}>
                 {({ menu, notices }) => <>
               <div className="page-heading">
                 <div>

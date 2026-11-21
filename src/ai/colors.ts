@@ -65,6 +65,10 @@ const WHITE_FROM = 75
 /** CSS colour to show a colour name as a swatch (its first shade); several colours for «Multicolor». */
 export function colorSwatch(label: string): string {
   if (label === 'Multicolor') return 'conic-gradient(#b5463c, #d9a441, #5e8a5a, #3f6ea5, #7a5a9c, #b5463c)'
+  // Metals are chosen by hand (jewellery, buckles): their shine cannot be told from yellow or grey by the pixels, so
+  // they are not in PALETTE and colorName never returns them.
+  if (label === 'Dorado') return 'linear-gradient(135deg, #f3dc8e, #b98a2e 55%, #e9c86a)'
+  if (label === 'Plateado') return 'linear-gradient(135deg, #f1f1f3, #9b9ea6 55%, #dadbe0)'
   // Named by earlier versions; garments saved then may still have it.
   if (label === 'Gris claro') return 'rgb(192 192 190)'
   const entry = PALETTE.find((color) => color.label === label)

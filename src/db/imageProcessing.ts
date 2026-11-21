@@ -39,24 +39,32 @@ function loadImage(blob: Blob): Promise<{ image: CanvasImageSource; size: ImageS
   })
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number, type = 'image/jpeg'): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob)
       else reject(new Error('No se pudo procesar la fotografía.'))
-    }, 'image/jpeg', quality)
+    }, type, quality)
   })
 }
 
-/** Draws the image scaled into a new canvas; transparent areas become white, as JPEG has no transparency. */
-function drawScaled(image: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+/** WebP keeps transparency; where the browser cannot write it, PNG. */
+async function transparentBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  const webp = await canvasToBlob(canvas, quality, 'image/webp')
+  return webp.type === 'image/webp' ? webp : canvasToBlob(canvas, quality, 'image/png')
+}
+
+/** Draws the image scaled into a new canvas; transparent areas become white (JPEG has no transparency) unless kept. */
+function drawScaled(image: CanvasImageSource, width: number, height: number, keepTransparency = false): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d')
   if (!context) throw new Error('El navegador no permite procesar la fotografía.')
-  context.fillStyle = '#ffffff'
-  context.fillRect(0, 0, width, height)
+  if (!keepTransparency) {
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, width, height)
+  }
   context.drawImage(image, 0, 0, width, height)
   return canvas
 }
@@ -83,15 +91,19 @@ export async function reducePhoto(blob: Blob): Promise<Blob> {
   }
 }
 
-export async function createThumbnail(blob: Blob): Promise<ImageSize & { thumbnail: Blob }> {
+/**
+ * The gallery's picture of a garment, 640 px at most. From a cut-out (`transparent`), it keeps the transparency
+ * (WebP), so the garment sits on the card's own colour, white garments too; from a photo, a JPEG.
+ */
+export async function createThumbnail(blob: Blob, { transparent = false }: { transparent?: boolean } = {}): Promise<ImageSize & { thumbnail: Blob }> {
   const decoded = await loadImage(blob)
   try {
     const { width, height } = decoded.size
     if (!width || !height) throw new Error('La fotografía no tiene dimensiones válidas.')
 
     const scale = Math.min(1, MAX_THUMBNAIL_EDGE / Math.max(width, height))
-    const canvas = drawScaled(decoded.image, Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)))
-    return { thumbnail: await canvasToBlob(canvas, THUMBNAIL_QUALITY), width, height }
+    const canvas = drawScaled(decoded.image, Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)), transparent)
+    return { thumbnail: transparent ? await transparentBlob(canvas, THUMBNAIL_QUALITY) : await canvasToBlob(canvas, THUMBNAIL_QUALITY), width, height }
   } finally {
     decoded.close()
   }

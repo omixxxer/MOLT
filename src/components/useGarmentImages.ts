@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
 import type { Garment, GarmentWithPhotos } from '../types/domain'
 
@@ -22,15 +22,31 @@ function readThumbnail(garmentId: string): Promise<Blob | undefined> {
   })
 }
 
-/** The thumbnail of one garment, read when the component mounts and again after the garment is edited. */
+// Thumbnails remade without editing the garment (thumbnailUpgrade.ts) are read again when this changes.
+let thumbnailEpoch = 0
+const epochListeners = new Set<() => void>()
+
+/** Every shown thumbnail is read again from the database. */
+export function reloadThumbnails() {
+  thumbnailEpoch += 1
+  for (const listener of epochListeners) listener()
+}
+
+function subscribeEpoch(listener: () => void) {
+  epochListeners.add(listener)
+  return () => { epochListeners.delete(listener) }
+}
+
+/** The thumbnail of one garment, read when the component mounts, after the garment is edited and on reloadThumbnails. */
 export function useGarmentThumbnail(garment: Pick<Garment, 'id' | 'updatedAt'>): Blob | undefined {
   const [thumbnail, setThumbnail] = useState<Blob>()
+  const epoch = useSyncExternalStore(subscribeEpoch, () => thumbnailEpoch)
 
   useEffect(() => {
     let cancelled = false
     void readThumbnail(garment.id).then((blob) => { if (!cancelled) setThumbnail(blob) })
     return () => { cancelled = true }
-  }, [garment.id, garment.updatedAt])
+  }, [garment.id, garment.updatedAt, epoch])
 
   return thumbnail
 }

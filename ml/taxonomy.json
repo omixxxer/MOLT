@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "categories": [
     { "id": "top", "label": "Parte superior", "code": "SUP", "role": "Top" },
     { "id": "bottom", "label": "Parte inferior", "code": "INF", "role": "Bottom" },
@@ -54,7 +54,10 @@
     { "id": "bufanda", "label": "Bufanda / pañuelo", "code": "BUF", "category": "accessory", "synonyms": ["bufanda", "panuelo", "foulard"] },
     { "id": "gafas", "label": "Gafas", "code": "GAF", "category": "accessory", "synonyms": ["gafas de sol"] },
     { "id": "corbata", "label": "Corbata", "code": "COR", "category": "accessory", "synonyms": ["pajarita"] },
-    { "id": "reloj", "label": "Reloj", "code": "REL", "category": "accessory", "synonyms": [] }
+    { "id": "reloj", "label": "Reloj", "code": "REL", "category": "accessory", "synonyms": [] },
+    { "id": "collar", "label": "Collar", "code": "COL", "category": "accessory", "synonyms": ["colgante", "cadena", "gargantilla"] },
+    { "id": "pulsera", "label": "Pulsera", "code": "PUL", "category": "accessory", "synonyms": ["brazalete", "esclava"] },
+    { "id": "pendientes", "label": "Pendientes", "code": "PEN", "category": "accessory", "synonyms": ["pendiente", "aros", "aretes", "zarcillos", "piercing"] }
   ],
   "attributes": {
     "sleeve": {
@@ -116,17 +119,19 @@
       "values": [
         { "id": "negro", "label": "Negro", "synonyms": [] },
         { "id": "blanco", "label": "Blanco", "synonyms": ["crudo", "hueso"] },
-        { "id": "gris", "label": "Gris", "synonyms": ["gris claro", "gris oscuro", "antracita", "plata"] },
+        { "id": "gris", "label": "Gris", "synonyms": ["gris claro", "gris oscuro", "antracita"] },
         { "id": "beige", "label": "Beige", "synonyms": ["crema", "arena", "camel"] },
         { "id": "marron", "label": "Marrón", "synonyms": ["chocolate", "tostado"] },
         { "id": "rojo", "label": "Rojo", "synonyms": ["granate", "burdeos", "vino"] },
         { "id": "naranja", "label": "Naranja", "synonyms": ["teja", "coral"] },
-        { "id": "amarillo", "label": "Amarillo", "synonyms": ["mostaza", "dorado"] },
+        { "id": "amarillo", "label": "Amarillo", "synonyms": ["mostaza"] },
         { "id": "verde", "label": "Verde", "synonyms": ["caqui", "oliva", "verde militar", "menta"] },
         { "id": "azul", "label": "Azul", "synonyms": ["celeste", "azul claro", "turquesa", "azul cielo"] },
         { "id": "azul-marino", "label": "Azul marino", "synonyms": ["marino", "navy"] },
         { "id": "morado", "label": "Morado", "synonyms": ["lila", "malva", "violeta", "lavanda"] },
         { "id": "rosa", "label": "Rosa", "synonyms": ["fucsia", "rosa palo"] },
+        { "id": "dorado", "label": "Dorado", "synonyms": ["dorada", "oro", "oro rosa"] },
+        { "id": "plateado", "label": "Plateado", "synonyms": ["plateada", "plata", "acero"] },
         { "id": "multicolor", "label": "Multicolor", "synonyms": ["varios colores"] }
       ]
     }

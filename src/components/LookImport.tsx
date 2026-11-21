@@ -143,7 +143,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
       for (const entry of chosen) {
         const { suggestion } = entry
         const usage = suggestUsage({ category: entry.category, subcategory: entry.subcategory, sleeve: suggestion.sleeve?.value })
-        const { thumbnail, width, height } = await createThumbnail(entry.image)
+        const { thumbnail, width, height } = await createThumbnail(entry.image, { transparent: true })
         const values = {
           category: entry.category,
           subcategory: entry.subcategory,

@@ -74,6 +74,9 @@ const levelsBySubcategory: Record<string, DressLevel[]> = {
   bufanda: DAILY_TO_SMART,
   cinturon: DAILY_TO_FORMAL,
   reloj: DAILY_TO_FORMAL,
+  collar: DAILY_TO_FORMAL,
+  pulsera: DAILY_TO_FORMAL,
+  pendientes: DAILY_TO_FORMAL,
   bolso: DAILY_TO_FORMAL
 }
 

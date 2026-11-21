@@ -217,7 +217,8 @@ function garmentSeasons(garment: Garment): Season[] {
 
 // Colours
 
-const NEUTRALS = new Set(['negro', 'blanco', 'gris', 'gris claro', 'beige', 'crema', 'camel', 'marron', 'azul marino'])
+// Gold and silver (jewellery, buckles) go with anything, like the neutrals.
+const NEUTRALS = new Set(['negro', 'blanco', 'gris', 'gris claro', 'beige', 'crema', 'camel', 'marron', 'azul marino', 'dorado', 'plateado'])
 const HUES: Record<string, number> = { rojo: 0, naranja: 30, amarillo: 55, verde: 130, azul: 215, morado: 275, rosa: 335 }
 /** Neutrals that sit too close to look intended. */
 const DULL_PAIRS = [['negro', 'azul marino'], ['negro', 'marron'], ['azul marino', 'marron']]

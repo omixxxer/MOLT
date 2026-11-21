@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Garment, GarmentPhotos } from '../types/domain'
 import { createTrainingExport, EXPORT_FORMAT, toTrainingRecord } from './datasetExport'
-import { matchLabel } from './taxonomy'
+import { matchLabel, TAXONOMY_VERSION } from './taxonomy'
 import { crc32 } from './zip'
 
 const makeGarment = (overrides: Partial<Garment> = {}): Garment => ({
@@ -117,7 +117,7 @@ describe('training export', () => {
     expect(entries.map((entry) => entry.name)).toEqual(['export.json', 'labels.jsonl', 'images/g1-0.jpg', 'images/g1-1.png'])
     for (const entry of entries) expect(entry.crc).toBe(crc32(entry.data))
     const info = JSON.parse(new TextDecoder().decode(entries[0]!.data))
-    expect(info).toMatchObject({ format: EXPORT_FORMAT, taxonomyVersion: 4, garments: 1 })
+    expect(info).toMatchObject({ format: EXPORT_FORMAT, taxonomyVersion: TAXONOMY_VERSION, garments: 1 })
     expect(new TextDecoder().decode(entries[3]!.data)).toBe('detalle')
   })
 
