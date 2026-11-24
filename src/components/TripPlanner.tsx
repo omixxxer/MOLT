@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { DemoButton } from './demo/DemoMode'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { database } from '../db/database'
@@ -94,6 +95,7 @@ export default function TripPlanner({ garments, onAvailabilityChange, onAddGarme
           <h2>Primero, tu armario.</h2>
           <p>La maleta se prepara con tus propias prendas. Añádelas y vuelve aquí.</p>
           {onAddGarments && <button className="button button-dark" type="button" onClick={onAddGarments}>Añadir prendas</button>}
+          <DemoButton className="studio-link" />
         </section>
       ) : trips && <>
         {back}

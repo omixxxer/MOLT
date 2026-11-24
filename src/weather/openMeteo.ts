@@ -1,4 +1,6 @@
 /** A place chosen from the search: coordinates, so «Valencia» is never a surprise in Venezuela. */
+import { DEMO_OFFLINE_MESSAGE, isDemo } from '../demo/demoMode'
+
 export interface Place {
   id?: number
   name: string
@@ -130,6 +132,8 @@ function withYearsBack(day: string, years: number) {
 
 /** Answers from the service, one retry when it is its fault or the network's, and errors that say what to do. */
 async function fetchJson<T>(url: URL, signal?: AbortSignal, attempt = 1): Promise<T> {
+  // The example wardrobe asks nothing to the service: its trip carries a sample forecast.
+  if (isDemo()) throw new WeatherError('offline', DEMO_OFFLINE_MESSAGE)
   const timeout = new AbortController()
   const timer = setTimeout(() => timeout.abort(), REQUEST_TIMEOUT)
   const onAbort = () => timeout.abort()

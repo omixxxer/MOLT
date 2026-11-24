@@ -25,6 +25,10 @@ Las cabezas se entrenaron solo con datos cuya licencia permite uso comercial. Lo
 | Fotos de [Unsplash](https://unsplash.com/license) y [Pexels](https://www.pexels.com/license/) | Licencias de Unsplash y Pexels |
 | Fotos propias del titular | Del titular |
 
+## Fotos del armario de ejemplo
+
+Las 12 fotos de `public/demo/` (el armario de ejemplo de «Ver cómo funciona») son del [Clothing Dataset](https://github.com/alexeygrigorev/clothing-dataset) de Alexey Grigorev ([versión reducida](https://github.com/alexeygrigorev/clothing-dataset-small), particiones `test` y `train`), con licencia [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Cada `.jpg` es la foto original; cada `.webp`, su recorte hecho con el recortador de Molt.
+
 ## Bibliotecas incluidas en la app
 
 | Biblioteca | Licencia |

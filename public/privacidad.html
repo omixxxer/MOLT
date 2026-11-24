@@ -41,15 +41,16 @@
       </header>
 
       <h1>Privacidad</h1>
-      <p class="date">Última actualización: 20 de noviembre de 2026</p>
+      <p class="date">Última actualización: 24 de noviembre de 2026</p>
 
       <section class="summary" aria-labelledby="summary-title">
         <strong id="summary-title">En pocas palabras</strong>
         <ul>
-          <li>Tus prendas, fotos, outfits, viajes y preferencias se guardan <strong>solo en este navegador</strong>, en tu dispositivo.</li>
-          <li>Las fotos se analizan <strong>en el propio dispositivo</strong>: no se envían a ningún servidor.</li>
+          <li><strong>Dónde se guarda:</strong> tus prendas, fotos, outfits, viajes y preferencias se guardan en este navegador, en tu dispositivo. Molt no tiene servidor propio que las reciba.</li>
+          <li><strong>Dónde se procesa:</strong> las fotos se analizan en el propio dispositivo (tipo, color, etiqueta, fondo). Para analizarlas no se envían a ningún sitio.</li>
+          <li><strong>Qué sale, y cuándo:</strong> para el tiempo, el nombre de una ciudad, sus coordenadas y las fechas van a Open-Meteo; para la foto de un viaje, el nombre del destino va a Wikipedia. Ninguno recibe tus prendas ni tus fotos.</li>
+          <li><strong>Copias, solo si las pides:</strong> la copia del armario, con fotos, se crea como archivo en tu dispositivo o, si lo eliges, se sube a tu propio Google Drive.</li>
           <li>Molt no tiene cuentas de usuario, ni analítica, ni publicidad, ni cookies de seguimiento.</li>
-          <li>Solo sale algo del dispositivo cuando lo usas: el nombre de una ciudad para consultar el tiempo, y tu copia de seguridad si eliges guardarla en tu propio Google Drive.</li>
         </ul>
       </section>
 
@@ -60,15 +61,18 @@
         <li>Los outfits guardados, los días en que te los has puesto, tus valoraciones y tus preferencias de colores y estilo.</li>
         <li>Los viajes, con su previsión del tiempo y la lista de la maleta.</li>
       </ul>
-      <p>Además, el navegador guarda en este dispositivo algunos ajustes pequeños: la ciudad que eliges para el tiempo, las últimas previsiones consultadas (para no pedirlas otra vez), si ya has visto la guía, cuándo hiciste la última copia y, si usas Google Drive, si el guardado automático está activo y cuándo se guardó por última vez. Los modelos de inteligencia artificial se guardan en la caché del navegador tras la primera descarga, para funcionar sin conexión.</p>
+      <p>Además, el navegador guarda en este dispositivo algunos ajustes pequeños: la ciudad que eliges para el tiempo, las últimas previsiones consultadas (para no pedirlas otra vez), si has ocultado los primeros pasos, la última forma de añadir prendas que usaste, cuándo hiciste la última copia y, si usas Google Drive, si el guardado automático está activo y cuándo se guardó por última vez. Los modelos de inteligencia artificial se guardan en la caché del navegador tras la primera descarga, para funcionar sin conexión.</p>
+      <p><strong>Armario de ejemplo.</strong> Si eliges «Ver cómo funciona», Molt abre un recorrido guiado sobre un armario de ejemplo: crea en este navegador una base de datos aparte con prendas de muestra (fotos de dominio público que se descargan del propio sitio de Molt, sin enviar nada) y un viaje de ejemplo, y marca la pestaña para abrirla en lugar de tu armario. Mientras dura el ejemplo, tu armario real no se abre, y no se consulta el tiempo, ni Wikipedia, ni Google Drive. Al salir del ejemplo se borra esa base de datos, y solo esa.</p>
       <p>Nadie más que tú tiene estos datos: no se envían al autor de Molt ni a ningún servidor de Molt, porque no existe tal servidor.</p>
 
       <h2>Análisis de las fotos en el dispositivo</h2>
-      <p>Al añadir una prenda, Molt propone su tipo, colores, estampado y marca, lee la etiqueta (talla y composición) y quita el fondo de la foto. Todo eso lo hacen modelos que se descargan del propio sitio de Molt y se ejecutan en tu navegador. Ni las fotos ni los resultados del análisis salen del dispositivo.</p>
+      <p>Al añadir una prenda, Molt propone su tipo, colores, estampado y marca, lee la etiqueta (talla y composición) y quita el fondo de la foto. Todo eso lo hacen modelos que se descargan del propio sitio de Molt y se ejecutan en tu navegador: para analizar una foto no se envía nada, y descargar los modelos solo pide archivos, sin incluir tus fotos. Con «Desde un look» pasa lo mismo: la foto completa se analiza aquí y no se guarda; solo se guarda el recorte de cada prenda.</p>
+      <p>Una de las bibliotecas que usa Molt para detectar el cuerpo en «Desde un look» (MediaPipe, de Google) intenta enviar a Google estadísticas de uso de la propia biblioteca, a <code>odml.pa.googleapis.com</code>. La política de seguridad de la página de Molt no permite esa conexión, así que el navegador la bloquea y no se envía nada.</p>
+      <p>Las fotos solo salen del dispositivo si tú haces una copia y la guardas o la subes a algún sitio (ver «Copias y exportaciones» y «Google Drive»).</p>
 
       <h2>Qué sale del dispositivo, y solo si lo usas</h2>
       <ul>
-        <li><strong>Previsión del tiempo (Open-Meteo).</strong> Al buscar una ciudad o consultar el tiempo para un outfit o un viaje, Molt envía a <a href="https://open-meteo.com/">Open-Meteo</a> el nombre que escribes, las coordenadas del lugar elegido y las fechas. Nunca envía tus prendas, fotos ni outfits. Open-Meteo recibe tu petición como cualquier servicio web (con tu dirección IP).</li>
+        <li><strong>Previsión del tiempo (Open-Meteo).</strong> Al buscar una ciudad, Molt envía a <a href="https://open-meteo.com/">Open-Meteo</a> el nombre que escribes. Si has elegido tu ciudad, al abrir Inicio u Outfits pide la previsión de hoy o de mañana con sus coordenadas, si no la tiene ya guardada; en un viaje, pide la de sus fechas con las coordenadas del destino, y la vuelve a pedir sola cada pocas horas mientras el viaje no ha terminado. Nunca envía tus prendas, fotos ni outfits. Open-Meteo recibe tu petición como cualquier servicio web (con tu dirección IP).</li>
         <li><strong>Foto del destino de un viaje (Wikipedia).</strong> Al abrir un viaje que aún no tiene foto, Molt pide a <a href="https://es.wikipedia.org/">Wikipedia</a> (es.wikipedia.org) una foto del lugar, enviando su nombre (y, si hace falta para distinguirlo, su región y país), y descarga la imagen de Wikimedia Commons (upload.wikimedia.org), que se muestra con su autor y licencia. Nunca envía tus prendas, fotos, fechas ni outfits. La imagen se guarda en la caché del navegador y no se vuelve a pedir; si Wikipedia no tiene una foto libre del lugar, el viaje muestra un dibujo hecho en el dispositivo y no se vuelve a preguntar en 30 días. Wikipedia recibe tu petición como cualquier servicio web (con tu dirección IP).</li>
         <li><strong>Copia en Google Drive (opcional).</strong> Si eliges guardar o restaurar la copia en Google Drive, se explica en la sección siguiente.</li>
         <li><strong>Alojamiento (Cloudflare).</strong> La web de Molt se sirve desde Cloudflare. Como cualquier servidor web, Cloudflare recibe las peticiones de los archivos de la app (por ejemplo, tu dirección IP y tu navegador) y puede tratarlas según su propia política de privacidad. Esas peticiones no contienen tu armario. Molt no añade herramientas de analítica ni de seguimiento.</li>

@@ -12,6 +12,9 @@ import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment, type GarmentWithPhotos } from '../types/domain'
 import { reloadThumbnails } from '../components/useGarmentImages'
 import { ClickSpark, Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
+import { DemoAddNotice, DemoBanner, DemoButton } from '../components/demo/DemoMode'
+import { isDemo, takeAfterDemo, takeTourRequest } from '../demo/demoMode'
+import type { TourPage } from '../components/demo/GuidedTour'
 
 type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
 
@@ -27,6 +30,7 @@ const TripPlanner = lazy(() => import('../components/TripPlanner'))
 const HomeScreen = lazy(() => import('../components/home/HomeScreen'))
 const WearHistory = lazy(() => import('../components/history/WearHistory'))
 const PatternWaves = lazy(() => import('../components/PatternWaves.jsx'))
+const GuidedTour = lazy(() => import('../components/demo/GuidedTour'))
 
 function ScreenLoader() {
   return <div className="loading-state"><LatticeLoader label="Cargando" pattern="ripple" fontSize={13} showTimer={false} /></div>
@@ -57,7 +61,8 @@ const pageHrefs: Record<Page, string> = {
   packing: '#maleta'
 }
 
-const localStorageMessage = 'Tus prendas y fotografías se guardan únicamente en este dispositivo.'
+// Where the wardrobe is kept. Processing and the optional copies are told apart in the privacy page.
+const localStorageMessage = 'Tu armario se guarda en este navegador. Las fotos se analizan aquí.'
 
 function getGarmentLabel(garment: Garment) {
   return garment.name.trim() || garment.subcategory || garment.category
@@ -78,7 +83,8 @@ function lastAddPage(): AddPage {
 }
 
 function App() {
-  const [page, setPage] = useState<Page>('home')
+  // Coming out of the example from the tour's last step: straight to adding garments.
+  const [page, setPage] = useState<Page>(() => takeAfterDemo() ?? 'home')
   useEffect(() => {
     if (!isAddPage(page)) return
     try { localStorage.setItem(LAST_ADD_KEY, page) } catch { /* private window: it opens «Una prenda» next time */ }
@@ -122,12 +128,29 @@ function App() {
       .catch((error: unknown) => console.warn('No se pudieron rehacer las miniaturas:', error))
   }, [])
 
+  const demo = isDemo()
+  const [leavingDemo, setLeavingDemo] = useState(false)
+  const [tourOpen, setTourOpen] = useState(() => demo && takeTourRequest())
+  const exitDemo = useCallback((then?: 'batch') => {
+    setTourOpen(false)
+    setLeavingDemo(true)
+    // Loaded when needed: it brings the example garments with it.
+    void import('../demo/demoWardrobe').then(({ leaveDemo }) => leaveDemo(undefined, then))
+  }, [])
+  const tourNavigate = useCallback((next: TourPage) => {
+    setSelectedGarment(null)
+    setPage(next)
+  }, [])
+
   useEffect(() => {
-    void refreshGarments()
+    // The example database is filled the first time it is opened; the real one is never opened in the example.
+    const ready = demo ? import('../demo/demoWardrobe').then(({ seedDemo }) => seedDemo()) : Promise.resolve()
+    void ready
+      .then(refreshGarments)
       .then(upgradeThumbnails)
       .catch(() => setError('No se pudo abrir el armario. Comprueba el almacenamiento de este navegador.'))
       .finally(() => setLoading(false))
-  }, [refreshGarments, upgradeThumbnails])
+  }, [demo, refreshGarments, upgradeThumbnails])
 
   const afterImport = useCallback(async () => {
     upgradeThumbnails(await refreshGarments())
@@ -233,9 +256,11 @@ function App() {
             <MoltMark />
             Molt<span aria-hidden="true">.</span>
           </a>
-          <a className="privacy-note" href="/privacidad.html" title="Privacidad: qué se guarda y qué sale del dispositivo"><span className="privacy-indicator" /><span className="privacy-long">{localStorageMessage}</span><span className="privacy-short">Guardado solo en tu dispositivo</span></a>
+          <a className="privacy-note" href="/privacidad.html" title="Privacidad: qué se guarda aquí, qué se procesa aquí y qué sale solo si lo pides"><span className="privacy-indicator" /><span className="privacy-long">{localStorageMessage}</span><span className="privacy-short">Guardado en este navegador</span></a>
         </header>
 
+        {demo && <DemoBanner onLeave={() => exitDemo()} leaving={leavingDemo} onTour={tourOpen ? undefined : () => setTourOpen(true)} />}
+        {tourOpen && !loading && <Suspense fallback={null}><GuidedTour onNavigate={tourNavigate} onStart={() => exitDemo('batch')} onClose={() => setTourOpen(false)} /></Suspense>}
         <main className="screen-content">
           {error && <div className="alert" role="alert">{error}</div>}
           {/* One per page: a failed screen leaves the navigation working, and going to another page recovers. */}
@@ -297,6 +322,7 @@ function App() {
                     <div className="empty-actions">
                       <button className="button button-dark" type="button" onClick={() => setPage('batch')}>Añadir varias de golpe</button>
                       <button className="button button-outline" type="button" onClick={() => setPage('add')}>Añadir una prenda</button>
+                      <DemoButton className="studio-link" />
                     </div>
                   )}
                 </section>
@@ -316,7 +342,7 @@ function App() {
             </section>
           )}
 
-          {page === 'add' && (
+          {page === 'add' && !demo && (
             <section className="form-screen" aria-labelledby="add-title">
                             <h1 id="add-title">Añadir prenda<span>.</span></h1>
               {addModes}
@@ -335,7 +361,7 @@ function App() {
             </section>
           )}
 
-          {page === 'batch' && (
+          {page === 'batch' && !demo && (
             <section className="form-screen" aria-labelledby="batch-title">
                             <h1 id="batch-title">Añadir varias prendas<span>.</span></h1>
               {addModes}
@@ -351,7 +377,7 @@ function App() {
             </section>
           )}
 
-          {page === 'look' && (
+          {page === 'look' && !demo && (
             <section className="form-screen" aria-labelledby="look-title">
                             <h1 id="look-title">Desde un look<span>.</span></h1>
               {addModes}
@@ -368,6 +394,8 @@ function App() {
               </Suspense>
             </section>
           )}
+
+          {demo && isAddPage(page) && <DemoAddNotice onLeave={() => exitDemo('batch')} />}
 
           {page === 'outfits' && (
             <Suspense fallback={<ScreenLoader />}>

@@ -115,7 +115,7 @@ export default function TripForm({ garments, data, onCreated }: TripFormProps) {
       </button>
       <p className="weather-note">
         {beyondForecast ? `La previsión llega a ${FORECAST_DAYS} días; para el resto usaremos cómo fue el tiempo esas fechas en años anteriores, y lo actualizaremos al acercarse. ` : ''}
-        Solo se envían el destino y las fechas: tus prendas no salen del dispositivo. <WeatherCredit />
+        Se envían el destino y las fechas a Open-Meteo, para el tiempo, y el nombre del destino a Wikipedia, para su foto. Tus prendas y fotos no se envían. <WeatherCredit />
       </p>
     </form>
   )

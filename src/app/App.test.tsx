@@ -84,7 +84,7 @@ describe('wardrobe flow', () => {
     await renderInWardrobe()
 
     // The note on where the data is kept opens the privacy policy.
-    expect(screen.getByRole('link', { name: /Tus prendas y fotografías se guardan únicamente en este dispositivo/ })).toHaveAttribute('href', '/privacidad.html')
+    expect(screen.getByRole('link', { name: /Tu armario se guarda en este navegador/ })).toHaveAttribute('href', '/privacidad.html')
     const navigation = screen.getByRole('navigation', { name: 'Navegación principal' })
     expect(navigation).toHaveTextContent('Armario')
     expect(navigation).toHaveTextContent('Outfits')
@@ -501,28 +501,26 @@ describe('wardrobe flow', () => {
     expect(await screen.findByRole('heading', { name: /desde un look/i })).toBeInTheDocument()
   })
 
-  it('opens on Inicio with the guide when the wardrobe is empty, which stays closed afterwards', async () => {
+  it('opens on Inicio with a welcome whose first step is adding garments, and the tour on request', async () => {
     const user = userEvent.setup()
-    const { unmount } = render(<App />)
+    const reload = vi.fn()
+    vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, reload })
+    render(<App />)
 
     expect(await screen.findByRole('heading', { name: /Te damos la bienvenida/ })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Fotografía tus prendas' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
-    expect(screen.getByRole('heading', { name: 'Crea tus outfits' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Paso 2 de 5/ })).toHaveAttribute('aria-current', 'step')
-    await user.click(screen.getByRole('button', { name: /Paso 5 de 5/ }))
-    expect(screen.getByRole('heading', { name: 'Tu armario es tuyo' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Entendido' }))
-    expect(screen.queryByRole('heading', { name: 'Cómo funciona' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Fotografía tu ropa' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Probar con armario de ejemplo' })).not.toBeInTheDocument()
 
-    unmount()
-    render(<App />)
-    await screen.findByRole('heading', { name: /Te damos la bienvenida/ })
-    expect(screen.queryByRole('heading', { name: 'Cómo funciona' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Cómo funciona' }))
-    expect(screen.getByRole('heading', { name: 'Fotografía tus prendas' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Añadir prendas' }))
+    // The tour, under the title, starts the example: the tab is marked and the app loads again.
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(0); return 0 })
+    await user.click(screen.getByRole('button', { name: /Ver un recorrido \(1 min\)/ }))
+    expect(sessionStorage.getItem('molt-demo')).toBe('1')
+    expect(sessionStorage.getItem('molt-tour')).toBe('1')
+    // After deleting any example left behind, so it always starts fresh.
+    await waitFor(() => expect(reload).toHaveBeenCalled())
+    sessionStorage.clear()
+
+    await user.click(screen.getByRole('button', { name: /Varias de golpe/ }))
     expect(await screen.findByRole('heading', { name: /Añadir varias prendas/ })).toBeInTheDocument()
   })
 })

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { DemoButton } from './demo/DemoMode'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../ai/colors'
@@ -107,6 +108,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
           <h2>Primero, tu armario.</h2>
           <p>Los outfits se crean con tus propias prendas. Añade al menos una parte de arriba y una de abajo.</p>
           {onAddGarments && <button className="button button-dark" type="button" onClick={onAddGarments}>Añadir prendas</button>}
+          <DemoButton className="studio-link" />
         </section>
       ) : !ready ? null : (
         <>

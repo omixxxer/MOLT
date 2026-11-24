@@ -625,6 +625,14 @@ button.choice-chip { font-family: inherit; }
 .home-today { display: grid; gap: 12px; padding: 16px; border-radius: 16px; background: var(--soft-surface); }
 .home-today .garment-tile { background: var(--white); }
 .home-today .outfit-garments { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.home-today h2 { margin: 0; }
+.home-today-look { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 14px; }
+.home-today-look .outfit-collage { background: var(--white); }
+.home-today-info { display: grid; gap: 8px; align-content: center; }
+.home-today-name { margin: 0; font-family: var(--serif); font-size: 20px; line-height: 1.2; }
+.home-today-info ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: var(--text-body); }
+.home-today-info .studio-link { text-align: left; }
+@media (min-width: 900px) { .home-today-look { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 24px; } }
 .home h2, .calendar-detail > h2, .stat-section h2 { margin: 0; font-family: var(--serif); font-size: 21px; font-weight: 500; }
 .calendar-detail > h2::first-letter { text-transform: uppercase; }
 .home-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -641,28 +649,93 @@ button.choice-chip { font-family: inherit; }
   .home-layout { grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 28px; }
 }
 
-/* The guide: numbered steps joined by a line, one panel at a time. */
-.guide { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
-.guide-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.guide-header .close-button { display: grid; place-items: center; }
-.guide-steps { display: flex; margin: 0; padding: 0; list-style: none; }
-.guide-steps li { position: relative; flex: 1; display: flex; justify-content: center; }
-.guide-steps li + li::before { content: ''; position: absolute; top: 50%; right: 50%; width: 100%; height: 2px; background: var(--mist); transition: background-color .25s ease; }
-.guide-steps li.done + li::before { background: var(--ink); }
-.guide-steps button { position: relative; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 2px solid var(--mist); border-radius: 50%; background: var(--white); font-size: var(--text-body); font-weight: 650; transition: background-color .25s ease, border-color .25s ease, color .25s ease; }
-.guide-steps li.done button, .guide-steps button[aria-current] { border-color: var(--ink); color: var(--white); background: var(--ink); }
-.guide-steps button[aria-current] { box-shadow: 0 0 0 3px var(--mist); }
-.guide-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; min-height: 196px; align-content: start; animation: batch-rise .28s ease both; }
-.guide-panel:focus { outline: none; }
-.guide-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: var(--soft-surface); }
-.guide-count { margin: 0 0 2px; font-size: var(--text-small); font-weight: 650; }
-.guide-panel h3 { margin: 0 0 6px; font-family: var(--serif); font-size: 24px; font-weight: 500; line-height: 1.15; }
-.guide-panel p:not(.guide-count) { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
-.guide-panel ul { display: grid; gap: 5px; margin: 0 0 10px; padding: 0; list-style: none; font-size: var(--text-body); line-height: 1.4; }
-.guide-panel li { display: flex; align-items: flex-start; gap: 6px; }
-.guide-panel li svg { flex: none; margin-top: 2px; }
-.guide-nav { display: flex; justify-content: space-between; gap: 8px; }
-.guide-nav .button:disabled { cursor: default; opacity: .45; }
+/* Welcome, for an empty wardrobe: the one first step, the ways to take it, and what comes after. */
+.welcome { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.welcome-start { display: grid; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
+.welcome-start h2, .welcome-next h2, .first-steps h2 { margin: 0; font-family: var(--serif); font-size: 24px; font-weight: 500; line-height: 1.15; }
+.welcome-kicker { margin: 0 0 -8px; font-size: var(--text-small); font-weight: 650; color: var(--lavender); text-transform: uppercase; letter-spacing: .06em; }
+.welcome-lead { margin: 0; font-size: 14px; line-height: 1.5; }
+.welcome-ways { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.welcome-way { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); text-align: left; cursor: pointer; transition: background-color .18s ease, border-color .18s ease; }
+.welcome-way:hover { border-color: var(--lavender); background: var(--soft-surface); }
+.welcome-way-main { border-color: var(--ink); background: var(--ink); color: var(--white); }
+.welcome-way-main:hover { border-color: var(--ink); background: #3d3749; }
+.welcome-way-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--soft-surface); color: var(--ink); }
+.welcome-way-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.welcome-way-text strong { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 15px; font-weight: 650; }
+.welcome-way-text strong small { padding: 1px 8px; border-radius: 999px; background: var(--lavender-soft); color: var(--ink); font-size: var(--text-small); font-weight: 650; }
+.welcome-way-text > span { font-size: var(--text-body); line-height: 1.4; opacity: .8; }
+.welcome-way-arrow { flex: none; }
+.empty-state .studio-link { margin-top: 14px; }
+.welcome { grid-template-areas: 'tour' 'start' 'next'; }
+.welcome-tour { grid-area: tour; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: -6px; font-size: var(--text-body); }
+.welcome-tour .studio-link { font-size: var(--text-body); font-weight: 650; }
+.welcome-tour small { flex-basis: 100%; font-size: var(--text-small); opacity: .8; }
+.welcome-start { grid-area: start; }
+.welcome-next { grid-area: next; }
+/* The guided tour: the screen dimmed, what each step is about lit up, and a card that tells it. */
+.tour { position: fixed; inset: 0; z-index: 60; }
+.tour-spot { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(29, 25, 38, .62); transition: top .35s ease, left .35s ease, width .35s ease, height .35s ease; pointer-events: none; }
+.tour-spot-none { top: 50%; left: 50%; width: 0; height: 0; }
+.tour-card { position: fixed; width: min(360px, calc(100vw - 32px)); display: grid; gap: 8px; padding: 16px 18px; border-radius: 16px; background: var(--white); color: var(--ink); box-shadow: 0 18px 40px rgba(29, 25, 38, .28); animation: tour-in .28s ease both; }
+.tour-card:focus { outline: none; }
+.tour[data-placement="center"] .tour-card { top: 50%; left: 50%; transform: translate(-50%, -50%); animation-name: tour-in-center; }
+.tour[data-placement="sheet"] .tour-card { left: 16px; right: 16px; bottom: 96px; width: auto; max-width: 520px; margin: 0 auto; }
+.tour-card-head { display: flex; align-items: center; justify-content: space-between; }
+.tour-card-head .close-button { display: grid; place-items: center; }
+.tour-count { margin: 0; font-size: var(--text-small); font-weight: 650; color: var(--lavender); }
+.tour-dots { display: flex; gap: 5px; }
+.tour-dots span { width: 18px; height: 4px; border-radius: 999px; background: var(--mist); transition: background-color .25s ease, width .25s ease; }
+.tour-dots span.done { background: var(--lavender-soft); }
+.tour-dots span.on { width: 28px; background: var(--ink); }
+.tour-card h2 { margin: 2px 0 0; font-family: var(--serif); font-size: 22px; font-weight: 500; line-height: 1.2; }
+.tour-card p#tour-text { margin: 0; font-size: 14px; line-height: 1.5; }
+.tour-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.tour-nav .button { display: inline-flex; align-items: center; gap: 6px; }
+@keyframes tour-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes tour-in-center { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot, .tour-dots span { transition: none; }
+  .tour-card { animation: none; }
+}
+.tour-button { display: inline-flex; align-items: center; gap: 6px; }
+.tour-button:disabled { cursor: progress; opacity: .7; }
+.demo-banner-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The example wardrobe: always said on screen, with the way out. */
+.demo-banner { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 16px; padding: 10px 16px; border: 1px solid var(--lavender); border-radius: 12px; background: var(--lavender-soft); color: var(--ink); }
+.demo-banner p { flex: 1 1 240px; margin: 0; font-size: var(--text-body); line-height: 1.4; }
+.demo-banner .button { min-height: 36px; padding: 0 14px; }
+.welcome-tip { margin: 0; padding: 10px 12px; border-left: 3px solid var(--lavender); border-radius: 6px; background: var(--soft-surface); font-size: var(--text-body); line-height: 1.45; }
+.welcome-next { display: grid; gap: 10px; padding: 4px 4px 0; }
+.welcome-next h2 { font-size: 20px; }
+.welcome-next ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: var(--text-body); line-height: 1.4; }
+.welcome-next li { display: flex; align-items: center; gap: 10px; }
+.welcome-next li svg { flex: none; color: var(--lavender); }
+.welcome-next .studio-link { justify-self: start; }
+@media (min-width: 900px) {
+  .welcome { grid-template-columns: minmax(0, 1.7fr) minmax(240px, 1fr); grid-template-areas: 'tour tour' 'start next'; align-items: start; gap: 16px 28px; }
+  .welcome-next { padding-top: 20px; }
+}
+
+/* «Primeros pasos»: a checklist ticked off by what has really been done, only the next step open. */
+.first-steps { display: grid; gap: 12px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
+.first-steps-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.first-steps-header p { margin: 2px 0 0; font-size: var(--text-body); }
+.first-steps-bar { height: 6px; border-radius: 999px; background: var(--mist); overflow: hidden; }
+.first-steps-bar span { display: block; height: 100%; border-radius: inherit; background: var(--ink); transition: width .3s ease; }
+.first-steps ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.first-steps li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 8px 0; }
+.first-steps li.current { padding: 12px; border-radius: 12px; background: var(--soft-surface); }
+.first-steps h3 { margin: 4px 0 0; font-size: 15px; font-weight: 650; line-height: 1.3; }
+.first-steps li.done h3 { text-decoration: line-through; opacity: .55; font-weight: 500; }
+.first-steps li p { margin: 4px 0 10px; font-size: var(--text-body); line-height: 1.45; }
+.first-steps-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--mist); border-radius: 50%; background: var(--white); font-size: var(--text-small); font-weight: 650; }
+.first-steps li.done .first-steps-mark, .first-steps li.current .first-steps-mark { border-color: var(--ink); background: var(--ink); color: var(--white); }
+.first-steps-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: var(--text-body); }
+.first-steps-done { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: var(--soft-surface); }
+.first-steps-done p { flex: 1 1 200px; margin: 0; font-size: var(--text-body); line-height: 1.45; }
+
 
 /* Calendar */
 .calendar-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 20px; }
@@ -726,9 +799,6 @@ button.choice-chip { font-family: inherit; }
 .stat-gaps strong { display: block; font-weight: 650; }
 
 @media (max-width: 720px) {
-  .guide { padding: 14px; }
-  .guide-panel { grid-template-columns: minmax(0, 1fr); gap: 10px; min-height: 270px; }
-  .guide-icon { width: 52px; height: 52px; }
   .calendar { padding: 8px; }
   .calendar-grid { gap: 3px; }
   .calendar-day img { padding: 13px 1px 1px; }
@@ -1119,7 +1189,7 @@ html:has(.card-drag-ghost), html:has(.card-drag-ghost) * { cursor: grabbing !imp
 @media (max-width: 720px), (pointer: coarse) {
   .category-chips button, .choice-chip { min-height: 40px; border-radius: 20px; }
   .add-modes button, .outfit-tabs [role="tab"], .trip-tabs [role=tab], .batch-tabs button { min-height: 44px; }
-  .studio-slot-tools .icon-button, .photo-stage-remove, .guide-steps button { width: 40px; height: 40px; }
+  .studio-slot-tools .icon-button, .photo-stage-remove { width: 40px; height: 40px; }
   .analysis-alternatives button, .trip-add { min-height: 40px; border-radius: 20px; }
   .outfit-actions .button, .packing-add .button, .packing-add input, .trip-occasion select, .batch-other { min-height: 44px; }
   /* The bottom navigation too (phones make it larger still, below). */
