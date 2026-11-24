@@ -155,7 +155,7 @@ export default function BatchImport({ onDone }: BatchImportProps) {
           <li><strong>Molt las ordena</strong><p>Junta las fotos de cada prenda, lee la etiqueta y quita el fondo.</p></li>
           <li><strong>Revisa y guarda</strong><p>Corrige solo lo que esté mal. Nada se guarda hasta que tú lo decidas.</p></li>
         </ol>
-        <p className="batch-privacy"><span className="privacy-indicator" />Las fotos se procesan aquí y no salen de tu dispositivo.</p>
+        <p className="batch-privacy"><span className="privacy-indicator" />Las fotos se analizan en este dispositivo: no se envían a ningún sitio para reconocerlas.</p>
       </div>
     )
   }

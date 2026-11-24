@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { isDemo } from '../../demo/demoMode'
 import { Cancel01Icon, Copy01Icon, Delete02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { forecastChanges, packingGroups, packingText, PACKING_STYLES, summarizeWeather, TRIP_KINDS, tripDates, type ForecastChange } from '../../trips/packingPlan'
@@ -380,7 +381,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
                 {summary.climateDays > 0 && <li>{summary.climateDays === trip.days.length ? 'Fechas lejanas' : `${summary.climateDays} de los días están lejos`}: es lo habitual en años anteriores, no una previsión. Se actualizará al acercarse.</li>}
               </ul>
             )}
-            <p className="weather-note">
+            {isDemo() ? <p className="weather-note">Previsión de muestra del ejemplo: no se ha consultado el tiempo.</p> : <p className="weather-note">
               {!finished && (
                 <span className="weather-updated">
                   {checking ? 'Consultando el tiempo…' : fetched ? `Tiempo actualizado ${fetched}; se actualiza solo.` : 'El tiempo se actualiza solo.'}
@@ -389,7 +390,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
               )}
               {finished && fetched && `Consultado ${fetched}. `}
               <WeatherCredit />
-            </p>
+            </p>}
           </section>
         </section>
         <PackingList trip={trip} groups={groups} garments={garments} editing={editing} onChange={update} />

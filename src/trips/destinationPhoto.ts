@@ -1,7 +1,8 @@
 import type { Place } from '../weather/openMeteo'
+import { isDemo } from '../demo/demoMode'
 import type { TripCover } from '../types/domain'
 
-// A real photo of a trip's destination, only when the user asks for it: the main image of the place's article on
+// A real photo of a trip's destination, looked for when a trip without one is opened: the main image of the place's article on
 // the Spanish Wikipedia (its images are on Wikimedia Commons, with a free licence), with its author and licence,
 // which must be shown with it. Only the place's name (and country, to tell places apart) goes to Wikipedia. The
 // image is kept in the browser's cache, so it is downloaded once and shown offline.
@@ -100,6 +101,8 @@ async function mainImage(place: Place, fetcher: Fetch): Promise<string | undefin
 
 /** Finds the photo and its credits; undefined when Wikipedia has none for the place. */
 export async function findDestinationPhoto(place: Place, fetcher: Fetch = fetch): Promise<TripCover | undefined> {
+  // The example wardrobe asks nothing to Wikipedia: its trip shows the drawing made on the device.
+  if (isDemo()) return undefined
   const file = await mainImage(place, fetcher)
   if (!file) return undefined
   const reply = await json<ImageReply>(apiUrl({ titles: `File:${file}`, prop: 'imageinfo', iiprop: 'url|extmetadata', iiurlwidth: String(WIDTH) }), fetcher)
@@ -127,6 +130,7 @@ async function openCache(): Promise<Cache | undefined> {
 
 /** The image, from the cache or downloaded (and kept) once. */
 export async function coverImage(cover: TripCover, fetcher: Fetch = fetch): Promise<Blob> {
+  if (isDemo()) throw new Error('El armario de ejemplo no descarga fotos de destinos.')
   const cache = await openCache()
   const cached = await cache?.match(cover.imageUrl)
   if (cached) return cached.blob()

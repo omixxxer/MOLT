@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isDemo } from '../../demo/demoMode'
 import { CloudAngledRainIcon, CloudAngledZapIcon, CloudIcon, CloudSnowIcon, FastWindIcon, Location01Icon, RainIcon, SlowWindsIcon, Sun03Icon, SunCloud01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { isRainy, isSnowy, placeLabel, WEATHER_ATTRIBUTION, type DailyWeather } from '../../weather/openMeteo'
@@ -57,7 +58,7 @@ export default function WeatherBar({ forecast, showDays, manualTemperature }: We
             ))}
           </span>
         )}
-        {!manualTemperature && <button type="button" className="studio-link" aria-expanded={editing} onClick={() => setEditing(!editing)}>{place ? 'Cambiar ciudad' : 'Añadir tu ciudad'}</button>}
+        {!manualTemperature && !isDemo() && <button type="button" className="studio-link" aria-expanded={editing} onClick={() => setEditing(!editing)}>{place ? 'Cambiar ciudad' : 'Añadir tu ciudad'}</button>}
       </div>
       {stale && <p className="weather-note" role="status">Sin conexión: es la última previsión guardada.</p>}
       {error && <p className="weather-note" role="alert">{error}</p>}
@@ -65,7 +66,7 @@ export default function WeatherBar({ forecast, showDays, manualTemperature }: We
         <div className="weather-edit">
           <PlaceField label="Tu ciudad" query={query} onQuery={setQuery} onSelect={(next) => { setPlace(next); setEditing(false) }} placeholder="p. ej. Castellón" autoFocus />
           {place && <button type="button" className="studio-link" onClick={() => { setPlace(undefined); setQuery(''); setEditing(false) }}>Quitar</button>}
-          <p className="weather-note">Solo se envía la ciudad para pedir el tiempo: tus prendas no salen del dispositivo. <WeatherCredit /></p>
+          <p className="weather-note">Para el tiempo se envían a Open-Meteo el nombre que buscas y las coordenadas de tu ciudad. Tus prendas y fotos no se envían. <WeatherCredit /></p>
         </div>
       )}
     </div>

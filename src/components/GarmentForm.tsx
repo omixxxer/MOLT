@@ -274,7 +274,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     } catch (error) {
       console.error('No se pudo analizar la imagen de la prenda:', error)
       if (requestId === analysisRequestId.current) {
-        setAnalysisError('No se pudo cargar o ejecutar el modelo. Comprueba la conexión si es la primera vez y el espacio y la memoria del dispositivo. La foto no se envía y no se ha generado ninguna predicción.')
+        setAnalysisError('No se pudo cargar o ejecutar el modelo. Comprueba la conexión si es la primera vez y el espacio y la memoria del dispositivo. La foto no se ha enviado a ningún sitio y no se ha generado ninguna predicción.')
       }
     } finally {
       if (requestId === analysisRequestId.current) setAnalyzing(false)

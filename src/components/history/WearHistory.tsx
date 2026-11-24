@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { DemoButton } from '../demo/DemoMode'
 import type { WearEntry } from '../../stats/wardrobeStats'
 import { loadWearHistory } from '../../stats/wearLog'
 import type { Garment, Outfit } from '../../types/domain'
@@ -42,6 +43,7 @@ export default function WearHistory({ garments, onAddGarments, onCreateOutfit, o
           <h2>Primero, tu armario.</h2>
           <p>Aquí verás lo que llevas cada día y cuánto usas cada prenda.</p>
           <button className="button button-dark" type="button" onClick={onAddGarments}>Añadir prendas</button>
+          <DemoButton className="studio-link" />
         </section>
       ) : history && (view === 'calendar'
         ? <WearCalendar garments={garments} outfits={history.outfits} entries={history.entries} onChanged={reload} onCreateOutfit={onCreateOutfit} />

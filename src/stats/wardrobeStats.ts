@@ -154,6 +154,14 @@ export function wardrobeStats(garments: Garment[], entries: WearEntry[], days?: 
   }
 }
 
+/** What the wardrobe still lacks before any outfit can be made («una parte de abajo»), or nothing when one can. */
+export function missingForOutfits(garments: Garment[]): string | undefined {
+  const usable = garments.filter((garment) => garment.availability !== 'unavailable')
+  const has = (role: Garment['role']) => usable.some((garment) => garment.role === role)
+  if (has('Una pieza') || (has('Top') && has('Bottom'))) return undefined
+  return has('Top') ? 'una parte de abajo' : 'una parte de arriba'
+}
+
 /** What the wardrobe lacks for making outfits. A garment without the data counts as suiting, as in the generator. */
 export function wardrobeGaps(garments: Garment[], now = new Date()): WardrobeGap[] {
   if (!garments.length) return []
@@ -165,8 +173,8 @@ export function wardrobeGaps(garments: Garment[], now = new Date()): WardrobeGap
   const gaps: WardrobeGap[] = []
   const tops = count('Top')
   const bottoms = count('Bottom')
-  const onePieces = count('Una pieza')
-  if (!onePieces && (!tops || !bottoms)) gaps.push({ title: tops ? 'Falta una parte de abajo' : 'Falta una parte de arriba', detail: 'Sin ella no se puede crear ningún outfit.' })
+  const missing = missingForOutfits(garments)
+  if (missing) gaps.push({ title: `Falta ${missing}`, detail: 'Sin ella no se puede crear ningún outfit.' })
   else if (tops >= 3 && bottoms && tops >= bottoms * 3) gaps.push({ title: 'Pocas partes de abajo', detail: `Tienes ${tops} de arriba para ${bottoms} de abajo: una más multiplica las combinaciones.` })
   else if (bottoms >= 3 && tops && bottoms >= tops * 3) gaps.push({ title: 'Pocas partes de arriba', detail: `Tienes ${bottoms} de abajo para ${tops} de arriba: una más multiplica las combinaciones.` })
   const shoes = count('Calzado')

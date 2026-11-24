@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { isDemo, startDemo } from '../demo/demoMode'
+import { TOUR_LABEL } from './demo/DemoMode'
 import type { DriveRestore } from '../cloud/driveSync'
 import type { DriveSync } from '../cloud/useDriveSync'
 import { backupReminderSnoozedUntil, isStorageFull, lastFileBackup, recordFileBackup, shouldRemindBackup, snoozeBackupReminder, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
@@ -214,7 +216,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
         <div className="data-menu-items">
           <button type="button" onClick={() => void exportBackup()} disabled={Boolean(busy) || garments.length === 0}>
             Exportar copia del armario
-            <small>Prendas, fotos, outfits y preferencias en un ZIP</small>
+            <small>Prendas, fotos, outfits y preferencias en un ZIP que se guarda en tu dispositivo</small>
           </button>
           <button type="button" onClick={() => { closeMenu(); fileInput.current?.click() }} disabled={Boolean(busy)}>
             Importar copia
@@ -225,7 +227,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
               <p className="data-menu-heading">Google Drive</p>
               <button type="button" onClick={() => { closeMenu(); void drive.save({ interactive: true }) }} disabled={Boolean(busy) || drive.status.kind === 'saving'}>
                 Guardar en Google Drive
-                <small>{drive.settings.lastSavedAt ? `Última copia desde aquí: ${time(drive.settings.lastSavedAt)}` : 'En una carpeta privada de Molt en tu Drive'}</small>
+                <small>{drive.settings.lastSavedAt ? `Última copia desde aquí: ${time(drive.settings.lastSavedAt)}` : 'Sube prendas y fotos a una carpeta privada de Molt en tu Drive'}</small>
               </button>
               <button type="button" onClick={() => void readFromDrive()} disabled={Boolean(busy) || drive.status.kind === 'saving'}>
                 Restaurar desde Google Drive
@@ -233,7 +235,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
               </button>
               <label className="data-menu-toggle">
                 <input type="checkbox" checked={drive.settings.autoSave} onChange={(event) => void drive.setAutoSave(event.target.checked)} />
-                <span>Guardar automáticamente<small>Unos segundos después de cada cambio, mientras la sesión de Google siga activa</small></span>
+                <span>Guardar automáticamente<small>Sube la copia a tu Drive unos segundos después de cada cambio, mientras la sesión de Google siga activa</small></span>
               </label>
             </>
           ) : (
@@ -247,11 +249,16 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
           <p className="data-menu-heading">Modelo de Molt</p>
           <button type="button" onClick={() => void exportTrainingData()} disabled={Boolean(busy) || garments.length === 0}>
             Exportar datos de entrenamiento
-            <small>Fotos y etiquetas, sin nombres, marcas ni notas</small>
+            <small>Un ZIP en tu dispositivo con fotos y etiquetas, sin nombres, marcas ni notas; no se envía</small>
+          </button>
+          <p className="data-menu-heading">Ayuda</p>
+          <button type="button" onClick={() => { closeMenu(); startDemo(undefined, { tour: true }) }}>
+            {TOUR_LABEL}
+            <small>Con un armario de ejemplo; el tuyo no se toca</small>
           </button>
           <a className="data-menu-link" href="/privacidad.html">
             Privacidad
-            <small>Qué se guarda y qué sale del dispositivo{drive.configured ? ', también con Google Drive' : ''}</small>
+            <small>Qué se guarda aquí, qué se procesa aquí y qué sale solo si lo usas{drive.configured ? ', también con Google Drive' : ''}</small>
           </a>
         </div>
       </details>
@@ -342,5 +349,7 @@ export default function WardrobeData({ garments, onImported, drive, children }: 
     </>
   )
 
+  // In the example there is nothing to keep: no copies, no Drive, no imports into data that is deleted on leaving.
+  if (isDemo()) return children({ menu: null, notices: null })
   return children({ menu: menuElement, notices })
 }

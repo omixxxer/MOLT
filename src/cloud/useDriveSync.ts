@@ -1,4 +1,5 @@
 import { liveQuery } from 'dexie'
+import { isDemo } from '../demo/demoMode'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DriveConflictError,
@@ -38,7 +39,8 @@ export interface DriveSync {
 }
 
 export function useDriveSync(): DriveSync {
-  const configured = Boolean(googleClientId())
+  // Never in the example wardrobe: its copy would overwrite the real one in Drive.
+  const configured = Boolean(googleClientId()) && !isDemo()
   const [settings, setSettings] = useState(loadDriveSettings)
   const [status, setStatus] = useState<DriveStatus>({ kind: 'idle' })
   const latest = useRef(settings)

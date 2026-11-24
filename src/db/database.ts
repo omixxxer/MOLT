@@ -2,6 +2,7 @@ import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { assignMissingCodes, codeCounters } from './garmentCodes'
 import { upgradeGarmentToV6 } from './garmentUpgrades'
+import { DEMO_DATABASE_NAME, isDemo } from '../demo/demoMode'
 
 const levelOfFormality: Record<LegacyFormality, DressLevel> = { Casual: 'Diario', 'Smart casual': 'Arreglado', Formal: 'Formal' }
 const occasionOfFormality: Record<string, string> = { Casual: 'Diario', 'Smart casual': 'Arreglado' }
@@ -198,4 +199,5 @@ async function moveLegacyDatabase(target: WardrobeDatabase, legacyName: string) 
   }
 }
 
-export const database = new WardrobeDatabase(DATABASE_NAME, LEGACY_DATABASE_NAME)
+/** The wardrobe. In the example (see demo/demoMode), a database of its own: the real one is not opened at all. */
+export const database = isDemo() ? new WardrobeDatabase(DEMO_DATABASE_NAME) : new WardrobeDatabase(DATABASE_NAME, LEGACY_DATABASE_NAME)

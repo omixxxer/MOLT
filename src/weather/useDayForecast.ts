@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { isDemo } from '../demo/demoMode'
 import { dayFromToday, getForecast, peekForecast, type DailyWeather, type Place } from './openMeteo'
 
 const PLACE_KEY = 'molt-place'
 
 export function readSavedPlace(): Place | undefined {
+  // The example uses no city (and asks for no weather): the real one stays as it is.
+  if (isDemo()) return undefined
   try {
     const stored = localStorage.getItem(PLACE_KEY)
     return stored ? JSON.parse(stored) as Place : undefined
@@ -13,6 +16,7 @@ export function readSavedPlace(): Place | undefined {
 }
 
 function savePlace(place: Place | undefined) {
+  if (isDemo()) return
   try {
     if (place) localStorage.setItem(PLACE_KEY, JSON.stringify(place))
     else localStorage.removeItem(PLACE_KEY)

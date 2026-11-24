@@ -130,11 +130,40 @@ describe('HomeScreen', () => {
     expect(onNavigate).toHaveBeenCalledWith('history')
   })
 
-  it('does not open the guide by itself when there are garments, but offers it', async () => {
+  it('guides the first steps: what is missing, then the first outfit, and ticks them off as they are done', async () => {
+    const props = { onNavigate: vi.fn(), onOpenGarment: vi.fn() }
+    const { rerender } = render(<HomeScreen garments={[garment('camisa', 'Top')]} loading={false} {...props} />)
+    const user = userEvent.setup()
+    const steps = await screen.findByRole('region', { name: 'Primeros pasos' })
+    expect(within(steps).getByText('0 de 3 hechos')).toBeInTheDocument()
+    expect(within(steps).getByText(/Tienes 1 prenda\. Falta una parte de abajo/)).toBeInTheDocument()
+    await user.click(within(steps).getByRole('button', { name: 'Añadir prendas' }))
+    expect(props.onNavigate).toHaveBeenCalledWith('batch')
+
+    rerender(<HomeScreen garments={wardrobe()} loading={false} {...props} />)
+    expect(await within(steps).findByText('1 de 3 hechos')).toBeInTheDocument()
+    await user.click(within(steps).getByRole('button', { name: 'Crear outfit' }))
+    expect(props.onNavigate).toHaveBeenCalledWith('outfits')
+
+    await user.click(screen.getByRole('button', { name: 'Me lo pongo hoy' }))
+    expect(await within(steps).findByText('3 de 3 hechos')).toBeInTheDocument()
+    await user.click(within(steps).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('region', { name: 'Primeros pasos' })).not.toBeInTheDocument()
+  })
+
+  it('hides the first steps when asked', async () => {
+    const { user } = home()
+    await user.click(await screen.findByRole('button', { name: 'Ocultar' }))
+    expect(screen.queryByRole('region', { name: 'Primeros pasos' })).not.toBeInTheDocument()
+  })
+
+  it('offers the tour while starting out, and not once the first steps are done', async () => {
     const { user } = home()
     await screen.findByRole('button', { name: 'Me lo pongo hoy' })
-    expect(screen.queryByRole('heading', { name: 'Fotografía tus prendas' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Cómo funciona' }))
-    expect(screen.getByRole('heading', { name: 'Fotografía tus prendas' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Ver un recorrido \(1 min\)/ }).length).toBeGreaterThan(0)
+    await user.click(screen.getAllByRole('button', { name: 'Me lo pongo hoy' })[0]!)
+    await screen.findByRole('heading', { name: 'Hoy llevas' })
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('button', { name: /Ver un recorrido/ })).not.toBeInTheDocument()
   })
 })

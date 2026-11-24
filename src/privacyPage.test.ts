@@ -25,6 +25,12 @@ describe('privacy policy page', () => {
     }
   })
 
+  it('tells of the library logging the app blocks, and keeps it blocked', () => {
+    expect(page).toContain('odml.pa.googleapis.com')
+    expect(app).not.toContain('odml.pa.googleapis.com')
+    expect(app).not.toMatch(/connect-src[^;"]*https:\/\/\*\.googleapis\.com/)
+  })
+
   it('loads nothing from outside its own site', () => {
     expect(page).not.toMatch(/<script/i)
     expect(page).not.toMatch(/<link[^>]+href="https?:/i)
