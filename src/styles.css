@@ -763,11 +763,6 @@ button.choice-chip { font-family: inherit; }
 
 /* Maleta */
 .trip-planner > h1 { margin-bottom: 14px; }
-.trip-list { display: flex; gap: 8px; margin-bottom: 18px; padding: 2px; overflow-x: auto; scrollbar-width: thin; }
-.trip-chip { display: grid; flex: none; gap: 1px; min-height: 48px; padding: 6px 13px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: var(--text-label); text-align: left; }
-.trip-chip strong { font-size: var(--text-body); font-weight: 650; }
-.trip-chip[aria-pressed=true] { color: var(--white); border-color: var(--ink); background: var(--ink); }
-.trip-chip-new { display: flex; align-items: center; gap: 5px; font-weight: 600; }
 .trip-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 640px; }
 .trip-form .page-intro { margin: 0; }
 .trip-form > .button { justify-self: start; min-width: 220px; }
@@ -1188,4 +1183,65 @@ img[data-transparent] { mix-blend-mode: normal; }
   .photo-editor-actions { grid-template-columns: 1fr 1fr; }
   .photo-editor-actions > span { display: none; }
   .photo-editor-actions .button-outline:first-child { grid-column: 1 / -1; }
+}
+
+/* Maleta: the list of trips first (TripPlanner), one card each, and «Tus viajes» to go back to it. */
+.trip-planner-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.trip-planner-head .button { display: inline-flex; align-items: center; gap: 6px; }
+.trip-back { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 12px; padding: 0 10px 0 4px; border: 0; border-radius: 18px; background: transparent; font-size: var(--text-body); font-weight: 650; }
+.trip-back:hover { background: var(--soft-surface); }
+.trip-home { display: grid; gap: 26px; margin-top: 18px; }
+.trip-home-title { margin: 0 0 12px; font-family: var(--serif); font-size: 22px; font-weight: 500; }
+.trip-home-empty { display: grid; justify-items: start; gap: 10px; padding: 18px; border: 1px dashed var(--line); border-radius: 12px; font-size: var(--text-body); }
+.trip-home-empty p { margin: 0; }
+.trip-home-empty .button { display: inline-flex; align-items: center; gap: 6px; }
+.trip-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.trip-card-button { display: grid; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--white); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+.trip-card-button:hover { box-shadow: 0 8px 24px rgba(45, 40, 56, .14); transform: translateY(-1px); }
+.trip-card-art { display: block; height: 128px; overflow: hidden; background: var(--soft-surface); }
+.trip-card-art > svg, .trip-card-art > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.trip-card-text { display: grid; gap: 3px; padding: 12px 14px 14px; font-size: var(--text-label); }
+.trip-card-text strong { font-family: var(--serif); font-size: 21px; font-weight: 500; }
+.trip-card-when { justify-self: start; padding: 2px 8px; border-radius: 10px; background: var(--ink); color: var(--white); font-size: var(--text-caption); font-weight: 650; }
+.trip-card[data-finished] .trip-card-when { background: var(--mist); color: var(--ink); }
+.trip-card[data-finished] .trip-card-art { filter: grayscale(.5); opacity: .8; }
+.trip-card-progress { display: grid; gap: 4px; margin-top: 6px; }
+.trip-card-progress .batch-dock-bar { border-radius: 2px; overflow: hidden; }
+.trip-card-progress small { font-size: var(--text-small); }
+.trip-cards-past { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.trip-cards-past .trip-card-art { height: 90px; }
+@media (prefers-reduced-motion: reduce) { .trip-card-button { transition: none; } .trip-card-button:hover { transform: none; } }
+
+/* The weather of a trip updates on its own: a line saying when, with a small button to look now. */
+.weather-updated { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
+.weather-refresh { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); }
+.weather-refresh:hover:not(:disabled) { background: var(--mist); }
+.weather-refresh:disabled { opacity: .5; }
+.trip-changes-done { margin: 6px 0 0; font-size: var(--text-label); }
+.trip-changes-actions .icon-button { width: 32px; height: 32px; }
+
+/* Editing the suitcase (PackingList): garments added by hand, the things that are not clothes, and notes. */
+.packing-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 10px; }
+.packing-edit { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; font-size: var(--text-label); }
+.packing[data-editing] { border-color: var(--ink); }
+.packing-add-garments { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
+.packing-garment label { display: flex; flex: 1; align-self: stretch; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.packing-garment input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.packing-garment label > img { flex: none; width: 36px; height: 44px; border-radius: 5px; object-fit: contain; mix-blend-mode: multiply; }
+.packing-garment label > span { min-width: 0; overflow-wrap: anywhere; }
+.packing-garment[data-packed] label > span { text-decoration: line-through; opacity: .6; }
+.packing-garment[data-packed] label > img { opacity: .5; }
+.packing-garment button { display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; }
+.packing-garment button:hover { background: var(--mist); }
+.packing-hint { margin: 4px 6px; font-size: var(--text-small); opacity: .8; }
+.packing-notes p { margin: 0 6px; font-size: var(--text-body); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.packing-notes textarea { width: 100%; min-height: 72px; padding: 8px 10px; border: 1px solid var(--mist); border-radius: 7px; background: var(--white); font: inherit; font-size: var(--text-body); resize: vertical; }
+.suitcase-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker-note { margin: -4px 0 0; font-size: var(--text-body); opacity: .8; }
+.picker-option[aria-pressed=true] .garment-tile { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.suitcase-chosen { display: inline-flex; align-items: center; gap: 3px; }
+.suitcase-picker-footer { position: sticky; bottom: -20px; display: flex; justify-content: flex-end; margin: 0 -20px -20px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--white); }
+@media (pointer: coarse) {
+  .packing-garment button, .weather-refresh { width: 40px; height: 40px; }
+  .packing-notes textarea { font-size: 16px; }
 }

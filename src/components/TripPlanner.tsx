@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Add01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { database } from '../db/database'
-import { tripDates } from '../trips/packingPlan'
 import type { Garment, Trip } from '../types/domain'
 import { dayFromToday } from '../weather/openMeteo'
 import { emptyOutfitData, loadOutfitData, type OutfitData } from './outfits/outfitData'
+import TripCard from './trips/TripCard'
 import TripForm from './trips/TripForm'
 import TripView from './trips/TripView'
 
@@ -16,12 +16,17 @@ interface TripPlannerProps {
   onAddGarments?: () => void
 }
 
-/** Your trips: the one under way or coming up opens first, and any can be packed, changed or planned anew. */
+/**
+ * Your trips: a list of them first (the ones under way or coming up, then the past ones), from which each opens, and
+ * «Nuevo viaje». With no trips yet, the form for the first one.
+ */
 export default function TripPlanner({ garments, onAvailabilityChange, onAddGarments }: TripPlannerProps) {
   const [trips, setTrips] = useState<Trip[]>()
+  /** undefined: the list of trips. */
   const [openId, setOpenId] = useState<string | 'new'>()
   const [data, setData] = useState<OutfitData>(emptyOutfitData)
   const [error, setError] = useState('')
+  const today = dayFromToday(0)
 
   const reloadData = useCallback(async () => setData(await loadOutfitData()), [])
 
@@ -30,10 +35,9 @@ export default function TripPlanner({ garments, onAvailabilityChange, onAddGarme
     Promise.all([database.trips.orderBy('startDate').toArray(), loadOutfitData()])
       .then(([stored, outfitData]) => {
         if (!active) return
-        const today = dayFromToday(0)
         setTrips(stored)
         setData(outfitData)
-        setOpenId((stored.find((trip) => trip.endDate >= today) ?? stored.at(-1))?.id ?? 'new')
+        if (!stored.length) setOpenId('new')
       })
       .catch(() => { if (active) setError('No se pudieron abrir tus viajes.') })
     return () => { active = false }
@@ -53,17 +57,36 @@ export default function TripPlanner({ garments, onAvailabilityChange, onAddGarme
       await database.trips.delete(trip.id)
       const remaining = (trips ?? []).filter((item) => item.id !== trip.id)
       setTrips(remaining)
-      setOpenId(remaining.at(-1)?.id ?? 'new')
+      setOpenId(remaining.length ? undefined : 'new')
     } catch {
       setError('No se pudo eliminar el viaje.')
     }
   }
 
+  function show(id: string | 'new' | undefined) {
+    setOpenId(id)
+    document.getElementById('trip-title')?.scrollIntoView?.({ block: 'start' })
+  }
+
   const open = trips?.find((trip) => trip.id === openId)
+  const coming = (trips ?? []).filter((trip) => trip.endDate >= today)
+  const past = (trips ?? []).filter((trip) => trip.endDate < today).reverse()
+  const back = trips && trips.length > 0 && openId !== undefined && (
+    <button type="button" className="trip-back" onClick={() => show(undefined)}>
+      <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />Tus viajes
+    </button>
+  )
 
   return (
     <section className="feature-screen trip-planner" aria-labelledby="trip-title">
-      <h1 id="trip-title">Maleta<span>.</span></h1>
+      <div className="trip-planner-head">
+        <h1 id="trip-title">Maleta<span>.</span></h1>
+        {trips && trips.length > 0 && openId === undefined && garments.length > 0 && (
+          <button type="button" className="button button-dark" onClick={() => show('new')}>
+            <HugeiconsIcon icon={Add01Icon} size={15} />Nuevo viaje
+          </button>
+        )}
+      </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {!garments.length ? (
         <section className="empty-state">
@@ -73,20 +96,35 @@ export default function TripPlanner({ garments, onAvailabilityChange, onAddGarme
           {onAddGarments && <button className="button button-dark" type="button" onClick={onAddGarments}>Añadir prendas</button>}
         </section>
       ) : trips && <>
-        {trips.length > 0 && (
-          <div className="trip-list" role="group" aria-label="Tus viajes">
-            {trips.map((trip) => (
-              <button key={trip.id} type="button" className="trip-chip" aria-pressed={trip.id === openId} onClick={() => setOpenId(trip.id)}>
-                <strong>{trip.place.name}</strong><span>{tripDates(trip)}</span>
-              </button>
-            ))}
-            <button type="button" className="trip-chip trip-chip-new" aria-pressed={openId === 'new'} onClick={() => setOpenId('new')}>
-              <HugeiconsIcon icon={Add01Icon} size={15} />Nuevo viaje
-            </button>
+        {back}
+        {openId === undefined && (
+          <div className="trip-home">
+            {coming.length > 0 && (
+              <section aria-labelledby="trips-coming">
+                <h2 id="trips-coming" className="trip-home-title">En curso y próximos</h2>
+                <ul className="trip-cards">
+                  {coming.map((trip) => <TripCard key={trip.id} trip={trip} garments={garments} today={today} onOpen={() => show(trip.id)} />)}
+                </ul>
+              </section>
+            )}
+            {coming.length === 0 && (
+              <section className="trip-home-empty">
+                <p>No tienes ningún viaje por delante.</p>
+                <button type="button" className="button button-dark" onClick={() => show('new')}><HugeiconsIcon icon={Add01Icon} size={15} />Preparar un viaje</button>
+              </section>
+            )}
+            {past.length > 0 && (
+              <section aria-labelledby="trips-past">
+                <h2 id="trips-past" className="trip-home-title">Pasados</h2>
+                <ul className="trip-cards trip-cards-past">
+                  {past.map((trip) => <TripCard key={trip.id} trip={trip} garments={garments} today={today} onOpen={() => show(trip.id)} />)}
+                </ul>
+              </section>
+            )}
           </div>
         )}
         {openId === 'new' && (
-          <TripForm garments={garments} data={data} onCreated={async (trip) => { await saveTrip(trip); setOpenId(trip.id) }} />
+          <TripForm garments={garments} data={data} onCreated={async (trip) => { await saveTrip(trip); show(trip.id) }} />
         )}
         {open && (
           <TripView

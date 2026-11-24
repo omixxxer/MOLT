@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy01Icon, Delete02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
+import { Cancel01Icon, Copy01Icon, Delete02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { forecastChanges, packingGroups, packingText, PACKING_STYLES, summarizeWeather, TRIP_KINDS, tripDates, type ForecastChange } from '../../trips/packingPlan'
 import { coverImage, findDestinationPhoto, forgetCover } from '../../trips/destinationPhoto'
@@ -17,12 +17,25 @@ import TripScene from './TripScene'
 import { useObjectUrl } from '../useObjectUrl'
 
 const weekday = new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric' })
-const REFRESH_AFTER = 3 * 3_600_000
+/** The forecast is looked at again on its own once it is this old: on opening the trip, coming back to the app, or while it stays open. */
+export const REFRESH_AFTER = 3 * 3_600_000
+/** How often an open trip checks whether its forecast has grown old. */
+const CHECK_EVERY = 10 * 60_000
 /** A place Wikipedia had no free photo of is looked for again after this long. */
 const COVER_RETRY_MS = 30 * 86_400_000
 
 export function dayName(day: string, format: Intl.DateTimeFormat = weekday) {
   return format.format(new Date(`${day}T12:00:00`))
+}
+
+/** «ahora mismo», «hace 5 min», «hace 2 h», «el 3 dic»: how old the forecast is. */
+export function sinceText(at: number, now = Date.now()) {
+  const minutes = Math.max(0, Math.round((now - at) / 60_000))
+  if (minutes < 1) return 'ahora mismo'
+  if (minutes < 60) return `hace ${minutes} min`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `hace ${hours} h`
+  return `el ${new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(at))}`
 }
 
 interface TripViewProps {
@@ -35,13 +48,17 @@ interface TripViewProps {
   onAvailabilityChange: (garment: Garment) => Promise<void>
 }
 
-/** A trip: its weather, what to wear each day and the list to pack, kept up to date as the dates approach. */
+/** A trip: its weather, what to wear each day and the list to pack, kept up to date on its own as the dates approach. */
 export default function TripView({ trip, garments, data, onChange, onDelete, onDataChanged, onAvailabilityChange }: TripViewProps) {
   const today = dayFromToday(0)
   const [pane, setPane] = useState<'days' | 'list'>('days')
-  const [refreshing, setRefreshing] = useState(false)
+  const refreshing = useRef(false)
+  const [checking, setChecking] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
   const [changes, setChanges] = useState<ForecastChange[]>([])
+  /** The days as they were before the new weather changed them, for «Deshacer». */
+  const [before, setBefore] = useState<TripDay[]>()
+  const [now, setNow] = useState(Date.now())
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const latest = useRef(trip)
@@ -49,7 +66,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
 
   const options = useMemo(() => ({ preferences: data.preferences, feedback: data.feedback, wear: data.wear }), [data.preferences, data.feedback, data.wear])
   const summary = useMemo(() => summarizeWeather(trip.days.map((day) => day.weather)), [trip.days])
-  const groups = useMemo(() => packingGroups(garments, trip.days), [garments, trip.days])
+  const groups = useMemo(() => packingGroups(garments, trip.days, trip.extraGarmentIds), [garments, trip.days, trip.extraGarmentIds])
   const garmentCount = groups.reduce((sum, group) => sum + group.items.length, 0)
   const packedCount = groups.flatMap((group) => group.items).filter(({ garment }) => trip.packedIds.includes(garment.id)).length + trip.extras.filter((extra) => extra.packed).length
   const totalCount = garmentCount + trip.extras.length
@@ -63,42 +80,82 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
     void onChange(next)
   }
 
+  /**
+   * Looks at the forecast again. When it has changed, the days the user has not edited are planned again on their own
+   * (the edited ones stay as they are), and «Deshacer» brings the outfits back as they were.
+   */
   async function refresh(force: boolean) {
     const current = latest.current
     const coming = current.days.filter((day) => day.date >= today)
-    if (!coming.length) return
-    setRefreshing(true)
+    if (!coming.length || refreshing.current) return
+    refreshing.current = true
+    setChecking(true)
     setError('')
-    setMessage('')
+    if (force) setMessage('')
     try {
       const { days, fetchedAt, stale } = await getForecast(current.place, coming[0]!.date, coming.length, { force })
-      setChanges(forecastChanges(coming.map((day) => day.weather), days))
+      const found = forecastChanges(coming.map((day) => day.weather), days)
       update({ days: current.days.map((day) => ({ ...day, weather: days.find((item) => item.date === day.date) ?? day.weather })), fetchedAt })
-      setMessage(stale ? 'Sin conexión: es la última previsión guardada.' : force ? 'Previsión actualizada.' : '')
+      if (found.length) {
+        setChanges(found)
+        await adjustOutfits(current.days)
+      } else if (stale) {
+        setMessage('Sin conexión: es la última previsión guardada.')
+      } else if (force) {
+        setMessage('El tiempo no ha cambiado.')
+      }
     } catch (reason) {
       if (force) setError(reason instanceof Error ? reason.message : 'No se pudo actualizar la previsión.')
     } finally {
-      setRefreshing(false)
+      refreshing.current = false
+      setChecking(false)
+      setNow(Date.now())
     }
   }
 
-  // When the plan is opened after a while, the weather is looked at again: forecasts change, and far dates come within reach.
+  // The weather is looked at again on its own when the forecast has grown old: on opening the trip, on coming back to
+  // the app, and every so often while it stays open. Forecasts change, and far dates come within reach.
   useEffect(() => {
-    if (!finished && Date.now() - Date.parse(trip.fetchedAt ?? '') > REFRESH_AFTER) void refresh(false)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (finished) return
+    const check = () => {
+      setNow(Date.now())
+      if (document.visibilityState !== 'hidden' && Date.now() - Date.parse(latest.current.fetchedAt ?? '') > REFRESH_AFTER) void refresh(false)
+    }
+    check()
+    const timer = window.setInterval(check, CHECK_EVERY)
+    document.addEventListener('visibilitychange', check)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+    }
+  }, [finished]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function adjustOutfits() {
+  /** The days not edited, planned again for the new weather; `previous` is kept for «Deshacer». */
+  async function adjustOutfits(previous: TripDay[]) {
     setAdjusting(true)
     try {
-      const days = await planDaysInBackground(garments, latest.current.days, trip.style, options)
-      update({ days })
-      setChanges([])
-      setMessage('Outfits reajustados al nuevo tiempo.')
+      const planned = await planDaysInBackground(garments, latest.current.days, latest.current.style, options)
+      update({ days: planned })
+      setBefore(previous)
     } catch {
-      setError('No se pudieron reajustar los outfits.')
+      setError('No se pudieron reajustar los outfits al nuevo tiempo.')
     } finally {
       setAdjusting(false)
     }
+  }
+
+  function undoAdjust() {
+    if (!before) return
+    // The outfits as they were, with the new weather.
+    update({ days: before.map((day) => ({ ...day, weather: latest.current.days.find((item) => item.date === day.date)?.weather ?? day.weather })) })
+    setBefore(undefined)
+    setChanges([])
+    setMessage('Outfits como estaban, con el tiempo nuevo.')
+  }
+
+  function closeChanges() {
+    setChanges([])
+    setBefore(undefined)
   }
 
   /** Another kind of suitcase: the days the user has not edited are planned again with its rules. */
@@ -163,7 +220,8 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
   }, [trip.id, trip.cover?.imageUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const kindLabel = TRIP_KINDS.find((item) => item.id === trip.kind)?.label
-  const fetched = trip.fetchedAt ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(trip.fetchedAt)) : undefined
+  const fetched = trip.fetchedAt ? sinceText(Date.parse(trip.fetchedAt), now) : undefined
+  const kept = trip.days.filter((day) => day.edited).length
 
   return (
     <div className="trip">
@@ -184,7 +242,6 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
           </div>
         </div>
         <div className="trip-tools">
-          {!finished && <button type="button" className="button button-outline" onClick={() => void refresh(true)} disabled={refreshing}><HugeiconsIcon icon={Refresh01Icon} size={15} />{refreshing ? 'Consultando…' : 'Actualizar tiempo'}</button>}
           <button type="button" className="icon-button" onClick={() => void copyList()} aria-label="Copiar la lista" title="Copiar la lista"><HugeiconsIcon icon={Copy01Icon} size={16} /></button>
           <button type="button" className="icon-button" onClick={() => void remove()} aria-label="Eliminar el viaje" title="Eliminar el viaje"><HugeiconsIcon icon={Delete02Icon} size={16} /></button>
         </div>
@@ -202,10 +259,17 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
           <div>
             <strong>Ha cambiado la previsión</strong>
             <ul>{changes.map((change) => <li key={change.date}><span className="trip-capitalize">{dayName(change.date)}</span>: {change.text}</li>)}</ul>
+            <p className="trip-changes-done" role="status">
+              {adjusting
+                ? 'Reajustando los outfits…'
+                : before && (kept
+                  ? `Outfits reajustados. ${kept === 1 ? 'El día que cambiaste se queda como estaba' : `Los ${kept} días que cambiaste se quedan como estaban`}.`
+                  : 'Outfits reajustados al nuevo tiempo.')}
+            </p>
           </div>
           <div className="trip-changes-actions">
-            <button type="button" className="button button-dark" onClick={() => void adjustOutfits()} disabled={adjusting}>{adjusting ? 'Reajustando…' : 'Reajustar outfits'}</button>
-            <button type="button" className="studio-link" onClick={() => setChanges([])}>Dejarlos como están</button>
+            {before && !adjusting && <button type="button" className="button button-outline" onClick={undoAdjust}>Deshacer</button>}
+            <button type="button" className="icon-button" onClick={closeChanges} aria-label="Cerrar el aviso del tiempo" title="Cerrar"><HugeiconsIcon icon={Cancel01Icon} size={14} /></button>
           </div>
         </section>
       )}
@@ -218,14 +282,23 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
               <HugeiconsIcon icon={weatherIcon(weather)} size={22} />
               <strong>{weather.high ?? weather.temperatureCelsius}°</strong>
               <small>{weather.low ?? weather.temperatureCelsius}°</small>
-              <small className="weather-rain">{weather.rainChance !== undefined && weather.rainChance >= 20 ? `${weather.rainChance} %` : ' '}</small>
+              <small className="weather-rain">{weather.rainChance !== undefined && weather.rainChance >= 20 ? `${weather.rainChance} %` : ' '}</small>
             </li>
           ))}
         </ul>
         <div className="trip-advice">
           {summary.advice.map((advice) => <p key={advice}>{advice}</p>)}
           {summary.climateDays > 0 && <p>{summary.climateDays === trip.days.length ? 'Fechas lejanas' : `${summary.climateDays} de los días están lejos`}: es lo habitual en años anteriores, no una previsión. Se actualizará al acercarse.</p>}
-          <p className="weather-note">{fetched && `Consultado el ${fetched}. `}<WeatherCredit /></p>
+          <p className="weather-note">
+            {!finished && (
+              <span className="weather-updated">
+                {checking ? 'Consultando el tiempo…' : fetched ? `Actualizado ${fetched}; se actualiza solo.` : 'Se actualiza solo.'}
+                <button type="button" className="weather-refresh" onClick={() => void refresh(true)} disabled={checking} aria-label="Consultar el tiempo ahora" title="Consultar el tiempo ahora"><HugeiconsIcon icon={Refresh01Icon} size={13} /></button>
+              </span>
+            )}
+            {finished && fetched && `Consultado ${fetched}. `}
+            <WeatherCredit />
+          </p>
         </div>
       </section>
 
@@ -252,7 +325,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
             />
           ))}
         </section>
-        <PackingList trip={trip} groups={groups} onChange={update} />
+        <PackingList trip={trip} groups={groups} garments={garments} onChange={update} />
       </div>
     </div>
   )
