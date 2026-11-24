@@ -310,7 +310,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
       <div className="studio-layout">
         <section className="studio-board" aria-label="Outfit" onTouchStart={(event) => { touchStart.current = { x: event.touches[0]?.clientX ?? 0, y: event.touches[0]?.clientY ?? 0 } }} onTouchEnd={finishSwipe}>
           <ul className="studio-slots">
-            {slots.map(({ role, garment }) => (
+            {slots.filter(({ garment }) => garment || !hasBase).map(({ role, garment }) => (
               <li key={role} className={garment ? 'studio-slot' : 'studio-slot studio-slot-empty'}>
                 {garment ? (
                   <>
@@ -334,6 +334,17 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
               </li>
             ))}
           </ul>
+          {/* Once the outfit can be worn, what could still be added is a small button, not a place as big as a garment. */}
+          {hasBase && slots.some(({ garment }) => !garment) && (
+            <div className="studio-add-row">
+              {slots.filter(({ garment }) => !garment).map(({ role }) => (
+                <button key={role} type="button" className="trip-add" onClick={() => setPicking(role)}>
+                  <HugeiconsIcon icon={Add01Icon} size={13} />
+                  {role === 'Capa' || role === 'Accesorio' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         <aside className="studio-side">

@@ -1311,3 +1311,12 @@ img[data-transparent] { mix-blend-mode: normal; }
   .outfit-heading { align-items: center; }
   .save-outfit-actions .button { flex: 1; }
 }
+/* The studio, tidier: what can still be added under the outfit, small; on a phone the occasions in one row that
+   scrolls, and the other ideas right under the outfit. */
+.studio-add-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+@media (max-width: 720px) {
+  .studio-plan > .choice-row { flex-wrap: nowrap; margin-inline: -16px; padding: 2px 16px 4px; overflow-x: auto; scrollbar-width: none; }
+  .studio-plan > .choice-row .choice-chip { flex: none; }
+  .studio-board { order: -2; }
+  .studio-ideas { order: -1; }
+}
