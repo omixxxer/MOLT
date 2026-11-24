@@ -134,7 +134,8 @@ describe('OutfitGenerator', () => {
     expect(onAvailabilityChange).toHaveBeenCalledWith(expect.objectContaining({ id: other, availability: 'laundry' }))
     await user.click(within(picker).getByRole('button', { name: other }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(onBoard()).toContain(other)
+    // The garment's thumbnail is read from the database when it reaches the board.
+    await waitFor(() => expect(onBoard()).toContain(other))
     expect(screen.getByRole('button', { name: `Soltar ${other}` })).toBeInTheDocument()
   })
 
@@ -304,7 +305,7 @@ describe('OutfitGenerator', () => {
     await waitFor(async () => expect((await database.outfits.toArray())[0]?.name).toBe('Reunión'))
 
     await user.click(screen.getByRole('button', { name: 'Cambiar' }))
-    expect(onBoard().sort()).toEqual([...shown].sort())
+    await waitFor(() => expect(onBoard().sort()).toEqual([...shown].sort()))
 
     await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
     await user.click(await screen.findByRole('button', { name: 'Eliminar Reunión' }))
