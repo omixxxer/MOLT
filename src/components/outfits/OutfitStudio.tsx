@@ -92,6 +92,8 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
   }), [data.preferences, data.feedback, data.wear])
 
   const current = useMemo(() => (board.length ? scoreOutfit(board, context, options) : undefined), [board, context, options])
+  /** The combinations kept in «Mis outfits» (saved or made by hand). */
+  const savedKeys = useMemo(() => new Set(data.outfits.filter((outfit) => outfit.favorite || outfit.kind === 'manual').map((outfit) => [...outfit.garmentIds].sort().join('|'))), [data.outfits])
   const boardKey = outfitKey(board)
   const sameOutfit = data.outfits.filter((outfit) => [...outfit.garmentIds].sort().join('|') === boardKey)
   const saved = sameOutfit.some((outfit) => outfit.favorite || outfit.kind === 'manual')
@@ -106,8 +108,17 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
     setError('')
     setNotice('')
     const request = { ...context, includeGarmentIds: keep }
-    if (!more) shownKeys.current.clear()
+    if (!more) {
+      shownKeys.current.clear()
+      // A new outfit is a new one: the combinations already in «Mis outfits» are not proposed again (they are
+      // there to wear), unless nothing else can be made.
+      for (const key of savedKeys) shownKeys.current.add(key)
+    }
     let found = generateOutfitCandidates(garments, request, { ...options, skip: shownKeys.current })
+    if (!found.length && !more && savedKeys.size) {
+      shownKeys.current.clear()
+      found = generateOutfitCandidates(garments, request, options)
+    }
     if (!found.length && more) {
       shownKeys.current.clear()
       found = generateOutfitCandidates(garments, request, options)
@@ -119,7 +130,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
     setTried({})
     if (found[0]) setBoard(found[0].garments)
     else if (!more) setNotice(explainNoOutfits(garments, request))
-  }, [context, garments, locked, options])
+  }, [context, garments, locked, options, savedKeys])
 
   // A new proposal whenever the plan changes; before painting, so the board never shows empty first.
   const plan = JSON.stringify([occasion, desiredStyle])

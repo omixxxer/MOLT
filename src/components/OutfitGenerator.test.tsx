@@ -36,8 +36,8 @@ const wardrobe = () => [
 
 function setup(garments = wardrobe(), extra: Partial<Parameters<typeof OutfitGenerator>[0]> = {}) {
   const onAvailabilityChange = vi.fn().mockResolvedValue(undefined)
-  render(<OutfitGenerator garments={garments} onAvailabilityChange={onAvailabilityChange} {...extra} />)
-  return { user: userEvent.setup(), onAvailabilityChange }
+  const view = render(<OutfitGenerator garments={garments} onAvailabilityChange={onAvailabilityChange} {...extra} />)
+  return { user: userEvent.setup(), onAvailabilityChange, unmount: view.unmount }
 }
 
 /** Outfits opens on «Mis outfits»: the studio, from «Crear outfit». */
@@ -274,6 +274,30 @@ describe('OutfitGenerator', () => {
     expect([...onBoard()].sort()).toEqual(proposal)
     // The saved outfit now has other garments, so this proposal is a new one to save.
     expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
+  })
+
+  it('does not propose again, as a new outfit, one already in Mis outfits', async () => {
+    const first = await studio()
+    await boardReady()
+    const saved = [...onBoard()].sort()
+    await first.user.click(screen.getByRole('button', { name: 'Guardar' }))
+    await first.user.click(within(screen.getByRole('dialog', { name: 'Guardar outfit' })).getByRole('button', { name: 'Guardar en Mis outfits' }))
+    await screen.findByRole('button', { name: 'Guardado' })
+    first.unmount()
+
+    await studio()
+    await boardReady()
+    expect([...onBoard()].sort()).not.toEqual(saved)
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
+  })
+
+  it('still proposes a saved outfit when it is the only one that can be made', async () => {
+    const only = [makeGarment('camisa', 'Top'), makeGarment('vaqueros', 'Bottom')]
+    await database.outfits.put({ id: 'o', garmentIds: ['camisa', 'vaqueros'], occasion: 'Diario', kind: 'generated', score: 80, createdAt: '2026-11-01T00:00:00.000Z', favorite: true })
+    await studio(only)
+    await boardReady()
+    expect([...onBoard()].sort()).toEqual(['camisa', 'vaqueros'])
+    expect(screen.getByRole('button', { name: 'Guardado' })).toBeDisabled()
   })
 
   it('closes the save dialog without saving', async () => {
