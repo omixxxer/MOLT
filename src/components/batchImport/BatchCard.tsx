@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Alert02Icon, PencilEdit02Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../../ai/colors'
 import { categoryIdForLabel, taxonomy } from '../../ml/taxonomy'
 import { garmentCategories, type GarmentCategory } from '../../types/domain'
 import ColorPalette from '../ColorPalette'
 import GarmentPhoto from '../GarmentPhoto'
+import EditIcon from '../EditIcon'
 import PhotoEditor from '../garmentForm/PhotoEditor'
 import {
   editGarment,
@@ -101,14 +102,14 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
         )}
         <button
           type="button"
-          className="batch-edit-photo"
+          className="edit-photo batch-edit-photo"
           onClick={() => setEditing(main.id)}
           onPointerDown={(event) => event.stopPropagation()}
           disabled={disabled}
           aria-label={`Editar la foto principal de ${subcategory || garment.category}: recortar o girar`}
           title="Recortar o girar la foto"
         >
-          <HugeiconsIcon icon={PencilEdit02Icon} size={15} />
+          <EditIcon />
         </button>
       </div>
 
@@ -140,8 +141,8 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
       )}
       {chosen && (
         <div className="batch-thumb-actions">
-          <button type="button" className="batch-thumb-edit" onClick={() => setEditing(chosen)} disabled={disabled} aria-label={chosenIsLabel ? 'Editar la foto de la etiqueta: recortar o girar' : 'Editar esta foto: recortar o girar'} title="Recortar o girar la foto">
-            <HugeiconsIcon icon={PencilEdit02Icon} size={14} />
+          <button type="button" className="edit-photo batch-thumb-edit" onClick={() => setEditing(chosen)} disabled={disabled} aria-label={chosenIsLabel ? 'Editar la foto de la etiqueta: recortar o girar' : 'Editar esta foto: recortar o girar'} title="Recortar o girar la foto">
+            <EditIcon size={16} />
           </button>
           {chosenIsLabel
             ? <button type="button" onClick={() => toggleLabel(garment.id, chosen)} disabled={disabled}>No es la etiqueta</button>

@@ -239,8 +239,12 @@ h1, h2, p { margin-top: 0; }
 .photo-stage-bar { position: absolute; right: 9px; bottom: 9px; left: 9px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .photo-stage-pill { min-height: 28px; display: inline-flex; align-items: center; padding: 0 10px; border: 0; border-radius: 14px; background: rgba(248, 246, 251, .94); font-size: var(--text-small); font-weight: 650; }
 button.photo-stage-pill { text-decoration: underline; }
-/* The pencil that opens the photo editor: an icon, a round button of the pills' height. */
-.photo-stage-pill.photo-stage-icon { justify-content: center; width: 28px; padding: 0; text-decoration: none; }
+/* The pencil that opens the photo editor (EditIcon), wherever a photo is loaded: a dark round button, so it stands
+   out over any photo. */
+.edit-photo { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; min-height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--white); text-decoration: none; cursor: pointer; box-shadow: 0 2px 8px rgba(45, 40, 56, .22); }
+.edit-photo:hover:not(:disabled) { background: #453E55; }
+.edit-photo:disabled { opacity: .45; cursor: default; }
+.photo-stage-pill.edit-photo { padding: 0; background: var(--ink); }
 .photo-strip { display: flex; gap: 7px; padding: 1px; overflow-x: auto; scrollbar-width: thin; }
 .photo-thumb { position: relative; flex: none; display: block; width: 58px; height: 58px; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--garment-surface); }
 .photo-thumb[aria-pressed=true] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
@@ -283,7 +287,9 @@ button.photo-stage-pill { text-decoration: underline; }
 .label-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .label-upload:focus-within { outline: 2px solid var(--lavender); outline-offset: 3px; }
 .label-slot-body { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft-surface); }
-.label-slot-body > img { width: 96px; height: 96px; border-radius: 6px; background: var(--white); object-fit: contain; }
+.label-slot-photo { position: relative; width: 96px; height: 96px; }
+.label-slot-photo > img { width: 96px; height: 96px; border-radius: 6px; background: var(--white); object-fit: contain; }
+.label-slot-edit { position: absolute; right: 4px; bottom: 4px; width: 28px; height: 28px; min-height: 28px; }
 .label-slot-reading { min-width: 0; display: grid; gap: 8px; }
 .label-slot-reading .analysis-read > div { grid-template-columns: 76px minmax(0, 1fr); }
 .label-slot-reading .analysis-progress { margin: 0; }
@@ -938,10 +944,10 @@ button.choice-chip { font-family: inherit; }
 .batch-thumb-actions { display: flex; flex-wrap: wrap; gap: 5px; padding: 7px 10px 0; }
 .batch-thumb-actions button { min-height: 28px; padding: 0 9px; border: 1px solid var(--mist); border-radius: 14px; background: var(--white); font-size: var(--text-caption); font-weight: 650; }
 .batch-thumb-actions button:hover { background: var(--mist); }
-/* The pencil that opens the photo editor, on the main photo and among a thumbnail's actions. */
-.batch-edit-photo { position: absolute; top: 9px; right: 9px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: rgba(248, 246, 251, .94); color: var(--ink); }
-.batch-edit-photo:hover { background: var(--white); }
-.batch-thumb-actions .batch-thumb-edit { display: grid; place-items: center; width: 28px; padding: 0; }
+/* The pencil (.edit-photo) on the card's main photo and among a thumbnail's actions. */
+.batch-edit-photo { position: absolute; top: 9px; right: 9px; }
+.batch-thumb-actions .batch-thumb-edit { width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; background: var(--ink); color: var(--white); }
+.batch-thumb-actions .batch-thumb-edit:hover:not(:disabled) { background: #453E55; }
 /* Regrouping by dragging (batchImport/cardDrag.tsx): the card's photo and each thumbnail can be picked up. */
 .batch-card-image, .batch-thumb { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .batch-card-image { cursor: grab; }
@@ -1053,6 +1059,9 @@ html:has(.card-drag-ghost), html:has(.card-drag-ghost) * { cursor: grabbing !imp
 .look-source { position: sticky; top: 96px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .look-source img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--line); border-radius: 12px; }
 .look-source .batch-add-more { justify-self: start; }
+/* The look photo with its pencil (.edit-photo) in a corner. */
+.look-source-photo, .look-empty-photo { position: relative; }
+.look-edit { position: absolute; right: 8px; bottom: 8px; }
 .look-import label > input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 /* Only the button opens the file chooser (not the whole card, as .photo-drop-choose does). */
 .look-choose { position: relative; cursor: pointer; }
@@ -1077,7 +1086,8 @@ html:has(.card-drag-ghost), html:has(.card-drag-ghost) * { cursor: grabbing !imp
 
 .look-empty { display: flex; align-items: center; gap: 24px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
 .look-empty img { flex: none; width: 140px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; filter: grayscale(.6); opacity: .8; }
-.look-empty > div { display: grid; justify-items: start; gap: 10px; }
+.look-empty > div:not(.look-empty-photo) { display: grid; justify-items: start; gap: 10px; }
+.look-empty-photo { flex: none; }
 .look-empty p { margin: 0; font-size: var(--text-body); line-height: 1.6; }
 .look-empty .photo-drop-actions { justify-content: flex-start; margin: 4px 0 0; }
 .look-link { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; font-size: var(--text-label); text-decoration: underline; }
@@ -1093,7 +1103,9 @@ html:has(.card-drag-ghost), html:has(.card-drag-ghost) * { cursor: grabbing !imp
   .look-scan { width: min(220px, 70%); justify-self: center; }
   .look-results { grid-template-columns: 1fr; gap: 16px; }
   .look-source { position: static; grid-template-columns: 72px minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 6px; }
-  .look-source img { grid-row: span 2; width: 72px; }
+  .look-source-photo { grid-row: span 2; width: 72px; }
+  .look-source img { width: 72px; }
+  .look-source .look-edit { right: 4px; bottom: 4px; width: 28px; height: 28px; min-height: 28px; }
   .look-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .look-empty { flex-direction: column; align-items: flex-start; padding: 16px; }
   .look-empty img { width: 110px; }

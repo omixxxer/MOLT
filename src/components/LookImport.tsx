@@ -14,6 +14,8 @@ import { isStorageFull, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import { garmentCategories, roleByCategory, type GarmentCategory, type GarmentWithPhotos, type Outfit } from '../types/domain'
 import { analysisRecord } from './garmentForm/analysisRecord'
 import { createSuggestedGarmentName } from './garmentForm/garmentName'
+import PhotoEditor from './garmentForm/PhotoEditor'
+import EditIcon from './EditIcon'
 import GarmentPhoto from './GarmentPhoto'
 import LookIllustration from './LookIllustration'
 import TakePhoto from './TakePhoto'
@@ -62,6 +64,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
   const [saveLook, setSaveLook] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [editing, setEditing] = useState(false)
   const photoUrl = useObjectUrl(photo)
   const busy = Boolean(stage) || saving
 
@@ -111,6 +114,13 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
     } finally {
       setStage(undefined)
     }
+  }
+
+  /** The look photo turned or cropped (to leave out another person, say): it replaces the photo and is analysed again. */
+  function applyEdit(edited: Blob) {
+    setEditing(false)
+    if (!photo) return
+    void choose(new File([edited], photo.name, { type: edited.type || photo.type, lastModified: photo.lastModified }))
   }
 
   function restart() {
@@ -203,6 +213,12 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
   }
 
   const chosen = found?.filter((entry) => entry.include) ?? []
+  const editButton = (
+    <button type="button" className="edit-photo look-edit" onClick={() => setEditing(true)} disabled={busy} aria-label="Editar la foto del look: recortar o girar" title="Recortar o girar la foto. Molt la analizará de nuevo.">
+      <EditIcon />
+    </button>
+  )
+  const editor = editing && photo && <PhotoEditor photo={photo} onCancel={() => setEditing(false)} onApply={applyEdit} />
   const pickPhoto = (label: string, className: string) => (
     <label className={className}>
       {label}
@@ -259,7 +275,10 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
       <div className="look-import">
         <section className="look-results" aria-labelledby="look-results-title">
           <aside className="look-source">
-            {photoUrl && <img src={photoUrl} alt="Tu foto" />}
+            <div className="look-source-photo">
+              {photoUrl && <img src={photoUrl} alt="Tu foto" />}
+              {editButton}
+            </div>
             <small>Tu foto no se guarda: solo los recortes.</small>
             {pickPhoto('Usar otra foto', 'batch-add-more')}
           </aside>
@@ -321,6 +340,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
             </div>
           </div>
         </div>
+        {editor}
       </div>
     )
   }
@@ -330,10 +350,13 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
     return (
       <div className="look-import">
         <section className="look-empty" aria-labelledby="look-empty-title">
-          {photoUrl && <img src={photoUrl} alt="La foto analizada" />}
+          <div className="look-empty-photo">
+            {photoUrl && <img src={photoUrl} alt="La foto analizada" />}
+            {editButton}
+          </div>
           <div>
             <h2 id="look-empty-title" className="look-title">No hemos encontrado prendas</h2>
-            <p>Suele pasar si la foto no es de cuerpo entero, hay poca luz o salen varias personas.</p>
+            <p>Suele pasar si la foto no es de cuerpo entero, hay poca luz o salen varias personas. Si sale alguien más, recórtala con el lápiz.</p>
             <div className="photo-drop-actions">
               <TakePhoto label="Hacer otra foto" ariaLabel="Hacer otra foto de cuerpo entero" disabled={busy} onTake={(files) => void choose(files?.[0])} />
               {pickPhoto('Elegir otra foto', 'button button-dark look-choose')}
@@ -344,6 +367,7 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
         <footer className="form-footer">
           <button className="button button-outline" type="button" onClick={onCancel}>Cancelar</button>
         </footer>
+        {editor}
       </div>
     )
   }
