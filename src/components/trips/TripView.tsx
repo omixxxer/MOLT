@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Cancel01Icon, Copy01Icon, Delete02Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { forecastChanges, packingGroups, packingText, PACKING_STYLES, summarizeWeather, TRIP_KINDS, tripDates, type ForecastChange } from '../../trips/packingPlan'
@@ -13,6 +13,7 @@ import type { OutfitData } from '../outfits/outfitData'
 import { WeatherCredit, weatherIcon } from '../weather/WeatherBar'
 import EditIcon from '../EditIcon'
 import PackingList from './PackingList'
+import { tripWhen } from './TripCard'
 import TripDayCard from './TripDayCard'
 import TripScene from './TripScene'
 import { useObjectUrl } from '../useObjectUrl'
@@ -178,6 +179,32 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
     }
   }
 
+  // The day shown: today during the trip, the first day still to come before it, the first one once it is over.
+  const [shownDate, setShownDate] = useState(() => (trip.days.find((day) => day.date >= today) ?? trip.days[0])?.date)
+  const found = trip.days.findIndex((day) => day.date === shownDate)
+  const shownIndex = found < 0 ? 0 : found
+  const shownDay = trip.days[shownIndex]!
+
+  // The chosen day stays in view in the strip, which scrolls sideways on a phone (only the strip, never the page).
+  useEffect(() => {
+    const chip = document.getElementById(`trip-day-${shownDay.date}`)
+    const strip = chip?.parentElement
+    if (!chip || !strip) return
+    if (chip.offsetLeft < strip.scrollLeft) strip.scrollLeft = chip.offsetLeft - 8
+    else if (chip.offsetLeft + chip.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = chip.offsetLeft + chip.offsetWidth - strip.clientWidth + 8
+  }, [shownDay.date])
+
+  /** Arrow keys, Home and End move between the days, as in any list of tabs. */
+  function moveDay(event: KeyboardEvent<HTMLDivElement>) {
+    const last = trip.days.length - 1
+    const next = { ArrowRight: shownIndex + 1, ArrowLeft: shownIndex - 1, Home: 0, End: last }[event.key]
+    if (next === undefined) return
+    event.preventDefault()
+    const date = trip.days[Math.max(0, Math.min(last, next))]!.date
+    setShownDate(date)
+    document.getElementById(`trip-day-${date}`)?.focus()
+  }
+
   /** On a phone only one pane shows: editing brings up the list, where the changes are made. */
   function toggleEditing(on: boolean) {
     setEditing(on)
@@ -239,6 +266,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
           {coverUrl ? <img src={coverUrl} alt="" /> : <TripScene scene={scene} />}
         </div>
         <div className="trip-header-text">
+          <span className="trip-card-when" data-finished={finished ? '' : undefined}>{tripWhen(trip, today)}</span>
           <h2>{trip.place.name}</h2>
           <p>{tripDates(trip)} · {trip.days.length} {trip.days.length === 1 ? 'día' : 'días'} · {kindLabel}</p>
           <p className="trip-place">{placeLabel(trip.place)}</p>
@@ -294,56 +322,75 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
         </section>
       )}
 
-      <section className="trip-weather" aria-label="Tiempo durante el viaje">
-        <ul className="weather-strip">
-          {trip.days.map(({ weather }) => (
-            <li key={weather.date} className={weather.source === 'climate' ? 'climate' : undefined}>
-              <span className="trip-capitalize">{dayName(weather.date)}</span>
-              <HugeiconsIcon icon={weatherIcon(weather)} size={22} />
-              <strong>{weather.high ?? weather.temperatureCelsius}°</strong>
-              <small>{weather.low ?? weather.temperatureCelsius}°</small>
-              <small className="weather-rain">{weather.rainChance !== undefined && weather.rainChance >= 20 ? `${weather.rainChance} %` : ' '}</small>
-            </li>
-          ))}
-        </ul>
-        <div className="trip-advice">
-          {summary.advice.map((advice) => <p key={advice}>{advice}</p>)}
-          {summary.climateDays > 0 && <p>{summary.climateDays === trip.days.length ? 'Fechas lejanas' : `${summary.climateDays} de los días están lejos`}: es lo habitual en años anteriores, no una previsión. Se actualizará al acercarse.</p>}
-          <p className="weather-note">
-            {!finished && (
-              <span className="weather-updated">
-                {checking ? 'Consultando el tiempo…' : fetched ? `Actualizado ${fetched}; se actualiza solo.` : 'Se actualiza solo.'}
-                <button type="button" className="weather-refresh" onClick={() => void refresh(true)} disabled={checking} aria-label="Consultar el tiempo ahora" title="Consultar el tiempo ahora"><HugeiconsIcon icon={Refresh01Icon} size={13} /></button>
-              </span>
-            )}
-            {finished && fetched && `Consultado ${fetched}. `}
-            <WeatherCredit />
-          </p>
-        </div>
-      </section>
-
       <div className="trip-tabs" role="tablist" aria-label="Ver">
         <button type="button" role="tab" aria-selected={pane === 'days'} onClick={() => setPane('days')}>Qué ponerte</button>
-        <button type="button" role="tab" aria-selected={pane === 'list'} onClick={() => setPane('list')}>Lista · {packedCount}/{totalCount}</button>
+        <button type="button" role="tab" aria-selected={pane === 'list'} onClick={() => setPane('list')}>Maleta · {packedCount}/{totalCount}</button>
       </div>
 
       <div className="trip-layout" data-pane={pane}>
         <section className="trip-days" aria-label="Qué ponerte cada día">
-          {trip.days.map((day, index) => (
+          {/* The days of the trip, each with its weather: choosing one shows what to wear that day. */}
+          <div className="trip-day-picker" role="tablist" aria-label="Días del viaje" onKeyDown={moveDay}>
+            {trip.days.map(({ date, weather }) => {
+              const chosen = date === shownDay.date
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  role="tab"
+                  id={`trip-day-${date}`}
+                  aria-selected={chosen}
+                  aria-controls="trip-day-panel"
+                  tabIndex={chosen ? 0 : -1}
+                  className="trip-day-chip"
+                  data-past={date < today ? '' : undefined}
+                  data-climate={weather.source === 'climate' ? '' : undefined}
+                  onClick={() => setShownDate(date)}
+                >
+                  <span className="trip-capitalize">{date === today ? 'Hoy' : dayName(date)}</span>
+                  <HugeiconsIcon icon={weatherIcon(weather)} size={20} />
+                  <strong>{weather.high ?? weather.temperatureCelsius}°</strong>
+                  <small>{weather.low ?? weather.temperatureCelsius}°</small>
+                  <small className="weather-rain">{weather.rainChance !== undefined && weather.rainChance >= 20 ? `${weather.rainChance} %` : ' '}</small>
+                </button>
+              )
+            })}
+          </div>
+
+          <div id="trip-day-panel" role="tabpanel" aria-labelledby={`trip-day-${shownDay.date}`}>
             <TripDayCard
-              key={day.date}
-              day={day}
+              key={shownDay.date}
+              day={shownDay}
               days={trip.days}
-              index={index}
+              index={shownIndex}
               style={trip.style}
               garments={garments}
               data={data}
               options={options}
-              onChange={(next) => replaceDay(index, next)}
+              onChange={(next) => replaceDay(shownIndex, next)}
               onDataChanged={onDataChanged}
               onAvailabilityChange={onAvailabilityChange}
             />
-          ))}
+          </div>
+
+          <section className="trip-weather" aria-label="Tiempo durante el viaje">
+            {(summary.advice.length > 0 || summary.climateDays > 0) && (
+              <ul className="trip-advice">
+                {summary.advice.map((advice) => <li key={advice}>{advice}</li>)}
+                {summary.climateDays > 0 && <li>{summary.climateDays === trip.days.length ? 'Fechas lejanas' : `${summary.climateDays} de los días están lejos`}: es lo habitual en años anteriores, no una previsión. Se actualizará al acercarse.</li>}
+              </ul>
+            )}
+            <p className="weather-note">
+              {!finished && (
+                <span className="weather-updated">
+                  {checking ? 'Consultando el tiempo…' : fetched ? `Tiempo actualizado ${fetched}; se actualiza solo.` : 'El tiempo se actualiza solo.'}
+                  <button type="button" className="weather-refresh" onClick={() => void refresh(true)} disabled={checking} aria-label="Consultar el tiempo ahora" title="Consultar el tiempo ahora"><HugeiconsIcon icon={Refresh01Icon} size={13} /></button>
+                </span>
+              )}
+              {finished && fetched && `Consultado ${fetched}. `}
+              <WeatherCredit />
+            </p>
+          </section>
         </section>
         <PackingList trip={trip} groups={groups} garments={garments} editing={editing} onChange={update} />
       </div>

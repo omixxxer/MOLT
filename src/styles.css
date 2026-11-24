@@ -1252,3 +1252,32 @@ img[data-transparent] { mix-blend-mode: normal; }
   .packing-garment button, .weather-refresh { width: 40px; height: 40px; }
   .packing-notes textarea { font-size: 16px; }
 }
+
+/* A trip, day by day (TripView): the days are tabs with their weather, and one day's outfit shows at a time. */
+.trip-header-text .trip-card-when { margin-bottom: 6px; }
+.trip-card-when[data-finished] { background: var(--mist); color: var(--ink); }
+.trip-days { align-content: start; }
+.trip-day-picker { position: relative; display: flex; gap: 6px; margin: 0; padding: 2px 2px 4px; overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.trip-day-chip { position: relative; display: grid; flex: 1 0 64px; justify-items: center; gap: 2px; max-width: 140px; padding: 8px 4px 7px; border: 1px solid transparent; border-radius: 12px; background: var(--soft-surface); color: var(--ink); font-size: var(--text-small); scroll-snap-align: start; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.trip-day-chip strong { font-family: var(--serif); font-size: 18px; font-weight: 500; line-height: 1.1; }
+.trip-day-chip small { font-size: var(--text-small); }
+.trip-day-chip:hover { border-color: var(--line); }
+.trip-day-chip[data-climate] { background: transparent; border-color: var(--line); }
+.trip-day-chip[data-past] { opacity: .55; }
+.trip-day-chip[aria-selected=true] { border-color: var(--ink); background: var(--ink); color: var(--white); opacity: 1; box-shadow: 0 4px 12px rgba(45, 40, 56, .22); }
+.trip-day-chip[aria-selected=true] .weather-rain { color: inherit; }
+#trip-day-panel { min-width: 0; }
+.trip-weather { gap: 8px; }
+.trip-advice { display: grid; gap: 6px; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--soft-surface); list-style: none; font-size: var(--text-body); line-height: 1.45; }
+.trip-advice li { position: relative; padding-left: 16px; }
+.trip-advice li::before { content: ''; position: absolute; top: .55em; left: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--lavender); }
+/* Beside the days on a wide screen, the list grows with its content instead of scrolling inside the page. */
+@media (min-width: 721px) {
+  .packing-list { max-height: none; overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { .trip-day-chip { transition: none; } }
+@media (max-width: 720px) {
+  /* The credit goes top left on the photo band, clear of the name and of the tools on the right. */
+  .trip-credit { top: 10px; right: auto; bottom: auto; left: 10px; max-width: calc(100% - 150px); }
+  .trip-day-chip { flex-basis: 58px; }
+}
