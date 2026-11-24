@@ -5,7 +5,7 @@ import { database } from '../../db/database'
 import { createOutfitFeedback } from '../../outfits/outfitGenerator'
 import type { Garment, Outfit } from '../../types/domain'
 import { askConfirm } from '../confirmDialog'
-import OutfitBoard from '../OutfitBoard'
+import OutfitCollage from './OutfitCollage'
 import type { OutfitData } from './outfitData'
 
 type Filter = 'all' | 'favorites' | 'worn'
@@ -30,10 +30,12 @@ interface SavedOutfitsProps {
   onChanged: () => Promise<void>
   /** Opens the outfit in the studio, to change it. */
   onOpen: (outfit: Outfit) => void
+  /** To the studio, to make a new outfit. */
+  onCreate: () => void
 }
 
 /** The outfits the user keeps or has worn: to wear again, change, rename or delete. */
-export default function SavedOutfits({ garments, data, onChanged, onOpen }: SavedOutfitsProps) {
+export default function SavedOutfits({ garments, data, onChanged, onOpen, onCreate }: SavedOutfitsProps) {
   const [filter, setFilter] = useState<Filter>('all')
   const [error, setError] = useState('')
   const kept = data.outfits.filter((outfit) => outfit.favorite || outfit.kind === 'manual' || outfit.wornAt)
@@ -76,7 +78,8 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen }: Save
       <section className="empty-state">
         <div className="empty-mark" aria-hidden="true">♡</div>
         <h2>Aún no hay outfits.</h2>
-        <p>Guarda los que te gusten o marca «Me lo pongo hoy», y aquí tendrás tu historial.</p>
+        <p>Crea uno: Molt te propone el de hoy según la ocasión y el tiempo, y lo cambias pieza a pieza. Los que guardes o te pongas aparecerán aquí.</p>
+        <button className="button button-dark" type="button" onClick={onCreate}>Crear outfit</button>
       </section>
     )
   }
@@ -95,13 +98,16 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen }: Save
           const count = wearings(outfit)
           const title = outfit.name || outfit.occasion
           return (
-            <article className="outfit-card" key={outfit.id}>
+            <article className="outfit-card saved-card" key={outfit.id}>
+              <div className="saved-art">
+                {outfitGarments.length > 0 && <OutfitCollage garments={outfitGarments} />}
+                <span className="saved-origin" data-kind={outfit.kind}>{outfit.kind === 'manual' ? 'Creado por ti' : 'Idea de Molt'}</span>
+              </div>
               <input className="saved-name" aria-label="Nombre del outfit" defaultValue={title} key={title} onBlur={(event) => rename(outfit, event.target.value === outfit.occasion ? '' : event.target.value)} maxLength={60} />
-              {outfitGarments.length > 0 && <OutfitBoard garments={outfitGarments} />}
-              {outfitGarments.length < outfit.garmentIds.length && <p className="outfit-explanation">Algunas prendas de este outfit ya no están en el armario.</p>}
-              <p className="outfit-explanation">
-                {outfit.wornAt ? `Puesto ${daysAgo(outfit.wornAt)}${count > 1 ? ` · ${count} veces` : ''}` : `Guardado ${daysAgo(outfit.createdAt)}`}
+              <p className="saved-meta">
+                {outfit.occasion} · {outfit.wornAt ? `puesto ${daysAgo(outfit.wornAt)}${count > 1 ? ` · ${count} veces` : ''}` : `guardado ${daysAgo(outfit.createdAt)}`}
               </p>
+              {outfitGarments.length < outfit.garmentIds.length && <p className="outfit-explanation">Algunas prendas de este outfit ya no están en el armario.</p>}
               <div className="outfit-actions">
                 <button type="button" className="button button-dark" onClick={() => void wear(outfit)} disabled={Boolean(outfit.wornAt) && sameDay(new Date(outfit.wornAt!), new Date())}>
                   {outfit.wornAt && sameDay(new Date(outfit.wornAt), new Date()) ? 'Puesto hoy' : 'Me lo pongo hoy'}
