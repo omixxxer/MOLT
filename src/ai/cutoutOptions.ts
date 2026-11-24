@@ -10,5 +10,10 @@ import type { LookOptions } from './cutout'
  * stays as before.
  */
 export function appCutoutOptions(category?: GarmentCategory): LookOptions {
-  return { refine: 'map', person: true, clean: 'skin', ...(category ? { focus: categoryIdForLabel(category) } : {}) }
+  return { refine: 'map', person: true, clean: 'skin', ...(category ? { focus: segmentationClassOf(categoryIdForLabel(category)) } : {}) }
+}
+
+/** The segmentation head's class for a category: jewellery is too small for its grid and is learnt as accessories. */
+export function segmentationClassOf(categoryId: string) {
+  return categoryId === 'jewellery' ? 'accessory' : categoryId
 }

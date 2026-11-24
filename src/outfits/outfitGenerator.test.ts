@@ -520,3 +520,52 @@ describe('validation with large wardrobes', () => {
     expect(elapsed).toBeLessThan(1500)
   })
 })
+
+describe('jewellery (its own role since taxonomy v6)', () => {
+  const base = () => [
+    garment('camisa', 'Top', { colors: ['Blanco'] }),
+    garment('pantalon', 'Bottom', { colors: ['Negro'] }),
+    garment('zapatos', 'Calzado', { colors: ['Negro'] })
+  ]
+  const jewel = (id: string, colour: string, extras: Partial<Garment> = {}) => garment(id, 'Joya', { category: 'Joyería', subcategory: 'Collar', colors: [colour], dressLevels: ['Diario', 'Arreglado', 'Formal'], ...extras })
+
+  it('adds a piece to the outfit, without competing with a bag, and none for sport', () => {
+    const wardrobe = [...base(), garment('bolso', 'Accesorio', { category: 'Accesorio', subcategory: 'Bolso', colors: ['Negro'] }), jewel('collar', 'Plateado')]
+    const [best] = generateOutfitCandidates(wardrobe, { occasion: 'Arreglado', temperatureCelsius: 18 })
+    expect(best!.garments.map((item) => item.id)).toContain('collar')
+    const sport = generateOutfitCandidates(wardrobe, { occasion: 'Deportivo', temperatureCelsius: 18 })
+    expect(sport.flatMap((outfit) => outfit.garments).some((item) => item.role === 'Joya')).toBe(false)
+  })
+
+  it('puts the pinned pieces in every outfit, and warns when gold and silver are mixed', () => {
+    const wardrobe = [...base(), jewel('collar', 'Dorado'), jewel('pulsera', 'Plateado', { subcategory: 'Pulsera' })]
+    const found = generateOutfitCandidates(wardrobe, { occasion: 'Diario', temperatureCelsius: 18, includeGarmentIds: ['collar', 'pulsera'] })
+    expect(found.length).toBeGreaterThan(0)
+    for (const outfit of found) expect(outfit.garments.map((item) => item.id)).toEqual(expect.arrayContaining(['collar', 'pulsera']))
+    expect(found[0]!.warnings).toContain('Mezcla joyas doradas y plateadas')
+    const matched = scoreOutfit([...base(), jewel('collar', 'Dorado')], { occasion: 'Diario', temperatureCelsius: 18 })
+    expect(matched.warnings).not.toContain('Mezcla joyas doradas y plateadas')
+    expect(found[0]!.score).toBeLessThan(scoreOutfit([...base(), jewel('collar', 'Dorado'), jewel('pulsera', 'Dorado', { subcategory: 'Pulsera' })], { occasion: 'Diario', temperatureCelsius: 18 }).score)
+  })
+})
+
+describe('shorts only for heat', () => {
+  const wardrobe = () => [
+    garment('camiseta', 'Top', { subcategory: 'Camiseta', seasons: ['Primavera', 'Verano', 'Otoño', 'Invierno'] }),
+    garment('vaqueros', 'Bottom', { subcategory: 'Vaqueros', seasons: ['Primavera', 'Verano', 'Otoño', 'Invierno'] }),
+    garment('short', 'Bottom', { subcategory: 'Pantalón corto', seasons: ['Primavera', 'Verano'] })
+  ]
+  const bottoms = (context: Parameters<typeof generateOutfitCandidates>[1]) => new Set(generateOutfitCandidates(wardrobe(), context).flatMap((outfit) => outfit.garments.filter((item) => item.role === 'Bottom').map((item) => item.id)))
+
+  it('leaves shorts out of a cool day, and of autumn and winter without a forecast', () => {
+    expect(bottoms({ occasion: 'Diario', temperatureCelsius: 14 })).toEqual(new Set(['vaqueros']))
+    expect(bottoms({ occasion: 'Diario', season: 'Otoño' })).toEqual(new Set(['vaqueros']))
+    expect(bottoms({ occasion: 'Diario', season: 'Invierno' })).toEqual(new Set(['vaqueros']))
+  })
+
+  it('proposes them in the heat, in summer without a forecast, and when pinned', () => {
+    expect(bottoms({ occasion: 'Diario', temperatureCelsius: 26 })).toContain('short')
+    expect(bottoms({ occasion: 'Diario', season: 'Verano' })).toContain('short')
+    expect(bottoms({ occasion: 'Diario', temperatureCelsius: 12, includeGarmentIds: ['short'] })).toEqual(new Set(['short']))
+  })
+})

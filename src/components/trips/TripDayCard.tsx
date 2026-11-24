@@ -14,8 +14,8 @@ import type { OutfitData } from '../outfits/outfitData'
 import { weatherIcon, weatherSummary } from '../weather/WeatherBar'
 
 const OCCASIONS = ['Diario', 'Arreglado', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas']
-const ROLE_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado', 'Accesorio']
-const ROLE_LABELS: Record<GarmentRole, string> = { Capa: 'capa', Top: 'parte de arriba', Bottom: 'parte de abajo', 'Una pieza': 'vestido o mono', Calzado: 'calzado', Accesorio: 'accesorio' }
+const ROLE_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado', 'Accesorio', 'Joya']
+const ROLE_LABELS: Record<GarmentRole, string> = { Capa: 'capa', Top: 'parte de arriba', Bottom: 'parte de abajo', 'Una pieza': 'vestido o mono', Calzado: 'calzado', Accesorio: 'accesorio', Joya: 'joya' }
 const dateFormat = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' })
 
 interface TripDayCardProps {
@@ -149,7 +149,7 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
           options={optionsForRole(picking, outfit, garments, context, options)}
           unavailable={garments.filter((garment) => garment.role === picking && (garment.availability === 'laundry' || garment.availability === 'unavailable'))}
           current={pickerCurrent}
-          canRemove={picking === 'Capa' || picking === 'Accesorio' || picking === 'Calzado'}
+          canRemove={picking === 'Capa' || picking === 'Accesorio' || picking === 'Joya' || picking === 'Calzado'}
           onPick={pick}
           onRemove={() => {
             onChange({ ...day, garmentIds: outfit.filter((garment) => garment.role !== picking).map((garment) => garment.id), edited: true })

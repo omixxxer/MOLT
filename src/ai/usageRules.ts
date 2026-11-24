@@ -77,6 +77,7 @@ const levelsBySubcategory: Record<string, DressLevel[]> = {
   collar: DAILY_TO_FORMAL,
   pulsera: DAILY_TO_FORMAL,
   pendientes: DAILY_TO_FORMAL,
+  anillo: DAILY_TO_FORMAL,
   bolso: DAILY_TO_FORMAL
 }
 

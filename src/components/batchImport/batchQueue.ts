@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { addPhoto, isLabelPhoto, type PhotoGroup } from '../../ai/batchGrouping'
 import { analyzeGarmentImage, labelSize, type ClothingAnalysisSuggestion, type LabelReading } from '../../ai/clothingAnalyzer'
 import { findBrand } from '../../ai/brands'
+import { subcategoryFromShape } from '../../ai/garmentShape'
 import { cutOutGarments, cutoutColors } from '../../ai/cutout'
 import { appCutoutOptions } from '../../ai/cutoutOptions'
 import { findComposition } from '../../ai/labelParser'
@@ -29,6 +30,8 @@ export interface BatchPhoto {
 }
 
 export interface BatchGarment extends PhotoGroup {
+  /** «Pantalón corto» when the cut-out's shape says the long trousers the classifier saw are short. */
+  shapeSubcategory?: string
   id: string
   /** Undefined until the user changes it: the main photo's suggestion is shown. */
   subcategory?: string
@@ -82,7 +85,7 @@ export function mainSuggestion(garment: BatchGarment): ClothingAnalysisSuggestio
 }
 
 export function garmentSubcategory(garment: BatchGarment): string {
-  return garment.subcategory ?? mainSuggestion(garment)?.subcategory ?? ''
+  return garment.subcategory ?? garment.shapeSubcategory ?? mainSuggestion(garment)?.subcategory ?? ''
 }
 
 /** What the garment's label photos (all of them) say: brand, composition and every line for the size. */
@@ -194,7 +197,7 @@ export function replacePhoto(photoId: string, edited: Blob) {
   }
   updatePhoto(photoId, { file, status: 'waiting' })
   const owner = state.garments.find((garment) => garment.photoIds[0] === photoId)
-  if (owner) updateGarment(owner.id, { cutout: undefined, cutoutStatus: 'waiting' })
+  if (owner) updateGarment(owner.id, { cutout: undefined, cutoutStatus: 'waiting', shapeSubcategory: undefined })
   jobs = jobs.filter((job) => !(job.kind === 'reanalyze' && job.photoId === photoId))
   jobs.unshift({ kind: 'reanalyze', photoId })
   void run()
@@ -250,9 +253,12 @@ async function cutOut(garmentId: string, current: number) {
     const latest = state.garments.find((entry) => entry.id === garmentId)
     // The main photo may have changed meanwhile (photos moved, or edited, by the user): that cut-out no longer applies.
     if (!latest || latest.photoIds[0] !== main.id || photoById(main.id)?.file !== main.file) return
+    // Denim shorts the classifier called «Vaqueros»: the cut-out's shape says they are short (garmentShape.ts).
+    const shorts = cutout && latest.subcategory === undefined ? subcategoryFromShape(latest.category, garmentSubcategory(latest), cutout.width, cutout.height) : undefined
     updateGarment(garmentId, {
       cutoutStatus: cutout ? 'done' : 'none',
       ...(cutout ? { cutout: cutout.image } : {}),
+      ...(shorts ? { shapeSubcategory: shorts } : {}),
       ...(colors.length && !latest.colorsEdited ? { colors } : {})
     })
   } catch (error) {
@@ -281,6 +287,7 @@ export function splitPhoto(garmentId: string, photoId: string) {
     colors: photo.suggestion.colors,
     include: true,
     cutoutStatus: 'waiting',
+    shapeSubcategory: undefined,
     colorsEdited: false
   }
   const rest = { ...garment, photoIds: garment.photoIds.filter((id) => id !== photoId) }
@@ -298,7 +305,7 @@ export function mergeInto(sourceId: string, targetId: string) {
     ...target,
     photoIds: [...target.photoIds, ...source.photoIds],
     labelIds: [...target.labelIds, ...source.labelIds],
-    ...(gainsMain ? { category: source.category, colors: source.colors, cutoutStatus: 'waiting' as const } : {})
+    ...(gainsMain ? { category: source.category, colors: source.colors, cutoutStatus: 'waiting' as const, shapeSubcategory: undefined } : {})
   }
   set({ garments: state.garments.filter((garment) => garment !== source).map((garment) => garment === target ? merged : garment) })
   if (gainsMain) queueCutout(merged.id)
@@ -323,7 +330,7 @@ export function movePhoto(fromId: string, photoId: string, to: string | 'new', a
     ...from,
     photoIds: from.photoIds.filter((id) => id !== photoId),
     labelIds: from.labelIds.filter((id) => id !== photoId),
-    ...(lostMain ? { cutout: undefined, cutoutStatus: 'waiting' as const } : {})
+    ...(lostMain ? { cutout: undefined, cutoutStatus: 'waiting' as const, shapeSubcategory: undefined } : {})
   }
   const queue: string[] = []
   if (lostMain && left.photoIds.length) queue.push(left.id)
@@ -350,7 +357,7 @@ export function movePhoto(fromId: string, photoId: string, to: string | 'new', a
       ...target,
       photoIds: as === 'photo' ? [...target.photoIds, photoId] : target.photoIds,
       labelIds: as === 'label' ? [...target.labelIds, photoId] : target.labelIds,
-      ...(gainsMain ? { category: photo.suggestion?.category ?? target.category, colors: photo.suggestion?.colors ?? target.colors, cutoutStatus: 'waiting' as const } : {})
+      ...(gainsMain ? { category: photo.suggestion?.category ?? target.category, colors: photo.suggestion?.colors ?? target.colors, cutoutStatus: 'waiting' as const, shapeSubcategory: undefined } : {})
     })
     if (gainsMain) queue.push(target.id)
   }
@@ -364,7 +371,7 @@ export function makeMain(garmentId: string, photoId: string) {
   if (!garment?.photoIds.includes(photoId) || garment.photoIds[0] === photoId) return
   set({
     garments: state.garments.map((entry) => entry.id === garmentId
-      ? { ...entry, photoIds: [photoId, ...entry.photoIds.filter((id) => id !== photoId)], cutout: undefined, cutoutStatus: 'waiting' as const }
+      ? { ...entry, photoIds: [photoId, ...entry.photoIds.filter((id) => id !== photoId)], cutout: undefined, cutoutStatus: 'waiting' as const, shapeSubcategory: undefined }
       : entry)
   })
   queueCutout(garmentId)

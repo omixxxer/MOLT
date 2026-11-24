@@ -6,7 +6,8 @@ export const garmentCategories = [
   'Vestido / mono',
   'Abrigo',
   'Calzado',
-  'Accesorio'
+  'Accesorio',
+  'Joyería'
 ] as const
 
 export type GarmentCategory = (typeof garmentCategories)[number]
@@ -15,7 +16,7 @@ export const dressLevels = ['Deportivo', 'Diario', 'Arreglado', 'Formal'] as con
 export type DressLevel = (typeof dressLevels)[number]
 /** Single formality saved before database version 6, converted to dress levels by the upgrade. */
 export type LegacyFormality = 'Casual' | 'Smart casual' | 'Formal'
-export type GarmentRole = 'Top' | 'Bottom' | 'Una pieza' | 'Capa' | 'Calzado' | 'Accesorio'
+export type GarmentRole = 'Top' | 'Bottom' | 'Una pieza' | 'Capa' | 'Calzado' | 'Accesorio' | 'Joya'
 /** The part a garment plays in an outfit, from its category. */
 export const roleByCategory: Record<GarmentCategory, GarmentRole> = {
   'Parte superior': 'Top',
@@ -23,7 +24,8 @@ export const roleByCategory: Record<GarmentCategory, GarmentRole> = {
   'Vestido / mono': 'Una pieza',
   Abrigo: 'Capa',
   Calzado: 'Calzado',
-  Accesorio: 'Accesorio'
+  Accesorio: 'Accesorio',
+  'Joyería': 'Joya'
 }
 export type Season = 'Primavera' | 'Verano' | 'Otoño' | 'Invierno'
 export type GarmentAvailability = 'available' | 'laundry' | 'unavailable'

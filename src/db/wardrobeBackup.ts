@@ -1,5 +1,6 @@
 import { blobBytes, createZip, readZip, type ZipEntry } from '../ml/zip'
 import type { Garment, GarmentWithPhotos, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
+import { upgradeGarmentToV6 } from './garmentUpgrades'
 import { database } from './database'
 import { codeCounters, codePrefix, nextCode } from './garmentCodes'
 import { garmentTables, getGarmentWithPhotos, putGarmentWithPhotos } from './garmentRepository'
@@ -148,7 +149,7 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
     ...(photos.additionalImages ? { additionalImages: photos.additionalImages.map(photo) } : {}),
     ...(photos.labelImage ? { labelImage: photo(photos.labelImage) } : {}),
     ...(photos.cutout ? { cutout: photo(photos.cutout) } : {})
-  }))
+  })).map((garment) => upgradeGarmentToV6(garment) ?? garment) // A backup from before taxonomy v6, brought up to it.
   return {
     exportedAt: manifest.exportedAt,
     garments,

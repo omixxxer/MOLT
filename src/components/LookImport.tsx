@@ -4,6 +4,7 @@ import { useState, type DragEvent } from 'react'
 import { analyzeGarmentImage, type ClothingAnalysisSuggestion } from '../ai/clothingAnalyzer'
 import { colorSwatch } from '../ai/colors'
 import { cutOutGarments, cutoutColors, type LookOptions } from '../ai/cutout'
+import { subcategoryFromShape } from '../ai/garmentShape'
 import { lookType } from '../ai/lookType'
 import { suggestUsage } from '../ai/usageRules'
 import { database } from '../db/database'
@@ -103,7 +104,8 @@ export default function LookImport({ onDone, onCancel }: LookImportProps) {
           colors: colors.length ? colors : suggestion.colors,
           include: true,
           category: type.category,
-          subcategory: type.subcategory
+          // Shorts the classifier called «Vaqueros»: the cut-out's shape says they are short.
+          subcategory: subcategoryFromShape(type.category, type.subcategory, cutout.width, cutout.height) ?? type.subcategory
         })
         setNamed({ done: garments.length, total: cutouts.length })
       }

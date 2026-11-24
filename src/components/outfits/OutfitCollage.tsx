@@ -46,7 +46,7 @@ export default function OutfitCollage({ garments, onSelect, label = garmentLabel
   const spots = layout(new Set(garments.map((garment) => garment.role)))
   let extra = 0
   const placed = garments.map((garment) => {
-    const own = garment.role === 'Accesorio' ? undefined : spots[garment.role]
+    const own = garment.role === 'Accesorio' || garment.role === 'Joya' ? undefined : spots[garment.role]
     // A second piece of the same kind, or an accessory, goes to the next free gap.
     const taken = own && garments.findIndex((item) => item.role === garment.role) !== garments.indexOf(garment)
     const spot = own && !taken ? own : spots.extra[extra++ % spots.extra.length]!

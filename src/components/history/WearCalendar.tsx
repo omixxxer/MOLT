@@ -8,7 +8,7 @@ import { GarmentThumbnail } from '../GarmentPhoto'
 import OutfitBoard, { garmentLabel } from '../OutfitBoard'
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-const ROLE_ORDER: Garment['role'][] = ['Una pieza', 'Top', 'Capa', 'Bottom', 'Calzado', 'Accesorio']
+const ROLE_ORDER: Garment['role'][] = ['Una pieza', 'Top', 'Capa', 'Bottom', 'Calzado', 'Accesorio', 'Joya']
 const monthFormat = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' })
 const dayFormat = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' })
 

@@ -17,7 +17,8 @@ const FIT: Record<GarmentCategory, [number, number]> = {
   'Vestido / mono': [0.7, 0.84],
   Abrigo: [0.82, 0.8],
   Calzado: [0.74, 0.5],
-  Accesorio: [0.6, 0.56]
+  Accesorio: [0.6, 0.56],
+  'Joyería': [0.5, 0.5]
 }
 
 /** Only a garment clearly askew is turned: between these degrees (less is noise; more is how it is, like a sleeve). */
