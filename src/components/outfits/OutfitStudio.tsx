@@ -34,11 +34,29 @@ const occasions: OutfitTemplate[] = ['Diario', 'Arreglado', 'Formal', 'Deportivo
 const SLOT_LABELS: Record<GarmentRole, string> = { Capa: 'Capa', Top: 'Parte de arriba', Bottom: 'Parte de abajo', 'Una pieza': 'Vestido o mono', Calzado: 'Calzado', Accesorio: 'Accesorio' }
 const SLOT_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado', 'Accesorio']
 
+/**
+ * What the studio opens with: an idea chosen in the wizard, a saved outfit to change (`lock`: every piece pinned), a
+ * single garment to build around, or nothing (`empty`, «Desde cero»).
+ */
+export interface StudioStart {
+  garmentIds: string[]
+  nonce: number
+  /** Pin every garment, as for a saved outfit. */
+  lock?: boolean
+  /** The garments to pin (the one the outfit was started from). */
+  lockIds?: string[]
+  /** An empty board, to choose piece by piece. */
+  empty?: boolean
+  /** The idea's name, as shown in the wizard: the one proposed on saving while the outfit stays as it came. */
+  name?: string
+}
+
 interface OutfitStudioProps {
   garments: Garment[]
   data: OutfitData
-  /** Garments to start from: one to build an outfit around, or a saved outfit to wear or change. */
-  start?: { garmentIds: string[]; nonce: number }
+  start?: StudioStart
+  /** The plan chosen before arriving here. */
+  initialOccasion?: OutfitTemplate
   desiredStyle: string
   manualTemperature: string
   onChanged: () => Promise<void>
@@ -55,8 +73,10 @@ interface OutfitStudioProps {
  * Where outfits are made: it opens with today's proposal, each piece can be kept, changed or chosen by hand (the
  * garments that go best first), and whatever is on the board can be worn or saved.
  */
-export default function OutfitStudio({ garments, data, start, desiredStyle, manualTemperature, onChanged, onAvailabilityChange, onShowSaved, editing, onCreateNew }: OutfitStudioProps) {
-  const [occasion, setOccasion] = useState<OutfitTemplate>('Diario')
+export default function OutfitStudio({ garments, data, start, initialOccasion, desiredStyle, manualTemperature, onChanged, onAvailabilityChange, onShowSaved, editing, onCreateNew }: OutfitStudioProps) {
+  const [occasion, setOccasion] = useState<OutfitTemplate>(initialOccasion ?? 'Diario')
+  /** The board came chosen (an idea, a saved outfit): the weather arriving later does not replace it. */
+  const chosenBoard = useRef(false)
   const forecast = useDayForecast()
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -143,26 +163,36 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
     const onlyWeather = plannedFor.current === plan
     proposedFor.current = conditions
     plannedFor.current = plan
-    // New weather does not undo what the user is doing on the board.
-    if (!onlyWeather || !edited) propose(false)
+    // New weather does not undo what the user is doing on the board, nor an outfit chosen to get here.
+    if (!onlyWeather || (!edited && !chosenBoard.current)) {
+      chosenBoard.current = false
+      propose(false)
+    }
   }, [conditions, edited, plan, propose, start])
 
-  // Arriving with garments: a saved outfit goes on the board as it is; a single garment gets an outfit around it.
+  // Arriving with garments: an idea or a saved outfit goes on the board as it is; a single garment gets an outfit
+  // around it; «Desde cero», an empty board.
   useLayoutEffect(() => {
     if (!start || appliedStart.current === start.nonce) return
     appliedStart.current = start.nonce
     proposedFor.current = conditions
     plannedFor.current = plan
+    if (start.empty) {
+      startEmpty()
+      return
+    }
     const chosen = start.garmentIds.map((id) => garments.find((garment) => garment.id === id)).filter((garment): garment is Garment => Boolean(garment))
-    setLocked(chosen.map((garment) => garment.id))
     if (chosen.length > 1) {
+      setLocked(start.lock ? chosen.map((garment) => garment.id) : (start.lockIds ?? []))
       setBoard(chosen)
       setLooks([])
-      setEdited(true)
+      setEdited(Boolean(start.lock))
+      chosenBoard.current = true
     } else {
+      setLocked(chosen.map((garment) => garment.id))
       propose(false, chosen.map((garment) => garment.id))
     }
-  }, [conditions, garments, plan, propose, start])
+  }, [conditions, garments, plan, propose, start]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleLock(garment: Garment) {
     setLocked((list) => list.includes(garment.id) ? list.filter((id) => id !== garment.id) : [...list, garment.id])
@@ -477,7 +507,15 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
         </aside>
       </div>
 
-      {saving && <SaveOutfitDialog garments={board} context={{ ...context, occasion }} onSave={save} onClose={() => setSaving(false)} />}
+      {saving && (
+        <SaveOutfitDialog
+          garments={board}
+          context={{ ...context, occasion }}
+          initialName={start?.name && start.garmentIds.slice().sort().join('|') === boardKey ? start.name : undefined}
+          onSave={save}
+          onClose={() => setSaving(false)}
+        />
+      )}
       {picking && (
         <GarmentPicker
           title={`Elige ${SLOT_LABELS[picking].toLocaleLowerCase('es')}`}

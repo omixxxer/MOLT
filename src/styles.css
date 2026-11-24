@@ -1385,3 +1385,61 @@ button.outfit-collage-piece:focus-visible { outline: 2px solid var(--lavender); 
 /* Changing a saved outfit: which one, and the way to a new one instead. */
 .studio-editing { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--ink); border-radius: 12px; font-size: var(--text-body); }
 .studio-editing .studio-link { font-weight: 650; }
+
+/* «Crear outfit» as a wizard (OutfitWizard): how to begin, Molt's ideas, and the studio to adjust. */
+.wizard { display: grid; gap: 18px; }
+.wizard-steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.wizard-steps li { flex: 1; }
+.wizard-steps button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 40px; padding: 0 8px; border: 0; border-bottom: 3px solid var(--mist); border-radius: 0; background: transparent; color: var(--ink); font-size: var(--text-body); font-weight: 650; opacity: .6; }
+.wizard-steps li[data-state=current] button { border-color: var(--ink); opacity: 1; }
+.wizard-steps li[data-state=done] button { border-color: var(--lavender); opacity: .9; }
+.wizard-steps button:disabled { cursor: default; }
+.wizard-steps button:not(:disabled):hover { opacity: 1; }
+.wizard-step-mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--soft-surface); font-size: var(--text-caption); }
+.wizard-steps li[data-state=current] .wizard-step-mark { background: var(--ink); color: var(--white); }
+.wizard-steps li[data-state=done] .wizard-step-mark { background: var(--lavender); color: var(--white); }
+.wizard-title { margin: 0; font-family: var(--serif); font-size: 26px; font-weight: 500; }
+.wizard-start { display: grid; gap: 14px; }
+.wizard-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.wizard-option { display: grid; align-content: start; justify-items: start; gap: 6px; min-height: 140px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; animation: batch-rise .3s ease both; }
+.wizard-option:hover { border-color: var(--ink); box-shadow: 0 8px 22px rgba(45, 40, 56, .12); transform: translateY(-1px); }
+.wizard-option strong { font-family: var(--serif); font-size: 21px; font-weight: 500; }
+.wizard-option span { font-size: var(--text-body); line-height: 1.45; opacity: .8; }
+.wizard-option-main { border-color: var(--ink); background: var(--ink); color: var(--white); }
+.wizard-option-main span { opacity: .85; }
+.wizard-option[aria-expanded=true] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.wizard-panel { display: grid; justify-items: start; gap: 10px; padding: 16px; border-radius: 16px; background: var(--soft-surface); animation: batch-rise .25s ease both; }
+.wizard-panel h3 { margin: 0; font-size: var(--text-body); font-weight: 650; }
+.wizard-panel > .choice-row { justify-self: stretch; }
+.wizard-garments { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); justify-self: stretch; gap: 10px; max-height: min(60vh, 520px); margin: 0; padding: 2px; overflow-y: auto; list-style: none; }
+.wizard-ideas { display: grid; gap: 14px; }
+.wizard-ideas-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.wizard-ideas-head .trip-back { margin: 0; }
+.wizard-summary { margin: 4px 0 0; font-size: var(--text-body); opacity: .8; }
+.wizard-idea-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.wizard-idea-grid li { animation: batch-rise .3s ease both; }
+.wizard-idea { display: grid; gap: 8px; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--white); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
+.wizard-idea:hover, .wizard-idea:focus-visible { border-color: var(--ink); box-shadow: 0 10px 26px rgba(45, 40, 56, .14); transform: translateY(-2px); }
+.wizard-idea-text { display: grid; gap: 2px; padding: 0 4px 4px; }
+.wizard-idea-text strong { font-family: var(--serif); font-size: 18px; font-weight: 500; }
+.wizard-idea-text small { font-size: var(--text-label); opacity: .75; }
+.wizard-more { justify-self: center; }
+@media (max-width: 720px) {
+  .wizard-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .wizard-option { min-height: 0; padding: 14px; }
+  .wizard-option-main { grid-column: 1 / -1; }
+  .wizard-option strong { font-size: 18px; }
+  .wizard-option span { font-size: var(--text-label); }
+  .wizard-idea-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .wizard-idea { padding: 5px; border-radius: 14px; }
+  .wizard-idea-text strong { font-size: 15px; }
+  .wizard-panel > .choice-row { flex-wrap: nowrap; margin-inline: -16px; padding: 2px 16px 4px; overflow-x: auto; scrollbar-width: none; }
+  .wizard-panel > .choice-row .choice-chip { flex: none; }
+  .wizard-garments { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wizard-option, .wizard-idea, .wizard-idea-grid li, .wizard-panel { animation: none; transition: none; }
+  .wizard-option:hover, .wizard-idea:hover { transform: none; }
+}
+/* The wizard's columns never grow past the screen: the chip rows inside scroll sideways instead. */
+.wizard, .wizard-start, .wizard-panel, .wizard-ideas { grid-template-columns: minmax(0, 1fr); }

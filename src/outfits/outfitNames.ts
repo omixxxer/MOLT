@@ -99,7 +99,12 @@ export function outfitNames(garments: Garment[], context: NameContext): string[]
     if (palette) names.push(`${setting} ${palette.in}`)
     names.push(`${setting} ${season}`)
   }
-  if (palette) for (const own of palette.own) names.push(allSame ? own : `${own} ${season}`)
+  // «Total black», «Todo en blanco» only when it is all that colour; the other names of the colour also with the season.
+  if (palette) for (const own of palette.own) {
+    const whole = /^(todo|total)\b/i.test(own)
+    if (allSame) names.push(own)
+    else if (!whole) names.push(`${own} ${season}`)
+  }
   if (aesthetic) {
     names.push(`${aesthetic} ${season}`)
     for (const setting of settings.slice(0, 3)) names.push(`${aesthetic} de ${lower(setting)}`)

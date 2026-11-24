@@ -8,7 +8,7 @@ import { OUTFIT_SCORE_WEIGHTS } from '../outfits/outfitGenerator'
 import { dressLevels, type DressLevel, type Garment, type Outfit, type UserPreferences } from '../types/domain'
 import { ChipsField, FormFold } from './garmentForm/fields'
 import { emptyOutfitData, emptyPreferences, loadOutfitData, type OutfitData } from './outfits/outfitData'
-import OutfitStudio from './outfits/OutfitStudio'
+import OutfitWizard from './outfits/OutfitWizard'
 import SavedOutfits from './outfits/SavedOutfits'
 
 interface OutfitGeneratorProps {
@@ -25,20 +25,16 @@ type OutfitView = 'studio' | 'saved'
 const colorOptions = taxonomy.attributes.colors.values.map((value) => value.label)
 
 /**
- * Outfits: «Mis outfits» first (the ones saved, made by hand or worn), and «Crear outfit» to make a new one in the
- * studio, which opens with Molt's proposal for today. Coming from a garment, the studio opens around it.
+ * Outfits: «Mis outfits» first (the ones saved, made by hand or worn), and «Crear outfit», a wizard: how to begin, the
+ * ideas Molt proposes, and the studio to adjust and save one. Coming from a garment, the ideas around it.
  */
 export default function OutfitGenerator({ garments, onAvailabilityChange, onAddGarments, startGarmentId }: OutfitGeneratorProps) {
   const [view, setView] = useState<OutfitView>(startGarmentId ? 'studio' : 'saved')
   const [data, setData] = useState<OutfitData>(emptyOutfitData)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
-  const [start, setStart] = useState<{ garmentIds: string[]; nonce: number } | undefined>(startGarmentId && { garmentIds: [startGarmentId.id], nonce: startGarmentId.nonce })
-  /** The saved outfit being changed in the studio, if any. */
-  const [editingId, setEditingId] = useState<string>()
-  /** A new key starts the studio again from nothing. */
-  const [studioKey, setStudioKey] = useState(0)
-  const [desiredStyle, setDesiredStyle] = useState('')
+  /** Each «Crear outfit» (or «Cambiar», or a garment to start from) is a new run of the wizard. */
+  const [session, setSession] = useState<{ key: number; garmentId?: string; editingId?: string }>(() => ({ key: 0, garmentId: startGarmentId?.id }))
   const [manualTemperature, setManualTemperature] = useState('')
   const wardrobeStyles = [...new Set(garments.flatMap((garment) => garment.styles).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))
 
@@ -55,36 +51,26 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
     return () => { active = false }
   }, [])
 
-  /** A saved outfit opened to change it («Cambiar»): the studio shows it, and saving changes that outfit. */
+  /** A saved outfit opened to change it («Cambiar»): straight to the studio, and saving changes that outfit. */
   function openOutfit(outfit: Outfit) {
-    setEditingId(outfit.id)
-    setStart({ garmentIds: outfit.garmentIds, nonce: Date.now() })
-    setStudioKey((key) => key + 1)
+    setSession((current) => ({ key: current.key + 1, editingId: outfit.id }))
     show('studio')
   }
 
-  /**
-   * «Crear outfit»: a new outfit. After changing a saved one, the studio starts again with today's proposal; a new
-   * outfit left half made is still there, so looking at «Mis outfits» does not lose it.
-   */
+  /** «Crear outfit»: a new outfit, from the first step of the wizard. */
   function createOutfit() {
-    if (editingId) {
-      setEditingId(undefined)
-      setStart(undefined)
-      setStudioKey((key) => key + 1)
-    }
+    setSession((current) => ({ key: current.key + 1 }))
     show('studio')
   }
 
-  // A garment chosen in the wardrobe while this screen is open: a new outfit in the studio, around it.
+  // A garment chosen in the wardrobe while this screen is open: the ideas around it.
   useEffect(() => {
     if (!startGarmentId) return
-    setEditingId(undefined)
-    setStart({ garmentIds: [startGarmentId.id], nonce: startGarmentId.nonce })
+    setSession((current) => (current.garmentId === startGarmentId.id && current.key === 0 ? current : { key: current.key + 1, garmentId: startGarmentId.id }))
     setView('studio')
   }, [startGarmentId?.nonce]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const editing = editingId ? data.outfits.find((outfit) => outfit.id === editingId) : undefined
+  const editing = session.editingId ? data.outfits.find((outfit) => outfit.id === session.editingId) : undefined
 
   async function savePreferences(next: UserPreferences) {
     setData((current) => ({ ...current, preferences: next }))
@@ -96,7 +82,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
   }
 
   const { preferences } = data
-  const adjustments = [desiredStyle, manualTemperature && `${manualTemperature} °C`, ...preferences.preferredColors, ...preferences.preferredStyles, preferences.preferredDressLevel].filter(Boolean).join(' · ')
+  const adjustments = [manualTemperature && `${manualTemperature} °C`, ...preferences.preferredColors, ...preferences.preferredStyles, preferences.preferredDressLevel].filter(Boolean).join(' · ')
   function show(next: OutfitView) {
     setView(next)
     document.getElementById('outfits-title')?.scrollIntoView?.({ block: 'start' })
@@ -125,28 +111,21 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
       ) : !ready ? null : (
         <>
           {view === 'saved' && <SavedOutfits garments={garments} data={data} onChanged={reload} onOpen={openOutfit} onCreate={createOutfit} />}
-          <div hidden={view !== 'studio'}>
-            <OutfitStudio
-              key={studioKey}
-              editing={editing}
-              onCreateNew={createOutfit}
+          {view === 'studio' && <div>
+            <OutfitWizard
+              key={session.key}
               garments={garments}
               data={data}
-              start={start}
-              desiredStyle={desiredStyle}
               manualTemperature={manualTemperature}
+              startGarmentId={session.garmentId}
+              editing={editing}
               onChanged={reload}
               onAvailabilityChange={onAvailabilityChange}
               onShowSaved={() => show('saved')}
+              onCreateNew={createOutfit}
             />
             <div className="outfit-folds">
               <FormFold title="Ajustes" summary={adjustments || 'Tus colores y estilos, y la temperatura a mano'}>
-                <label className="form-field">Estética para hoy
-                  <select value={desiredStyle} onChange={(event) => setDesiredStyle(event.target.value)}>
-                    <option value="">Sin preferencia</option>
-                    {wardrobeStyles.map((style) => <option key={style}>{style}</option>)}
-                  </select>
-                </label>
                 <label className="form-field">Temperatura a mano (°C)
                   <input type="number" value={manualTemperature} onChange={(event) => setManualTemperature(event.target.value)} placeholder="La de la previsión" />
                 </label>
@@ -168,7 +147,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
                 </p>
               </FormFold>
             </div>
-          </div>
+          </div>}
         </>
       )}
     </section>

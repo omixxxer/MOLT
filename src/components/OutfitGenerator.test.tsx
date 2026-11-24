@@ -40,10 +40,23 @@ function setup(garments = wardrobe(), extra: Partial<Parameters<typeof OutfitGen
   return { user: userEvent.setup(), onAvailabilityChange, unmount: view.unmount }
 }
 
-/** Outfits opens on «Mis outfits»: the studio, from «Crear outfit». */
+/** The ideas Molt proposes in the wizard's second step, best first: each a button named «name: garments». */
+async function ideas() {
+  const list = await screen.findByRole('region', { name: 'Ideas para ti' })
+  return within(list).getAllByRole('button').filter((button) => /: /.test(button.getAttribute('aria-label') ?? ''))
+}
+
+/** From the ideas, the best one to the studio. */
+async function pickIdea(user: ReturnType<typeof userEvent.setup>, index = 0) {
+  await user.click((await ideas())[index]!)
+}
+
+/** Outfits opens on «Mis outfits»; «Crear outfit», «Sorpréndeme» and the best idea lead to the studio. */
 async function studio(garments = wardrobe(), extra: Partial<Parameters<typeof OutfitGenerator>[0]> = {}) {
   const view = setup(garments, extra)
   await view.user.click((await screen.findAllByRole('button', { name: 'Crear outfit' }))[0]!)
+  await view.user.click(screen.getByRole('button', { name: /Sorpréndeme/ }))
+  await pickIdea(view.user)
   return view
 }
 
@@ -185,16 +198,71 @@ describe('OutfitGenerator', () => {
     expect(onBoard()).toContain('chinos')
   })
 
-  it('starts around the garment it comes from', async () => {
-    setup(wardrobe(), { startGarmentId: { id: 'polo', nonce: 1 } })
+  it('starts around the garment it comes from: its ideas all have it, and it stays fixed', async () => {
+    const { user } = setup(wardrobe(), { startGarmentId: { id: 'polo', nonce: 1 } })
+    const found = await ideas()
+    expect(found.length).toBeGreaterThan(0)
+    for (const idea of found) expect(idea.getAttribute('aria-label')).toMatch(/polo/)
+    await pickIdea(user)
     await boardReady()
     expect(onBoard()).toContain('polo')
     expect(screen.getByRole('button', { name: 'Soltar polo' })).toBeInTheDocument()
   })
 
   it('tells what is missing when no outfit can be made', async () => {
-    await studio([makeGarment('camisa', 'Top')])
+    const { user } = setup([makeGarment('camisa', 'Top')])
+    await user.click((await screen.findAllByRole('button', { name: 'Crear outfit' }))[0]!)
+    await user.click(screen.getByRole('button', { name: /Sorpréndeme/ }))
     expect(await screen.findByRole('status')).toHaveTextContent(/una de abajo/)
+  })
+
+  it('creates in three steps: how to begin, the ideas, and the studio with the one chosen', async () => {
+    const { user } = setup()
+    await user.click((await screen.findAllByRole('button', { name: 'Crear outfit' }))[0]!)
+    expect(screen.getByRole('heading', { name: '¿Cómo quieres empezar?' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Outfit' })).not.toBeInTheDocument()
+
+    // By style: the plan chosen is the studio's.
+    await user.click(screen.getByRole('button', { name: /Por estilo/ }))
+    await user.click(within(screen.getByRole('group', { name: 'Plan' })).getByRole('button', { name: 'Arreglado' }))
+    await user.click(screen.getByRole('button', { name: 'Ver ideas' }))
+    expect(screen.getByText(/^Arreglado\./)).toBeInTheDocument()
+    const found = await ideas()
+    expect(found.length).toBeGreaterThan(1)
+    const [name, garments] = found[1]!.getAttribute('aria-label')!.split(': ')
+    await user.click(found[1]!)
+    await boardReady()
+    expect([...onBoard()].sort().join(', ')).toBe(garments!.split(', ').sort().join(', '))
+    expect(screen.getByRole('button', { name: 'Arreglado', pressed: true })).toBeInTheDocument()
+    // The idea's name is the one proposed on saving.
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(within(screen.getByRole('dialog', { name: 'Guardar outfit' })).getByRole('textbox', { name: 'Nombre' })).toHaveValue(name)
+    await user.keyboard('{Escape}')
+
+    // Back to the first step, from the steps above.
+    await user.click(within(screen.getByRole('list', { name: 'Pasos' })).getByRole('button', { name: /Empezar/ }))
+    await user.click(screen.getByRole('button', { name: /Desde una prenda/ }))
+    await user.click(screen.getByRole('button', { name: 'Empezar con chinos' }))
+    for (const idea of await ideas()) expect(idea.getAttribute('aria-label')).toMatch(/chinos/)
+    expect(screen.getByText(/^Con chinos/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar cómo empezar' }))
+    await user.click(screen.getByRole('button', { name: /Desde cero/ }))
+    expect(screen.getByRole('button', { name: 'Elegir parte de abajo' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Outfit' })).queryAllByRole('img')).toHaveLength(0)
+  })
+
+  it('shows more ideas on asking, none of them repeated', async () => {
+    const { user } = setup()
+    await user.click((await screen.findAllByRole('button', { name: 'Crear outfit' }))[0]!)
+    await user.click(screen.getByRole('button', { name: /Sorpréndeme/ }))
+    const before = (await ideas()).map((idea) => idea.getAttribute('aria-label')!.split(': ')[1])
+    await user.click(screen.getByRole('button', { name: 'Ver más ideas' }))
+    const after = (await ideas()).map((idea) => idea.getAttribute('aria-label')!.split(': ')[1])
+    expect(after.length).toBeGreaterThanOrEqual(before.length)
+    expect(new Set(after.map((garments) => garments!.split(', ').sort().join())).size).toBe(after.length)
+    const names = (await ideas()).map((idea) => idea.getAttribute('aria-label')!.split(': ')[0])
+    expect(new Set(names).size).toBe(names.length)
   })
 
   it('opens on Mis outfits, with a button to create one', async () => {
@@ -204,17 +272,21 @@ describe('OutfitGenerator', () => {
     expect(screen.queryByRole('region', { name: 'Outfit' })).not.toBeInTheDocument()
     await user.click(screen.getAllByRole('button', { name: 'Crear outfit' })[0]!)
     expect(screen.getByRole('heading', { name: /Crear outfit/ })).toBeInTheDocument()
-    await boardReady()
+    expect(screen.getByRole('heading', { name: '¿Cómo quieres empezar?' })).toBeInTheDocument()
   })
 
-  it('keeps the board while looking at the saved outfits, which can be renamed, opened and deleted', async () => {
+  it('saves an outfit, which can then be renamed, opened and deleted in Mis outfits', async () => {
     const { user } = await studio()
     await boardReady()
     const shown = onBoard()
     await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
     expect(await screen.findByText('Aún no hay outfits.')).toBeInTheDocument()
+    // «Crear outfit» starts again; the same plan gives the same best idea.
     await user.click(screen.getAllByRole('button', { name: 'Crear outfit' })[0]!)
-    expect(onBoard()).toEqual(shown)
+    await user.click(screen.getByRole('button', { name: /Sorpréndeme/ }))
+    await pickIdea(user)
+    await boardReady()
+    expect([...onBoard()].sort()).toEqual([...shown].sort())
 
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
     const name = within(screen.getByRole('dialog', { name: 'Guardar outfit' })).getByRole('textbox', { name: 'Nombre' })
@@ -270,6 +342,9 @@ describe('OutfitGenerator', () => {
     await user.click(screen.getAllByRole('button', { name: 'Crear outfit' })[0]!)
     expect(screen.getByRole('heading', { name: /Crear outfit/ })).toBeInTheDocument()
     expect(screen.queryByText(/Cambiando/)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '¿Cómo quieres empezar?' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Sorpréndeme/ }))
+    await pickIdea(user)
     await boardReady()
     expect([...onBoard()].sort()).toEqual(proposal)
     // The saved outfit now has other garments, so this proposal is a new one to save.

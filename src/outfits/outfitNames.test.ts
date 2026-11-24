@@ -44,6 +44,13 @@ describe('outfit names', () => {
     expect(names).toContain('Verde bosque de otoño')
   })
 
+  it('calls an outfit «Total black» only when it is all black', () => {
+    const mostly = [...black.slice(0, 3), garment('zapatillas', 'Calzado', ['Blanco'])]
+    const names = outfitNames(mostly, { occasion: 'Diario', date: november })
+    expect(names.some((name) => /^(todo|total)\b/i.test(name))).toBe(false)
+    expect(names).toContain('Paseo en negro')
+  })
+
   it('still has a name with no colours or plan it knows', () => {
     expect(outfitName([garment('x', 'Top', [])], { occasion: 'Otra cosa', date: november })).toBeTruthy()
   })

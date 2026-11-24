@@ -9,6 +9,8 @@ interface SaveOutfitDialogProps {
   garments: Garment[]
   /** The plan and the weather, which the proposed names come from. */
   context: { occasion: string; temperatureCelsius?: number; weatherConditions?: string[] }
+  /** The name already shown for this outfit (an idea in the wizard), proposed first. */
+  initialName?: string
   onSave: (name: string) => Promise<void>
   onClose: () => void
 }
@@ -17,9 +19,9 @@ interface SaveOutfitDialogProps {
  * Saving an outfit: the collage it will have in «Mis outfits», and a name to find it again. One is proposed from its
  * colour, plan and season («Cena en negro»), and «Otro nombre» gives another.
  */
-export default function SaveOutfitDialog({ garments, context, onSave, onClose }: SaveOutfitDialogProps) {
+export default function SaveOutfitDialog({ garments, context, initialName, onSave, onClose }: SaveOutfitDialogProps) {
   const [variant, setVariant] = useState(0)
-  const [name, setName] = useState(() => outfitName(garments, context))
+  const [name, setName] = useState(() => initialName ?? outfitName(garments, context))
   const [saving, setSaving] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
@@ -38,7 +40,9 @@ export default function SaveOutfitDialog({ garments, context, onSave, onClose }:
   }, [onClose])
 
   function another() {
-    const next = variant + 1
+    let next = variant + 1
+    // Never «another» name that is the one already there.
+    while (next < variant + 12 && outfitName(garments, context, next) === name) next += 1
     setVariant(next)
     setName(outfitName(garments, context, next))
     input.current?.focus()
