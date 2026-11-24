@@ -58,7 +58,7 @@ function candidatesForDay(garments: Garment[], day: TripDay, packed: Garment[], 
   }
   collect(generateOutfitCandidates(garments, context, { ...options, seed: day.date, limit: 8 }))
   for (const garment of packed) {
-    if (garment.role !== 'Accesorio') collect(generateOutfitCandidates(garments, { ...context, includeGarmentIds: [garment.id] }, { ...options, seed: day.date, limit: 3 }))
+    if (garment.role !== 'Accesorio' && garment.role !== 'Joya') collect(generateOutfitCandidates(garments, { ...context, includeGarmentIds: [garment.id] }, { ...options, seed: day.date, limit: 3 }))
   }
   return [...found.values()]
 }
@@ -74,7 +74,7 @@ function tripValue(candidate: OutfitCandidate, others: Map<string, number>, prev
       value -= rules.newGarment
       if (garment.role === 'Calzado' && packedOfRole('Calzado') >= rules.shoes) value -= 25
       if (garment.role === 'Capa' && packedOfRole('Capa') >= rules.layers) value -= 15
-      if (garment.role === 'Accesorio') value -= 4
+      if (garment.role === 'Accesorio' || garment.role === 'Joya') value -= 4
     }
     const limit = garment.role === 'Top' || garment.role === 'Una pieza' ? rules.wearsPerTop : garment.role === 'Bottom' ? rules.wearsPerBottom : Infinity
     if (worn >= limit) value -= 30 * (worn - limit + 1)
@@ -115,7 +115,7 @@ export interface PackingGroup {
   items: Array<{ garment: Garment; days: number }>
 }
 
-const GROUPS: Array<[GarmentRole, string]> = [['Capa', 'Abrigos y chaquetas'], ['Top', 'Partes de arriba'], ['Una pieza', 'Vestidos y monos'], ['Bottom', 'Partes de abajo'], ['Calzado', 'Calzado'], ['Accesorio', 'Accesorios']]
+const GROUPS: Array<[GarmentRole, string]> = [['Capa', 'Abrigos y chaquetas'], ['Top', 'Partes de arriba'], ['Una pieza', 'Vestidos y monos'], ['Bottom', 'Partes de abajo'], ['Calzado', 'Calzado'], ['Accesorio', 'Accesorios'], ['Joya', 'Joyería']]
 
 /** Each garment once, with how many days it is worn; a garment since deleted drops out. */
 export function packingGroups(garments: Garment[], days: TripDay[], extraGarmentIds: string[] = []): PackingGroup[] {

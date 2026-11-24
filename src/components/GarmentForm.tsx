@@ -12,6 +12,7 @@ import { colorSwatch } from '../ai/colors'
 import { cutOutGarments, cutoutColors } from '../ai/cutout'
 import { appCutoutOptions } from '../ai/cutoutOptions'
 import type { SegmentationMap } from '../ai/segmentation'
+import { subcategoryFromShape } from '../ai/garmentShape'
 import { suggestUsage } from '../ai/usageRules'
 import { createThumbnail, reducePhoto } from '../db/imageProcessing'
 import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
@@ -104,8 +105,8 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   const analysisRequestId = useRef(0)
   const labelRequestId = useRef(0)
   // Analyses finish later; they must see what the user typed meanwhile, not the values when they started.
-  const typed = useRef({ brand, size, composition, suggested, category, labelPhoto })
-  typed.current = { brand, size, composition, suggested, category, labelPhoto }
+  const typed = useRef({ brand, size, composition, suggested, category, subcategory, labelPhoto })
+  typed.current = { brand, size, composition, suggested, category, subcategory, labelPhoto }
   // A saved garment keeps the use the user gave it; a new one follows the suggestion until the user changes it.
   const usageTouched = useRef(new Set<UsageField>(garment ? usageFields : []))
 
@@ -288,6 +289,9 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
       const [main] = await cutOutGarments(photo, map, 'single', appCutoutOptions(suggestedCategory))
       if (requestId !== analysisRequestId.current) return
       setCutout(main?.image)
+      // Denim shorts the classifier called «Vaqueros»: the cut-out's shape says they are short (garmentShape.ts).
+      const shorts = main && typed.current.suggested.has('subcategory') ? subcategoryFromShape(typed.current.category, typed.current.subcategory, main.width, main.height) : undefined
+      if (shorts) setSubcategory(shorts)
       // The cut-out's own pixels give the colours more exactly than the coarse map; only if the user kept them.
       if (main && typed.current.suggested.has('colors')) {
         const measured = await cutoutColors(main.image)

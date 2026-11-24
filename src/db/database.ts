@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { assignMissingCodes, codeCounters } from './garmentCodes'
+import { upgradeGarmentToV6 } from './garmentUpgrades'
 
 const levelOfFormality: Record<LegacyFormality, DressLevel> = { Casual: 'Diario', 'Smart casual': 'Arreglado', Formal: 'Formal' }
 const occasionOfFormality: Record<string, string> = { Casual: 'Diario', 'Smart casual': 'Arreglado' }
@@ -114,6 +115,16 @@ export class WardrobeDatabase extends Dexie {
         const tables = { garments: transaction.table('garments'), photos: transaction.table('garmentPhotos'), thumbnails: transaction.table('garmentThumbnails') }
         // One garment at a time, so the photos of the whole wardrobe are never in memory together.
         for (const id of await tables.garments.toCollection().primaryKeys()) await moveInlinePhotos(tables, id as string)
+      })
+    // Taxonomy v6: jewellery leaves the accessories for its own category, and denim shorts saved as «Vaqueros» (the
+    // classifier knew the fabric, not the length) become «Pantalón corto», by the shape of their cut-out.
+    this.version(9)
+      .stores({})
+      .upgrade(async (transaction) => {
+        await transaction.table('garments').toCollection().modify((garment: Garment, ref: { value: Garment }) => {
+          const upgraded = upgradeGarmentToV6(garment)
+          if (upgraded) ref.value = upgraded
+        })
       })
     if (legacyName) this.on('ready', () => moveLegacyDatabase(this, legacyName))
   }

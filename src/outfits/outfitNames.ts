@@ -59,7 +59,7 @@ const NEUTRALS = new Set(['Negro', 'Blanco', 'Gris', 'Beige'])
 /** The colour that sets the tone: the most worn one, a colour before a neutral when they tie, all black if all is. */
 export function mainColour(garments: Garment[]) {
   const counts = new Map<string, number>()
-  for (const garment of garments) for (const colour of garment.colors.slice(0, 1)) counts.set(colour, (counts.get(colour) ?? 0) + (garment.role === 'Accesorio' ? 0.5 : 1))
+  for (const garment of garments) for (const colour of garment.colors.slice(0, 1)) counts.set(colour, (counts.get(colour) ?? 0) + (garment.role === 'Accesorio' || garment.role === 'Joya' ? 0.5 : 1))
   return [...counts].sort((a, b) => b[1] - a[1] || Number(NEUTRALS.has(a[0])) - Number(NEUTRALS.has(b[0])))[0]?.[0]
 }
 
@@ -87,7 +87,7 @@ function lower(text: string) {
 export function outfitNames(garments: Garment[], context: NameContext): string[] {
   const colour = mainColour(garments)
   const palette = colour ? COLOURS[colour] : undefined
-  const allSame = colour !== undefined && garments.filter((garment) => garment.role !== 'Accesorio').every((garment) => garment.colors[0] === colour)
+  const allSame = colour !== undefined && garments.filter((garment) => garment.role !== 'Accesorio' && garment.role !== 'Joya').every((garment) => garment.colors[0] === colour)
   const settings = SETTINGS[context.occasion] ?? SETTINGS.Diario!
   const season = SEASONS[seasonOfDate(context.date ?? new Date())]!
   const aesthetic = aestheticOf(garments)

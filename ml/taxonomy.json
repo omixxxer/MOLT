@@ -1,12 +1,13 @@
 {
-  "version": 5,
+  "version": 6,
   "categories": [
     { "id": "top", "label": "Parte superior", "code": "SUP", "role": "Top" },
     { "id": "bottom", "label": "Parte inferior", "code": "INF", "role": "Bottom" },
     { "id": "one-piece", "label": "Vestido / mono", "code": "UNA", "role": "Una pieza" },
     { "id": "outerwear", "label": "Abrigo", "code": "ABG", "role": "Capa" },
     { "id": "footwear", "label": "Calzado", "code": "CAL", "role": "Calzado" },
-    { "id": "accessory", "label": "Accesorio", "code": "ACC", "role": "Accesorio" }
+    { "id": "accessory", "label": "Accesorio", "code": "ACC", "role": "Accesorio" },
+    { "id": "jewellery", "label": "Joyería", "code": "JOY", "role": "Joya" }
   ],
   "subcategories": [
     { "id": "camiseta", "label": "Camiseta", "code": "CAM", "category": "top", "synonyms": ["t-shirt", "camiseta de manga corta", "camiseta basica"] },
@@ -23,7 +24,7 @@
 
     { "id": "pantalon", "label": "Pantalón", "code": "PAN", "category": "bottom", "synonyms": ["pantalones", "chino", "chinos", "pantalon de vestir", "pantalon de invierno", "pantalon impermeable"] },
     { "id": "vaqueros", "label": "Vaqueros", "code": "VAQ", "category": "bottom", "synonyms": ["jeans", "tejanos", "pantalon vaquero"] },
-    { "id": "pantalon-corto", "label": "Pantalón corto", "code": "PCO", "category": "bottom", "synonyms": ["shorts", "bermudas", "bermuda"] },
+    { "id": "pantalon-corto", "label": "Pantalón corto", "code": "PCO", "category": "bottom", "synonyms": ["shorts", "bermudas", "bermuda", "short vaquero", "shorts vaqueros", "pantalon corto vaquero", "bermuda vaquera"] },
     { "id": "pantalon-chandal", "label": "Pantalón de chándal", "code": "PCH", "category": "bottom", "synonyms": ["chandal", "jogger", "joggers", "sweatpants"] },
     { "id": "leggings", "label": "Leggings", "code": "LEG", "category": "bottom", "synonyms": ["mallas"] },
     { "id": "falda", "label": "Falda", "code": "FAL", "category": "bottom", "synonyms": [] },
@@ -54,10 +55,11 @@
     { "id": "bufanda", "label": "Bufanda / pañuelo", "code": "BUF", "category": "accessory", "synonyms": ["bufanda", "panuelo", "foulard"] },
     { "id": "gafas", "label": "Gafas", "code": "GAF", "category": "accessory", "synonyms": ["gafas de sol"] },
     { "id": "corbata", "label": "Corbata", "code": "COR", "category": "accessory", "synonyms": ["pajarita"] },
-    { "id": "reloj", "label": "Reloj", "code": "REL", "category": "accessory", "synonyms": [] },
-    { "id": "collar", "label": "Collar", "code": "COL", "category": "accessory", "synonyms": ["colgante", "cadena", "gargantilla"] },
-    { "id": "pulsera", "label": "Pulsera", "code": "PUL", "category": "accessory", "synonyms": ["brazalete", "esclava"] },
-    { "id": "pendientes", "label": "Pendientes", "code": "PEN", "category": "accessory", "synonyms": ["pendiente", "aros", "aretes", "zarcillos", "piercing"] }
+    { "id": "reloj", "label": "Reloj", "code": "REL", "category": "jewellery", "synonyms": [] },
+    { "id": "collar", "label": "Collar", "code": "COL", "category": "jewellery", "synonyms": ["colgante", "cadena", "gargantilla"] },
+    { "id": "pulsera", "label": "Pulsera", "code": "PUL", "category": "jewellery", "synonyms": ["brazalete", "esclava"] },
+    { "id": "pendientes", "label": "Pendientes", "code": "PEN", "category": "jewellery", "synonyms": ["pendiente", "aros", "aretes", "zarcillos", "piercing"] },
+    { "id": "anillo", "label": "Anillo", "code": "ANI", "category": "jewellery", "synonyms": ["anillos", "sortija", "alianza"] }
   ],
   "attributes": {
     "sleeve": {

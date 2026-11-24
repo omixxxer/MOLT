@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { colorName, colorSwatch } from '../ai/colors'
+import { compatibleTaxonomy, splitCategories } from '../ai/clothingAnalyzer'
 import { suggestUsage } from '../ai/usageRules'
 import { codePrefix } from '../db/garmentCodes'
 import { matchLabel, taxonomy, TAXONOMY_VERSION } from './taxonomy'
 import modelDescription from '../../public/models/vesta/vesta-model.json'
 
-// Taxonomy v5: necklaces, bracelets and earrings as accessories, and gold and silver as colours. Chosen by hand for
-// now: the model was not retrained (it does not predict them), only its description follows the new version.
-describe('jewellery (taxonomy v5)', () => {
+// Taxonomy v5 added necklaces, bracelets and earrings, and gold and silver as colours; v6 took them, the watch and a
+// new ring out of the accessories into «Joyería». Chosen by hand for now: the model (trained on v5) does not predict
+// them, and the app shares its «accessory» out between both categories (clothingAnalyzer.splitCategories).
+describe('jewellery (taxonomy v6)', () => {
   it('reads the new accessories from free text, with their synonyms and plurals', () => {
     expect(matchLabel('subcategory', 'Collar dorado')).toBe('collar')
     expect(matchLabel('subcategory', 'Colgante de plata')).toBe('collar')
@@ -17,17 +19,21 @@ describe('jewellery (taxonomy v5)', () => {
     expect(matchLabel('subcategory', 'Pendientes de aro')).toBe('pendientes')
     expect(matchLabel('subcategory', 'pendiente')).toBe('pendientes')
     expect(matchLabel('subcategory', 'Aros')).toBe('pendientes')
-    expect(taxonomy.subcategories.filter((entry) => ['collar', 'pulsera', 'pendientes'].includes(entry.id)).every((entry) => entry.category === 'accessory')).toBe(true)
+    expect(matchLabel('subcategory', 'Sortija')).toBe('anillo')
+    expect(taxonomy.subcategories.filter((entry) => entry.category === 'jewellery').map((entry) => entry.id)).toEqual(['reloj', 'collar', 'pulsera', 'pendientes', 'anillo'])
+    expect(taxonomy.categories.find((entry) => entry.id === 'jewellery')).toMatchObject({ label: 'Joyería', role: 'Joya' })
   })
 
   it('gives them codes of their own and every dress level, in every season', () => {
-    expect(codePrefix({ category: 'Accesorio', subcategory: 'Collar' })).toBe('COL')
-    expect(codePrefix({ category: 'Accesorio', subcategory: 'Pulsera' })).toBe('PUL')
-    expect(codePrefix({ category: 'Accesorio', subcategory: 'Pendientes' })).toBe('PEN')
+    expect(codePrefix({ category: 'Joyería', subcategory: 'Collar' })).toBe('COL')
+    expect(codePrefix({ category: 'Joyería', subcategory: 'Pulsera' })).toBe('PUL')
+    expect(codePrefix({ category: 'Joyería', subcategory: 'Pendientes' })).toBe('PEN')
+    expect(codePrefix({ category: 'Joyería', subcategory: 'Anillo' })).toBe('ANI')
+    expect(codePrefix({ category: 'Joyería', subcategory: '' })).toBe('JOY')
     const codes = taxonomy.subcategories.map((entry) => entry.code)
     expect(new Set(codes).size).toBe(codes.length)
-    for (const subcategory of ['Collar', 'Pulsera', 'Pendientes']) {
-      expect(suggestUsage({ category: 'Accesorio', subcategory })).toMatchObject({
+    for (const subcategory of ['Collar', 'Pulsera', 'Pendientes', 'Anillo', 'Reloj']) {
+      expect(suggestUsage({ category: 'Joyería', subcategory })).toMatchObject({
         seasons: ['Primavera', 'Verano', 'Otoño', 'Invierno'],
         dressLevels: ['Diario', 'Arreglado', 'Formal']
       })
@@ -45,8 +51,18 @@ describe('jewellery (taxonomy v5)', () => {
     expect(colorName(150, 150, 150)).toBe('Gris')
   })
 
-  it('keeps the model description on the same taxonomy version as the app', () => {
-    expect(TAXONOMY_VERSION).toBe(5)
-    expect(modelDescription.taxonomyVersion).toBe(TAXONOMY_VERSION)
+  it('reads the model trained on v5, which has no jewellery category', () => {
+    expect(TAXONOMY_VERSION).toBe(6)
+    expect(compatibleTaxonomy(modelDescription.taxonomyVersion)).toBe(true)
+    expect(compatibleTaxonomy(4)).toBe(false)
+  })
+
+  it('shares the accessories of the model out between accessories and jewellery, by how likely a watch is', () => {
+    const split = splitCategories({ top: 0.1, accessory: 0.9 }, { reloj: 0.6, bolso: 0.2, camiseta: 0.2 })
+    expect(split.jewellery).toBeCloseTo(0.9 * 0.75)
+    expect(split.accessory).toBeCloseTo(0.9 * 0.25)
+    expect(split.top).toBe(0.1)
+    // A model that has the category is left as it is.
+    expect(splitCategories({ jewellery: 0.5, accessory: 0.5 }, { reloj: 1 })).toEqual({ jewellery: 0.5, accessory: 0.5 })
   })
 })

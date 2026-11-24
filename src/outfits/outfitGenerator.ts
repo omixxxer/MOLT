@@ -78,7 +78,7 @@ const TEMPLATE_LEVEL: Record<OutfitTemplate, DressLevel | undefined> = {
 
 // The garments of each role that enter the search, chosen by rankForRole; the rest wait their turn. Their product,
 // about 1800 combinations, keeps generating instant on a phone with any wardrobe.
-const MAX_PER_ROLE: Record<GarmentRole, number> = { Top: 7, Bottom: 7, 'Una pieza': 7, Capa: 3, Calzado: 3, Accesorio: 2 }
+const MAX_PER_ROLE: Record<GarmentRole, number> = { Top: 7, Bottom: 7, 'Una pieza': 7, Capa: 3, Calzado: 3, Accesorio: 2, Joya: 3 }
 const MAX_RESULTS = 5
 const DAY = 86_400_000
 const FEEDBACK_HALF_LIFE_DAYS = 60
@@ -113,7 +113,7 @@ const WARMTH: Record<string, number> = {
   chanclas: 0, sandalias: 0, zuecos: 0.3, tacones: 0.3, zapatillas: 0.4, zapatos: 0.4, botas: 0.8,
   bufanda: 0.5, gorro: 0.4
 }
-const WARMTH_BY_ROLE: Record<GarmentRole, number> = { Top: 1.5, Bottom: 2, 'Una pieza': 1.8, Capa: 2.5, Calzado: 0.4, Accesorio: 0 }
+const WARMTH_BY_ROLE: Record<GarmentRole, number> = { Top: 1.5, Bottom: 2, 'Una pieza': 1.8, Capa: 2.5, Calzado: 0.4, Accesorio: 0, Joya: 0 }
 const WARM_FIBRES = /lana|cachemira|alpaca|mohair|plumón|pluma/i
 const COOL_FIBRES = /lino|seda/i
 const OPEN_SHOES = new Set(['sandalias', 'chanclas'])
@@ -208,6 +208,21 @@ function suitableSeasons(context: OutfitContext): Season[] | undefined {
   if (context.season === 'Invierno') return ['Invierno', 'Otoño']
   if (context.season === 'Verano') return ['Verano', 'Primavera']
   return context.season ? ['Primavera', 'Otoño', context.season === 'Otoño' ? 'Invierno' : 'Verano'] : undefined
+}
+
+/** Garments only for real heat: tagged «Primavera» too, but a cool spring day is no day for them. */
+const HEAT_ONLY = new Set(['pantalon-corto'])
+const HEAT_FROM = 20
+
+/**
+ * Shorts are proposed from 20 °C, or in spring and summer when there is no forecast: their «Primavera» would let them
+ * into a cool day of autumn (which takes spring clothes) or into November without a forecast. Pinned, they go anyway.
+ */
+function tooColdFor(garment: Garment, context: OutfitContext) {
+  if (!HEAT_ONLY.has(subcategoryId(garment) ?? '') || context.occasion === 'Calor y pocas capas') return false
+  const temperature = context.temperatureHigh ?? context.temperatureCelsius
+  if (temperature !== undefined) return temperature < HEAT_FROM
+  return context.season === 'Otoño' || context.season === 'Invierno'
 }
 
 /** The garment's seasons; for one saved without them, those its type suggests (a hoodie is not for summer). */
@@ -406,7 +421,7 @@ function rotationScore(garments: Garment[], options: OutfitGenerationOptions) {
     const days = worn.get(garment.id)
     if (days === undefined) continue
     // Fewer points for accessories and shoes: nobody minds repeating them.
-    const weight = garment.role === 'Calzado' || garment.role === 'Accesorio' ? 0.4 : 1
+    const weight = garment.role === 'Calzado' || garment.role === 'Accesorio' || garment.role === 'Joya' ? 0.4 : 1
     score += (days < 1.5 ? -22 : days < 3.5 ? -12 : days < 7.5 ? -5 : days > 21 ? 5 : 0) * weight
   }
   const key = outfitKey(garments)
@@ -457,10 +472,13 @@ export function scoreOutfit(garments: Garment[], context: OutfitContext, options
     preference: preferenceScore(garments, options),
     rotation: rotationScore(garments, options)
   }
-  const score = Math.round((Object.keys(OUTFIT_SCORE_WEIGHTS) as Array<keyof typeof OUTFIT_SCORE_WEIGHTS>).reduce((total, key) => total + scores[key] * OUTFIT_SCORE_WEIGHTS[key], 0) * 10) / 10
+  // Gold and silver together on the jewellery look unplanned: a small cost, and a word about it.
+  const metals = new Set(garments.filter((garment) => garment.role === 'Joya').flatMap((garment) => garment.colors.filter((colour) => colour === 'Dorado' || colour === 'Plateado')))
+  const mixedMetals = metals.size > 1
+  const score = Math.round(((Object.keys(OUTFIT_SCORE_WEIGHTS) as Array<keyof typeof OUTFIT_SCORE_WEIGHTS>).reduce((total, key) => total + scores[key] * OUTFIT_SCORE_WEIGHTS[key], 0) - (mixedMetals ? 4 : 0)) * 10) / 10
   const climate = climateNotes(garments, context, scores.thermal)
   const worn = lastWorn(options)
-  const forgotten = garments.find((garment) => (worn.get(garment.id) ?? 0) > 21 && garment.role !== 'Accesorio')
+  const forgotten = garments.find((garment) => (worn.get(garment.id) ?? 0) > 21 && garment.role !== 'Accesorio' && garment.role !== 'Joya')
   const justWorn = garments.find((garment) => (worn.get(garment.id) ?? 99) < 3.5 && (garment.role === 'Top' || garment.role === 'Bottom' || garment.role === 'Una pieza'))
   const explanation = [
     TEMPLATE_LEVEL[context.occasion as OutfitTemplate] && scores.occasion >= 80 ? `Encaja con ${context.occasion.toLocaleLowerCase('es')}` : '',
@@ -474,6 +492,7 @@ export function scoreOutfit(garments: Garment[], context: OutfitContext, options
   const warnings = [
     ...climate.warnings,
     levelCoherence(garments) <= 40 ? 'Mezcla prendas de estilos muy distintos' : '',
+    mixedMetals ? 'Mezcla joyas doradas y plateadas' : '',
     justWorn ? `Llevaste ${justWorn.subcategory ? justWorn.subcategory.toLocaleLowerCase('es') : 'esta prenda'} hace poco` : ''
   ].filter(Boolean)
   return { garments, score, scores, explanation, warnings }
@@ -532,6 +551,7 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
   // Out of season only when known and there is something else to wear for that role; a pinned garment always stays.
   const seasons = suitableSeasons(context)
   const inSeason = (garment: Garment) => {
+    if (tooColdFor(garment, context)) return false
     const known = garmentSeasons(garment)
     return !seasons || !known.length || known.some((season) => seasons.includes(season))
   }
@@ -553,11 +573,14 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
   const shoes = byRole('Calzado')
   const accessories = byRole('Accesorio')
   const hasPinnedRole = (role: GarmentRole) => garments.some((garment) => includedIds.has(garment.id) && garment.role === role)
+  // Jewellery is not searched with the rest (it would multiply the combinations): what is pinned goes in every
+  // outfit, and otherwise one piece is added at the end to the outfits it suits.
+  const pinnedJewels = garments.filter((garment) => garment.role === 'Joya' && includedIds.has(garment.id))
   const candidates: OutfitCandidate[] = []
   const seen = new Set<string>()
 
   const add = (base: Garment[], layer?: Garment, shoe?: Garment, accessory?: Garment) => {
-    const selected = [...base, layer, shoe, accessory].filter((item): item is Garment => Boolean(item))
+    const selected = [...base, layer, shoe, accessory, ...pinnedJewels].filter((item): item is Garment => Boolean(item))
     // What the user pins is respected; the rules below are about what Molt proposes on its own.
     const proposed = selected.filter((item) => !includedIds.has(item.id))
     if (context.occasion === 'Formal' && proposed.some((item) => !fitsFormal(item))) return
@@ -599,7 +622,26 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
   if (!hasPinnedRole('Top') && !hasPinnedRole('Bottom')) {
     for (const onePiece of onePieces) optional([onePiece])
   }
-  return pickVaried(candidates, Math.max(1, Math.min(options.limit ?? MAX_RESULTS, MAX_RESULTS)), shown, options.seed)
+  const picked = pickVaried(candidates, Math.max(1, Math.min(options.limit ?? MAX_RESULTS, MAX_RESULTS)), shown, options.seed)
+  if (pinnedJewels.length) return picked
+  return withJewellery(picked, byRole('Joya'), context, options, (key) => Boolean(options.skip?.has(key) || disliked.has(key)))
+}
+
+/**
+ * One piece of jewellery for each outfit that suits one: not for sport, only formal ones for «Formal», a different
+ * piece for each outfit when there are several, and only when it does not lower the outfit's score.
+ */
+function withJewellery(outfits: OutfitCandidate[], jewels: Garment[], context: OutfitContext, options: OutfitGenerationOptions, skipped: (key: string) => boolean) {
+  if (!jewels.length || context.occasion === 'Deportivo') return outfits
+  const suitable = context.occasion === 'Formal' ? jewels.filter(fitsFormal) : jewels
+  if (!suitable.length) return outfits
+  return outfits.map((outfit, index) => {
+    const jewel = suitable[index % suitable.length]!
+    const garments = [...outfit.garments, jewel]
+    if (skipped(outfitKey(garments))) return outfit
+    const adorned = scoreOutfit(garments, context, options)
+    return adorned.score >= outfit.score - 1 ? adorned : outfit
+  })
 }
 
 /**

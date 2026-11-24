@@ -93,6 +93,38 @@ type TextReader = (image: Blob) => Promise<TextLine[]>
 let classifierPromise: Promise<Classifier> | undefined
 
 const categoryLabels = new Map(taxonomy.categories.map((entry) => [entry.id, entry.label as GarmentCategory]))
+
+/**
+ * Categories the app has that a model trained on an earlier taxonomy does not, and where the model put their garments
+ * then: v6 took the jewellery (watch, necklace, bracelet, earrings, ring) out of the accessories.
+ */
+const SPLIT_FROM: Record<string, string> = { jewellery: 'accessory' }
+/** The model taxonomies this app reads: its own, and v5, whose only difference is the jewellery, inside accessories. */
+export function compatibleTaxonomy(version: number) {
+  return version === TAXONOMY_VERSION || (TAXONOMY_VERSION === 6 && version === 5)
+}
+
+/**
+ * A model without a category of the app (jewellery, for a v5 model) still gives it: the probability of the category
+ * it used to belong to is shared out by how likely its own subcategories are against the rest of that category's.
+ */
+export function splitCategories(categories: Record<string, number>, subcategories: Record<string, number>): Record<string, number> {
+  const result = { ...categories }
+  for (const [missing, parent] of Object.entries(SPLIT_FROM)) {
+    if (missing in categories || !(parent in categories)) continue
+    let own = 0
+    let rest = 0
+    for (const [value, score] of Object.entries(subcategories)) {
+      const category = subcategoryEntries.get(value)?.category
+      if (category === missing) own += score
+      else if (category === parent) rest += score
+    }
+    const share = own + rest > 0 ? own / (own + rest) : 0
+    result[missing] = categories[parent]! * share
+    result[parent] = categories[parent]! * (1 - share)
+  }
+  return result
+}
 const subcategoryEntries = new Map(taxonomy.subcategories.map((entry) => [entry.id, entry]))
 
 async function normalizeImage(image: Blob): Promise<NormalizedImage> {
@@ -185,7 +217,7 @@ function patchSoftmax(logits: Float32Array, settings: NonNullable<ModelDescripti
 async function loadDescription(): Promise<ModelDescription> {
   const description = await fetchDescription<ModelDescription>(`${MODEL_BASE}vesta-model.json`)
   if (description.format !== 'vesta-model') throw new Error('La descripción del modelo no es válida.')
-  if (description.taxonomyVersion !== TAXONOMY_VERSION) {
+  if (!compatibleTaxonomy(description.taxonomyVersion)) {
     throw new Error(`El modelo usa la taxonomía v${description.taxonomyVersion} y la app la v${TAXONOMY_VERSION}.`)
   }
   return description
@@ -311,7 +343,7 @@ export async function analyzeGarmentImage(
     }
   }
 
-  const categoryScores = averaged.category!
+  const categoryScores = splitCategories(averaged.category!, averaged.subcategory ?? {})
   // Every (category, subcategory) pair ranked by P(category) × P(subcategory | category).
   const ranked = Object.entries(categoryScores)
     .filter(([category]) => categoryLabels.has(category))

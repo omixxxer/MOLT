@@ -31,8 +31,8 @@ import WeatherBar from '../weather/WeatherBar'
 import type { OutfitData } from './outfitData'
 
 const occasions: OutfitTemplate[] = ['Diario', 'Arreglado', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas']
-const SLOT_LABELS: Record<GarmentRole, string> = { Capa: 'Capa', Top: 'Parte de arriba', Bottom: 'Parte de abajo', 'Una pieza': 'Vestido o mono', Calzado: 'Calzado', Accesorio: 'Accesorio' }
-const SLOT_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado', 'Accesorio']
+const SLOT_LABELS: Record<GarmentRole, string> = { Capa: 'Capa', Top: 'Parte de arriba', Bottom: 'Parte de abajo', 'Una pieza': 'Vestido o mono', Calzado: 'Calzado', Accesorio: 'Accesorio', Joya: 'Joya' }
+const SLOT_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado', 'Accesorio', 'Joya']
 
 /**
  * What the studio opens with: an idea chosen in the wizard, a saved outfit to change (`lock`: every piece pinned), a
@@ -427,7 +427,7 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
                 ) : (
                   <button type="button" className="studio-slot-add" onClick={() => setPicking(role)}>
                     <HugeiconsIcon icon={Add01Icon} size={18} />
-                    {role === 'Capa' || role === 'Accesorio' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
+                    {role === 'Capa' || role === 'Accesorio' || role === 'Joya' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
                   </button>
                 )}
               </li>
@@ -440,7 +440,7 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
               {slots.filter(({ garment }) => !garment).map(({ role }) => (
                 <button key={role} type="button" className="trip-add" onClick={() => setPicking(role)}>
                   <HugeiconsIcon icon={Add01Icon} size={13} />
-                  {role === 'Capa' || role === 'Accesorio' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
+                  {role === 'Capa' || role === 'Accesorio' || role === 'Joya' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
                 </button>
               ))}
             </div>
@@ -522,7 +522,7 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
           options={optionsForRole(picking, board, garments, context, options)}
           unavailable={garments.filter((garment) => garment.role === picking && (garment.availability === 'laundry' || garment.availability === 'unavailable'))}
           current={pickerCurrent}
-          canRemove={picking === 'Capa' || picking === 'Accesorio' || picking === 'Calzado'}
+          canRemove={picking === 'Capa' || picking === 'Accesorio' || picking === 'Joya' || picking === 'Calzado'}
           onPick={pick}
           onRemove={() => removeFromBoard(picking)}
           onAvailability={(garment, availability) => void changeAvailability(garment, availability)}
