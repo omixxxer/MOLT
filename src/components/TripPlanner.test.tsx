@@ -138,6 +138,10 @@ describe('TripPlanner', () => {
     stubService()
     const { user } = setup()
     await createTrip(user)
+    // The kind of suitcase is shown in the header and changed in «Editar la maleta».
+    expect(screen.getByText('Maleta equilibrada')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /ligera/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Editar la maleta' }))
     expect(screen.getByRole('button', { name: /equilibrada/i, pressed: true })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /ligera/i }))
     expect(await screen.findByText(/Maleta ligera: outfits elegidos de nuevo/)).toBeInTheDocument()
@@ -200,7 +204,7 @@ describe('TripPlanner', () => {
     expect(list.getByText(`2 de ${total} en la maleta`)).toBeInTheDocument()
     // Adding and removing is done in «Editar la maleta».
     expect(list.queryByLabelText('Añadir a la lista')).not.toBeInTheDocument()
-    await user.click(list.getByRole('button', { name: 'Editar la maleta' }))
+    await user.click(screen.getByRole('button', { name: 'Editar la maleta' }))
 
     await user.type(list.getByLabelText('Añadir a la lista'), 'Entradas')
     await user.click(list.getByRole('button', { name: 'Añadir' }))
@@ -310,7 +314,7 @@ describe('TripPlanner', () => {
     const { user, unmount } = setup()
     const list = within(await openTrip(user))
     expect(list.queryByRole('checkbox', { name: /polo/ })).not.toBeInTheDocument()
-    await user.click(list.getByRole('button', { name: 'Editar la maleta' }))
+    await user.click(screen.getByRole('button', { name: 'Editar la maleta' }))
     await user.click(list.getByRole('button', { name: 'Añadir prendas del armario' }))
     const picker = within(screen.getByRole('dialog', { name: 'Añadir prendas a la maleta' }))
     // What the outfits already take is not offered again.
@@ -320,16 +324,20 @@ describe('TripPlanner', () => {
     await user.click(picker.getByRole('button', { name: 'Listo' }))
     expect(list.getByRole('checkbox', { name: /polo.*Por si acaso/ })).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: 'Listo' }))
+    expect(list.queryByRole('button', { name: 'Añadir prendas del armario' })).not.toBeInTheDocument()
+
+    // Notes are written at any time, without editing the suitcase.
     await user.type(list.getByLabelText('Notas del viaje'), 'Tren a las 9:15')
-    await user.click(list.getByRole('button', { name: 'Listo' }))
-    expect(list.getByText('Tren a las 9:15')).toBeInTheDocument()
+    await user.tab()
     await waitFor(async () => expect(await database.trips.get('t')).toMatchObject({ extraGarmentIds: ['polo'], notes: 'Tren a las 9:15' }))
 
     unmount()
     const again = setup()
     const reopened = within(await openTrip(again.user))
     expect(reopened.getByRole('checkbox', { name: /polo/ })).toBeInTheDocument()
-    await again.user.click(reopened.getByRole('button', { name: 'Editar la maleta' }))
+    expect(reopened.getByLabelText('Notas del viaje')).toHaveValue('Tren a las 9:15')
+    await again.user.click(screen.getByRole('button', { name: 'Editar la maleta' }))
     await again.user.click(reopened.getByRole('button', { name: /Quitar polo de la maleta/ }))
     expect(reopened.queryByRole('checkbox', { name: /polo/ })).not.toBeInTheDocument()
   })

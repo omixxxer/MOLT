@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Add01Icon, Cancel01Icon, PencilEdit02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import type { PackingGroup } from '../../trips/packingPlan'
 import type { Garment, Trip } from '../../types/domain'
@@ -12,6 +12,8 @@ interface PackingListProps {
   groups: PackingGroup[]
   /** The whole wardrobe, to add garments to the suitcase by hand. */
   garments: Garment[]
+  /** «Editar la maleta», opened from the pencil in the trip's header. */
+  editing: boolean
   onChange: (change: Partial<Trip>) => void
 }
 
@@ -21,11 +23,11 @@ function wornText(days: number) {
 }
 
 /**
- * The list to tick while packing: each garment once, and the rest of the suitcase. «Editar» opens the changes:
- * garments added by hand («por si acaso»), the things that are not clothes, and notes about the trip.
+ * The list to tick while packing: each garment once, and the rest of the suitcase, with the trip's notes, which can be
+ * written at any time. While editing (the pencil in the header), garments are added by hand («por si acaso») and the
+ * things that are not clothes added or taken out.
  */
-export default function PackingList({ trip, groups, garments, onChange }: PackingListProps) {
-  const [editing, setEditing] = useState(false)
+export default function PackingList({ trip, groups, garments, editing, onChange }: PackingListProps) {
   const [picking, setPicking] = useState(false)
   const [newItem, setNewItem] = useState('')
   const [notes, setNotes] = useState(trip.notes ?? '')
@@ -52,19 +54,9 @@ export default function PackingList({ trip, groups, garments, onChange }: Packin
     onChange({ extraGarmentIds: next, ...(next.includes(garment.id) ? {} : { packedIds: trip.packedIds.filter((id) => id !== garment.id) }) })
   }
 
-  function finish() {
-    saveNotes()
-    setEditing(false)
-  }
-
   return (
     <aside className="packing" aria-labelledby="packing-list-title" data-editing={editing ? '' : undefined}>
-      <div className="packing-head">
-        <h2 id="packing-list-title" className="trip-heading">Lista de maleta <span className="packing-count">{items.length} {items.length === 1 ? 'prenda' : 'prendas'}</span></h2>
-        {editing
-          ? <button type="button" className="button button-dark packing-edit" onClick={finish}>Listo</button>
-          : <button type="button" className="button button-outline packing-edit" onClick={() => setEditing(true)}><HugeiconsIcon icon={PencilEdit02Icon} size={15} />Editar la maleta</button>}
-      </div>
+      <h2 id="packing-list-title" className="trip-heading">Lista de maleta <span className="packing-count">{items.length} {items.length === 1 ? 'prenda' : 'prendas'}</span></h2>
       <div className="packing-progress" role="status">
         <div className="batch-dock-bar"><span style={{ width: `${total ? (packed / total) * 100 : 0}%` }} /></div>
         <p>{total > 0 && packed === total ? '¡Todo en la maleta!' : `${packed} de ${total} en la maleta`}</p>
@@ -124,19 +116,10 @@ export default function PackingList({ trip, groups, garments, onChange }: Packin
           )}
         </section>
 
-        {(editing || trip.notes) && (
-          <section className="packing-notes" aria-label="Notas">
-            <h3>Notas</h3>
-            {editing
-              ? (
-                  <>
-                    <label className="visually-hidden" htmlFor={`packing-notes-${trip.id}`}>Notas del viaje</label>
-                    <textarea id={`packing-notes-${trip.id}`} value={notes} onChange={(event) => setNotes(event.target.value)} onBlur={saveNotes} placeholder="Reservas, horarios, qué no olvidar…" rows={3} maxLength={1000} />
-                  </>
-                )
-              : <p>{trip.notes}</p>}
-          </section>
-        )}
+        <section className="packing-notes" aria-label="Notas">
+          <h3><label htmlFor={`packing-notes-${trip.id}`}>Notas del viaje</label></h3>
+          <textarea id={`packing-notes-${trip.id}`} value={notes} onChange={(event) => setNotes(event.target.value)} onBlur={saveNotes} placeholder="Reservas, horarios, qué no olvidar…" rows={3} maxLength={1000} />
+        </section>
       </div>
       {picking && (
         <SuitcasePicker

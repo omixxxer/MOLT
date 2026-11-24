@@ -11,6 +11,7 @@ import { askConfirm } from '../confirmDialog'
 import { garmentLabel } from '../OutfitBoard'
 import type { OutfitData } from '../outfits/outfitData'
 import { WeatherCredit, weatherIcon } from '../weather/WeatherBar'
+import EditIcon from '../EditIcon'
 import PackingList from './PackingList'
 import TripDayCard from './TripDayCard'
 import TripScene from './TripScene'
@@ -52,6 +53,8 @@ interface TripViewProps {
 export default function TripView({ trip, garments, data, onChange, onDelete, onDataChanged, onAvailabilityChange }: TripViewProps) {
   const today = dayFromToday(0)
   const [pane, setPane] = useState<'days' | 'list'>('days')
+  /** «Editar la maleta», from the pencil in the header: the kind of suitcase, and changes to the list. */
+  const [editing, setEditing] = useState(false)
   const refreshing = useRef(false)
   const [checking, setChecking] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
@@ -175,6 +178,12 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
     }
   }
 
+  /** On a phone only one pane shows: editing brings up the list, where the changes are made. */
+  function toggleEditing(on: boolean) {
+    setEditing(on)
+    if (on) setPane('list')
+  }
+
   function replaceDay(index: number, day: TripDay) {
     update({ days: latest.current.days.map((item, position) => (position === index ? day : item)) })
   }
@@ -233,15 +242,10 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
           <h2>{trip.place.name}</h2>
           <p>{tripDates(trip)} · {trip.days.length} {trip.days.length === 1 ? 'día' : 'días'} · {kindLabel}</p>
           <p className="trip-place">{placeLabel(trip.place)}</p>
-          <div className="trip-style-switch" role="group" aria-label="Tipo de maleta">
-            {(Object.entries(PACKING_STYLES) as Array<[PackingStyle, (typeof PACKING_STYLES)[PackingStyle]]>).map(([id, rules]) => (
-              <button key={id} type="button" aria-pressed={trip.style === id} title={rules.detail} onClick={() => void changeStyle(id)} disabled={adjusting}>
-                <span className="trip-style-prefix">Maleta </span>{rules.label.toLocaleLowerCase('es')}
-              </button>
-            ))}
-          </div>
+          <span className="trip-style-badge">Maleta {PACKING_STYLES[trip.style].label.toLocaleLowerCase('es')}</span>
         </div>
         <div className="trip-tools">
+          <button type="button" className="icon-button trip-edit" onClick={() => toggleEditing(!editing)} aria-pressed={editing} aria-label="Editar la maleta" title="Editar la maleta: tipo de maleta, prendas y lo que no es ropa"><EditIcon size={17} /></button>
           <button type="button" className="icon-button" onClick={() => void copyList()} aria-label="Copiar la lista" title="Copiar la lista"><HugeiconsIcon icon={Copy01Icon} size={16} /></button>
           <button type="button" className="icon-button" onClick={() => void remove()} aria-label="Eliminar el viaje" title="Eliminar el viaje"><HugeiconsIcon icon={Delete02Icon} size={16} /></button>
         </div>
@@ -252,6 +256,22 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
         )}
       </header>
 
+      {editing && (
+        <section className="trip-editor" aria-labelledby="trip-editor-title">
+          <div className="trip-editor-head">
+            <h3 id="trip-editor-title">Editar la maleta</h3>
+            <button type="button" className="button button-dark" onClick={() => toggleEditing(false)}>Listo</button>
+          </div>
+          <div className="trip-style-switch" role="group" aria-label="Tipo de maleta">
+            {(Object.entries(PACKING_STYLES) as Array<[PackingStyle, (typeof PACKING_STYLES)[PackingStyle]]>).map(([id, rules]) => (
+              <button key={id} type="button" aria-pressed={trip.style === id} title={rules.detail} onClick={() => void changeStyle(id)} disabled={adjusting}>
+                <span className="trip-style-prefix">Maleta </span>{rules.label.toLocaleLowerCase('es')}
+              </button>
+            ))}
+          </div>
+          <p className="trip-editor-note">{PACKING_STYLES[trip.style].detail}. Cambiarlo elige de nuevo los outfits de los días que no has tocado. En la lista puedes añadir prendas «por si acaso» y quitar o añadir lo que no es ropa.</p>
+        </section>
+      )}
       {error && <p className="form-error" role="alert">{error}</p>}
       {message && <p className="outfit-notice" role="status">{message}</p>}
       {changes.length > 0 && (
@@ -325,7 +345,7 @@ export default function TripView({ trip, garments, data, onChange, onDelete, onD
             />
           ))}
         </section>
-        <PackingList trip={trip} groups={groups} garments={garments} onChange={update} />
+        <PackingList trip={trip} groups={groups} garments={garments} editing={editing} onChange={update} />
       </div>
     </div>
   )

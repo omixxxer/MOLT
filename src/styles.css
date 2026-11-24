@@ -795,6 +795,15 @@ button.choice-chip { font-family: inherit; }
 .trip-header .trip-place { font-size: var(--text-small); }
 .trip-tools { grid-area: tools; display: flex; align-items: center; gap: 8px; }
 .trip-tools .icon-button, .trip-tools .button-outline { background: rgba(248, 246, 251, .9); }
+/* The kind of suitcase, shown in the header and changed in «Editar la maleta» (the pencil among the tools). */
+.trip-style-badge { margin-top: 10px; padding: 4px 10px; border-radius: 12px; background: rgba(238, 235, 244, .92); font-size: var(--text-label); font-weight: 650; }
+.trip-tools .trip-edit[aria-pressed=true] { color: var(--white); background: var(--ink); }
+.trip-editor { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--ink); border-radius: 12px; background: var(--white); }
+.trip-editor-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.trip-editor h3 { margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 500; }
+.trip-editor .trip-style-switch { justify-self: start; margin-top: 0; }
+.trip-editor-note { margin: 0; font-size: var(--text-body); line-height: 1.5; opacity: .85; }
+.packing-notes h3 label { cursor: text; }
 .trip-style-switch { display: inline-flex; flex-wrap: wrap; margin-top: 12px; padding: 3px; border-radius: 9px; background: rgba(238, 235, 244, .92); }
 .trip-style-switch button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font-size: var(--text-label); font-weight: 650; transition: background-color .18s ease; }
 .trip-style-switch button[aria-pressed=true] { background: var(--white); box-shadow: 0 1px 3px rgba(45, 40, 56, .16); }
@@ -1221,8 +1230,6 @@ img[data-transparent] { mix-blend-mode: normal; }
 .trip-changes-actions .icon-button { width: 32px; height: 32px; }
 
 /* Editing the suitcase (PackingList): garments added by hand, the things that are not clothes, and notes. */
-.packing-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 10px; }
-.packing-edit { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; font-size: var(--text-label); }
 .packing[data-editing] { border-color: var(--ink); }
 .packing-add-garments { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
 .packing-garment label { display: flex; flex: 1; align-self: stretch; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
