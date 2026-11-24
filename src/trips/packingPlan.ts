@@ -111,16 +111,20 @@ export function nextOutfitForDay(garments: Garment[], days: TripDay[], index: nu
 export interface PackingGroup {
   role: GarmentRole
   title: string
+  /** `days` is 0 for a garment added by hand that no day of the plan wears («por si acaso»). */
   items: Array<{ garment: Garment; days: number }>
 }
 
 const GROUPS: Array<[GarmentRole, string]> = [['Capa', 'Abrigos y chaquetas'], ['Top', 'Partes de arriba'], ['Una pieza', 'Vestidos y monos'], ['Bottom', 'Partes de abajo'], ['Calzado', 'Calzado'], ['Accesorio', 'Accesorios']]
 
 /** Each garment once, with how many days it is worn; a garment since deleted drops out. */
-export function packingGroups(garments: Garment[], days: TripDay[]): PackingGroup[] {
+export function packingGroups(garments: Garment[], days: TripDay[], extraGarmentIds: string[] = []): PackingGroup[] {
   const counts = wearCounts(days)
+  const added = new Set(extraGarmentIds)
   return GROUPS.flatMap(([role, title]) => {
-    const items = garments.filter((garment) => garment.role === role && counts.has(garment.id)).map((garment) => ({ garment, days: counts.get(garment.id)! }))
+    const items = garments
+      .filter((garment) => garment.role === role && (counts.has(garment.id) || added.has(garment.id)))
+      .map((garment) => ({ garment, days: counts.get(garment.id) ?? 0 }))
     return items.length ? [{ role, title, items }] : []
   })
 }
@@ -198,14 +202,15 @@ export function forecastChanges(before: DailyWeather[], after: DailyWeather[]): 
 
 /** The list as plain text, to send or keep elsewhere. */
 export function packingText(trip: Trip, garments: Garment[], label: (garment: Garment) => string) {
-  const groups = packingGroups(garments, trip.days)
+  const groups = packingGroups(garments, trip.days, trip.extraGarmentIds)
   const mark = (packed: boolean) => (packed ? '[x]' : '[ ]')
   return [
     `Maleta para ${trip.place.name} (${trip.startDate} a ${trip.endDate})`,
     ...groups.flatMap((group) => ['', group.title, ...group.items.map(({ garment }) => `${mark(trip.packedIds.includes(garment.id))} ${label(garment)}`)]),
     '',
     'Además',
-    ...trip.extras.map((extra) => `${mark(extra.packed)} ${extra.label}`)
+    ...trip.extras.map((extra) => `${mark(extra.packed)} ${extra.label}`),
+    ...(trip.notes?.trim() ? ['', 'Notas', trip.notes.trim()] : [])
   ].join('\n')
 }
 

@@ -194,6 +194,10 @@ export interface Trip {
   days: TripDay[]
   packedIds: string[]
   extras: TripExtra[]
+  /** Garments added to the suitcase by hand, worn no day of the plan («por si acaso»). */
+  extraGarmentIds?: string[]
+  /** Free notes about the trip (tickets, reservations, what not to forget). */
+  notes?: string
   fetchedAt?: string
   createdAt: string
   updatedAt: string

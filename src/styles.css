@@ -769,11 +769,6 @@ button.choice-chip { font-family: inherit; }
 
 /* Maleta */
 .trip-planner > h1 { margin-bottom: 14px; }
-.trip-list { display: flex; gap: 8px; margin-bottom: 18px; padding: 2px; overflow-x: auto; scrollbar-width: thin; }
-.trip-chip { display: grid; flex: none; gap: 1px; min-height: 48px; padding: 6px 13px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: var(--text-label); text-align: left; }
-.trip-chip strong { font-size: var(--text-body); font-weight: 650; }
-.trip-chip[aria-pressed=true] { color: var(--white); border-color: var(--ink); background: var(--ink); }
-.trip-chip-new { display: flex; align-items: center; gap: 5px; font-weight: 600; }
 .trip-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 640px; }
 .trip-form .page-intro { margin: 0; }
 .trip-form > .button { justify-self: start; min-width: 220px; }
@@ -806,6 +801,15 @@ button.choice-chip { font-family: inherit; }
 .trip-header .trip-place { font-size: var(--text-small); }
 .trip-tools { grid-area: tools; display: flex; align-items: center; gap: 8px; }
 .trip-tools .icon-button, .trip-tools .button-outline { background: rgba(248, 246, 251, .9); }
+/* The kind of suitcase, shown in the header and changed in «Editar la maleta» (the pencil among the tools). */
+.trip-style-badge { margin-top: 10px; padding: 4px 10px; border-radius: 12px; background: rgba(238, 235, 244, .92); font-size: var(--text-label); font-weight: 650; }
+.trip-tools .trip-edit[aria-pressed=true] { color: var(--white); background: var(--ink); }
+.trip-editor { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--ink); border-radius: 12px; background: var(--white); }
+.trip-editor-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.trip-editor h3 { margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 500; }
+.trip-editor .trip-style-switch { justify-self: start; margin-top: 0; }
+.trip-editor-note { margin: 0; font-size: var(--text-body); line-height: 1.5; opacity: .85; }
+.packing-notes h3 label { cursor: text; }
 .trip-style-switch { display: inline-flex; flex-wrap: wrap; margin-top: 12px; padding: 3px; border-radius: 9px; background: rgba(238, 235, 244, .92); }
 .trip-style-switch button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font-size: var(--text-label); font-weight: 650; transition: background-color .18s ease; }
 .trip-style-switch button[aria-pressed=true] { background: var(--white); box-shadow: 0 1px 3px rgba(45, 40, 56, .16); }
@@ -1200,4 +1204,92 @@ img[data-transparent] { mix-blend-mode: normal; }
   .photo-editor-actions { grid-template-columns: 1fr 1fr; }
   .photo-editor-actions > span { display: none; }
   .photo-editor-actions .button-outline:first-child { grid-column: 1 / -1; }
+}
+
+/* Maleta: the list of trips first (TripPlanner), one card each, and «Tus viajes» to go back to it. */
+.trip-planner-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.trip-planner-head .button { display: inline-flex; align-items: center; gap: 6px; }
+.trip-back { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 12px; padding: 0 10px 0 4px; border: 0; border-radius: 18px; background: transparent; font-size: var(--text-body); font-weight: 650; }
+.trip-back:hover { background: var(--soft-surface); }
+.trip-home { display: grid; gap: 26px; margin-top: 18px; }
+.trip-home-title { margin: 0 0 12px; font-family: var(--serif); font-size: 22px; font-weight: 500; }
+.trip-home-empty { display: grid; justify-items: start; gap: 10px; padding: 18px; border: 1px dashed var(--line); border-radius: 12px; font-size: var(--text-body); }
+.trip-home-empty p { margin: 0; }
+.trip-home-empty .button { display: inline-flex; align-items: center; gap: 6px; }
+.trip-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.trip-card-button { display: grid; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--white); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .15s ease, transform .15s ease; }
+.trip-card-button:hover { box-shadow: 0 8px 24px rgba(45, 40, 56, .14); transform: translateY(-1px); }
+.trip-card-art { display: block; height: 128px; overflow: hidden; background: var(--soft-surface); }
+.trip-card-art > svg, .trip-card-art > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.trip-card-text { display: grid; gap: 3px; padding: 12px 14px 14px; font-size: var(--text-label); }
+.trip-card-text strong { font-family: var(--serif); font-size: 21px; font-weight: 500; }
+.trip-card-when { justify-self: start; padding: 2px 8px; border-radius: 10px; background: var(--ink); color: var(--white); font-size: var(--text-caption); font-weight: 650; }
+.trip-card[data-finished] .trip-card-when { background: var(--mist); color: var(--ink); }
+.trip-card[data-finished] .trip-card-art { filter: grayscale(.5); opacity: .8; }
+.trip-card-progress { display: grid; gap: 4px; margin-top: 6px; }
+.trip-card-progress .batch-dock-bar { border-radius: 2px; overflow: hidden; }
+.trip-card-progress small { font-size: var(--text-small); }
+.trip-cards-past { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.trip-cards-past .trip-card-art { height: 90px; }
+@media (prefers-reduced-motion: reduce) { .trip-card-button { transition: none; } .trip-card-button:hover { transform: none; } }
+
+/* The weather of a trip updates on its own: a line saying when, with a small button to look now. */
+.weather-updated { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
+.weather-refresh { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); }
+.weather-refresh:hover:not(:disabled) { background: var(--mist); }
+.weather-refresh:disabled { opacity: .5; }
+.trip-changes-done { margin: 6px 0 0; font-size: var(--text-label); }
+.trip-changes-actions .icon-button { width: 32px; height: 32px; }
+
+/* Editing the suitcase (PackingList): garments added by hand, the things that are not clothes, and notes. */
+.packing[data-editing] { border-color: var(--ink); }
+.packing-add-garments { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
+.packing-garment label { display: flex; flex: 1; align-self: stretch; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.packing-garment input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.packing-garment label > img { flex: none; width: 36px; height: 44px; border-radius: 5px; object-fit: contain; mix-blend-mode: multiply; }
+.packing-garment label > span { min-width: 0; overflow-wrap: anywhere; }
+.packing-garment[data-packed] label > span { text-decoration: line-through; opacity: .6; }
+.packing-garment[data-packed] label > img { opacity: .5; }
+.packing-garment button { display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; }
+.packing-garment button:hover { background: var(--mist); }
+.packing-hint { margin: 4px 6px; font-size: var(--text-small); opacity: .8; }
+.packing-notes p { margin: 0 6px; font-size: var(--text-body); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.packing-notes textarea { width: 100%; min-height: 72px; padding: 8px 10px; border: 1px solid var(--mist); border-radius: 7px; background: var(--white); font: inherit; font-size: var(--text-body); resize: vertical; }
+.suitcase-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker-note { margin: -4px 0 0; font-size: var(--text-body); opacity: .8; }
+.picker-option[aria-pressed=true] .garment-tile { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.suitcase-chosen { display: inline-flex; align-items: center; gap: 3px; }
+.suitcase-picker-footer { position: sticky; bottom: -20px; display: flex; justify-content: flex-end; margin: 0 -20px -20px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--white); }
+@media (pointer: coarse) {
+  .packing-garment button, .weather-refresh { width: 40px; height: 40px; }
+  .packing-notes textarea { font-size: 16px; }
+}
+
+/* A trip, day by day (TripView): the days are tabs with their weather, and one day's outfit shows at a time. */
+.trip-header-text .trip-card-when { margin-bottom: 6px; }
+.trip-card-when[data-finished] { background: var(--mist); color: var(--ink); }
+.trip-days { align-content: start; }
+.trip-day-picker { position: relative; display: flex; gap: 6px; margin: 0; padding: 2px 2px 4px; overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.trip-day-chip { position: relative; display: grid; flex: 1 0 64px; justify-items: center; gap: 2px; max-width: 140px; padding: 8px 4px 7px; border: 1px solid transparent; border-radius: 12px; background: var(--soft-surface); color: var(--ink); font-size: var(--text-small); scroll-snap-align: start; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.trip-day-chip strong { font-family: var(--serif); font-size: 18px; font-weight: 500; line-height: 1.1; }
+.trip-day-chip small { font-size: var(--text-small); }
+.trip-day-chip:hover { border-color: var(--line); }
+.trip-day-chip[data-climate] { background: transparent; border-color: var(--line); }
+.trip-day-chip[data-past] { opacity: .55; }
+.trip-day-chip[aria-selected=true] { border-color: var(--ink); background: var(--ink); color: var(--white); opacity: 1; box-shadow: 0 4px 12px rgba(45, 40, 56, .22); }
+.trip-day-chip[aria-selected=true] .weather-rain { color: inherit; }
+#trip-day-panel { min-width: 0; }
+.trip-weather { gap: 8px; }
+.trip-advice { display: grid; gap: 6px; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--soft-surface); list-style: none; font-size: var(--text-body); line-height: 1.45; }
+.trip-advice li { position: relative; padding-left: 16px; }
+.trip-advice li::before { content: ''; position: absolute; top: .55em; left: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--lavender); }
+/* Beside the days on a wide screen, the list grows with its content instead of scrolling inside the page. */
+@media (min-width: 721px) {
+  .packing-list { max-height: none; overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { .trip-day-chip { transition: none; } }
+@media (max-width: 720px) {
+  /* The credit goes top left on the photo band, clear of the name and of the tools on the right. */
+  .trip-credit { top: 10px; right: auto; bottom: auto; left: 10px; max-width: calc(100% - 150px); }
+  .trip-day-chip { flex-basis: 58px; }
 }
