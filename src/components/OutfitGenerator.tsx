@@ -34,6 +34,10 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [start, setStart] = useState<{ garmentIds: string[]; nonce: number } | undefined>(startGarmentId && { garmentIds: [startGarmentId.id], nonce: startGarmentId.nonce })
+  /** The saved outfit being changed in the studio, if any. */
+  const [editingId, setEditingId] = useState<string>()
+  /** A new key starts the studio again from nothing. */
+  const [studioKey, setStudioKey] = useState(0)
   const [desiredStyle, setDesiredStyle] = useState('')
   const [manualTemperature, setManualTemperature] = useState('')
   const wardrobeStyles = [...new Set(garments.flatMap((garment) => garment.styles).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))
@@ -51,17 +55,36 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
     return () => { active = false }
   }, [])
 
+  /** A saved outfit opened to change it («Cambiar»): the studio shows it, and saving changes that outfit. */
   function openOutfit(outfit: Outfit) {
+    setEditingId(outfit.id)
     setStart({ garmentIds: outfit.garmentIds, nonce: Date.now() })
+    setStudioKey((key) => key + 1)
     show('studio')
   }
 
-  // A garment chosen in the wardrobe while this screen is open: the studio, around it.
+  /**
+   * «Crear outfit»: a new outfit. After changing a saved one, the studio starts again with today's proposal; a new
+   * outfit left half made is still there, so looking at «Mis outfits» does not lose it.
+   */
+  function createOutfit() {
+    if (editingId) {
+      setEditingId(undefined)
+      setStart(undefined)
+      setStudioKey((key) => key + 1)
+    }
+    show('studio')
+  }
+
+  // A garment chosen in the wardrobe while this screen is open: a new outfit in the studio, around it.
   useEffect(() => {
     if (!startGarmentId) return
+    setEditingId(undefined)
     setStart({ garmentIds: [startGarmentId.id], nonce: startGarmentId.nonce })
     setView('studio')
   }, [startGarmentId?.nonce]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const editing = editingId ? data.outfits.find((outfit) => outfit.id === editingId) : undefined
 
   async function savePreferences(next: UserPreferences) {
     setData((current) => ({ ...current, preferences: next }))
@@ -82,9 +105,9 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
   return (
     <section className="feature-screen outfit-generator" aria-labelledby="outfits-title">
       <div className="outfit-heading">
-        <h1 id="outfits-title">{view === 'studio' ? 'Crear outfit' : 'Mis outfits'}<span>.</span></h1>
+        <h1 id="outfits-title">{view === 'studio' ? (editing ? 'Cambiar outfit' : 'Crear outfit') : 'Mis outfits'}<span>.</span></h1>
         {garments.length > 0 && view === 'saved' && (
-          <button type="button" className="button button-dark outfit-create" onClick={() => show('studio')}><HugeiconsIcon icon={Add01Icon} size={15} />Crear outfit</button>
+          <button type="button" className="button button-dark outfit-create" onClick={createOutfit}><HugeiconsIcon icon={Add01Icon} size={15} />Crear outfit</button>
         )}
       </div>
       {garments.length > 0 && view === 'studio' && (
@@ -101,9 +124,12 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
         </section>
       ) : !ready ? null : (
         <>
-          {view === 'saved' && <SavedOutfits garments={garments} data={data} onChanged={reload} onOpen={openOutfit} onCreate={() => show('studio')} />}
+          {view === 'saved' && <SavedOutfits garments={garments} data={data} onChanged={reload} onOpen={openOutfit} onCreate={createOutfit} />}
           <div hidden={view !== 'studio'}>
             <OutfitStudio
+              key={studioKey}
+              editing={editing}
+              onCreateNew={createOutfit}
               garments={garments}
               data={data}
               start={start}

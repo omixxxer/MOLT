@@ -45,13 +45,17 @@ interface OutfitStudioProps {
   onAvailabilityChange: (garment: Garment) => Promise<void>
   /** To «Mis outfits», from the notice after saving or wearing. */
   onShowSaved: () => void
+  /** The saved outfit being changed («Cambiar» in «Mis outfits»): saving updates it instead of making another. */
+  editing?: Outfit
+  /** Leaves the outfit being changed for a new one. */
+  onCreateNew: () => void
 }
 
 /**
  * Where outfits are made: it opens with today's proposal, each piece can be kept, changed or chosen by hand (the
  * garments that go best first), and whatever is on the board can be worn or saved.
  */
-export default function OutfitStudio({ garments, data, start, desiredStyle, manualTemperature, onChanged, onAvailabilityChange, onShowSaved }: OutfitStudioProps) {
+export default function OutfitStudio({ garments, data, start, desiredStyle, manualTemperature, onChanged, onAvailabilityChange, onShowSaved, editing, onCreateNew }: OutfitStudioProps) {
   const [occasion, setOccasion] = useState<OutfitTemplate>('Diario')
   const forecast = useDayForecast()
   const [error, setError] = useState('')
@@ -92,6 +96,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
   const sameOutfit = data.outfits.filter((outfit) => [...outfit.garmentIds].sort().join('|') === boardKey)
   const saved = sameOutfit.some((outfit) => outfit.favorite || outfit.kind === 'manual')
   const wornToday = sameOutfit.some((outfit) => outfit.wornAt && localDay(new Date(outfit.wornAt)) === localDay())
+  const changedFromEditing = Boolean(editing) && [...editing!.garmentIds].sort().join('|') !== boardKey
   const hasBase = board.some((garment) => garment.role === 'Una pieza') || (board.some((garment) => garment.role === 'Top') && board.some((garment) => garment.role === 'Bottom'))
 
   // The notice after saving or wearing is about that outfit: another one on the board clears it.
@@ -232,6 +237,25 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
     }
   }
 
+  /** The outfit being changed, with the garments now on the board; its name, history and the rest stay. */
+  async function saveChanges() {
+    if (!editing || !current) return
+    setError('')
+    setNotice('')
+    try {
+      const at = new Date().toISOString()
+      const outfit: Outfit = { ...editing, garmentIds: board.map((garment) => garment.id), score: current.score, favorite: true }
+      await database.transaction('rw', database.outfits, database.outfitFeedback, async () => {
+        await database.outfits.put(outfit)
+        await database.outfitFeedback.add(createOutfitFeedback('saved', outfit.garmentIds, outfit.id, at))
+      })
+      await onChanged()
+      setKept(`Cambios guardados en «${outfit.name || outfit.occasion}».`)
+    } catch {
+      setError('No se pudieron guardar los cambios del outfit.')
+    }
+  }
+
   async function save(name: string) {
     await keep({ favorite: true, ...(name ? { name } : {}) }, 'saved')
     setSaving(false)
@@ -297,6 +321,12 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
 
   return (
     <div className="studio">
+      {editing && (
+        <p className="studio-editing" role="status">
+          <span>Cambiando <strong>«{editing.name || editing.occasion}»</strong>. «Guardar cambios» lo actualiza en Mis outfits.</span>
+          <button type="button" className="studio-link" onClick={onCreateNew}>Crear uno nuevo</button>
+        </p>
+      )}
       <div className="studio-plan">
         <div className="choice-row" role="group" aria-label="¿Para qué es?">
           {occasions.map((item) => (
@@ -403,7 +433,9 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
           {hasBase && (
             <div className="studio-actions">
               <button type="button" className="button button-dark" onClick={() => void keep({ wornAt: new Date().toISOString() }, 'worn')} disabled={wornToday}>{wornToday ? 'Puesto hoy' : 'Me lo pongo hoy'}</button>
-              <button type="button" className="button button-outline" onClick={() => setSaving(true)} disabled={saved}><HugeiconsIcon icon={saved ? Tick02Icon : FavouriteIcon} size={15} />{saved ? 'Guardado' : 'Guardar'}</button>
+              {editing
+                ? <button type="button" className="button button-outline" onClick={() => void saveChanges()} disabled={!changedFromEditing}><HugeiconsIcon icon={changedFromEditing ? FavouriteIcon : Tick02Icon} size={15} />{changedFromEditing ? 'Guardar cambios' : 'Guardado'}</button>
+                : <button type="button" className="button button-outline" onClick={() => setSaving(true)} disabled={saved}><HugeiconsIcon icon={saved ? Tick02Icon : FavouriteIcon} size={15} />{saved ? 'Guardado' : 'Guardar'}</button>}
               <button type="button" className="icon-button" onClick={() => void discard()} aria-label="No me convence" title="No me convence: no volverá a proponerse"><HugeiconsIcon icon={ThumbsDownIcon} size={16} /></button>
             </div>
           )}

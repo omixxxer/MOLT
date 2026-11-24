@@ -240,6 +240,42 @@ describe('OutfitGenerator', () => {
     await waitFor(async () => expect(await database.outfits.count()).toBe(0))
   })
 
+  it('changes a saved outfit in place, and «Crear outfit» then starts a new one', async () => {
+    const { user } = await studio()
+    await boardReady()
+    const proposal = [...onBoard()].sort()
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Guardar outfit' })).getByRole('button', { name: 'Guardar en Mis outfits' }))
+    await screen.findByRole('button', { name: 'Guardado' })
+    const [stored] = await database.outfits.toArray()
+
+    // «Cambiar» opens it, says so, and saving changes that same outfit.
+    await user.click(screen.getByRole('button', { name: 'Ver Mis outfits' }))
+    await user.click(await screen.findByRole('button', { name: 'Cambiar' }))
+    expect(screen.getByRole('heading', { name: /Cambiar outfit/ })).toBeInTheDocument()
+    expect(screen.getByText(/Cambiando/)).toHaveTextContent(stored!.name!)
+    expect(screen.getByRole('button', { name: 'Guardado' })).toBeDisabled()
+    await boardReady()
+    const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
+    await user.click(screen.getByRole('button', { name: `Cambiar ${top}` }))
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByText(/Cambios guardados/)).toBeInTheDocument()
+    const outfits = await database.outfits.toArray()
+    expect(outfits).toHaveLength(1)
+    expect(outfits[0]).toEqual(expect.objectContaining({ id: stored!.id, name: stored!.name }))
+    expect(outfits[0]!.garmentIds).not.toContain(top)
+
+    // Back in «Mis outfits», «Crear outfit» is a new outfit: today's proposal, not the one just changed.
+    await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
+    await user.click(screen.getAllByRole('button', { name: 'Crear outfit' })[0]!)
+    expect(screen.getByRole('heading', { name: /Crear outfit/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Cambiando/)).not.toBeInTheDocument()
+    await boardReady()
+    expect([...onBoard()].sort()).toEqual(proposal)
+    // The saved outfit now has other garments, so this proposal is a new one to save.
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
+  })
+
   it('closes the save dialog without saving', async () => {
     const { user } = await studio()
     await boardReady()

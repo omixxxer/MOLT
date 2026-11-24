@@ -1382,3 +1382,6 @@ button.outfit-collage-piece:focus-visible { outline: 2px solid var(--lavender); 
   .saved-card .outfit-actions .button-dark { flex-basis: 100%; }
   .saved-card .outfit-actions .button { white-space: normal; }
 }
+/* Changing a saved outfit: which one, and the way to a new one instead. */
+.studio-editing { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--ink); border-radius: 12px; font-size: var(--text-body); }
+.studio-editing .studio-link { font-weight: 650; }
