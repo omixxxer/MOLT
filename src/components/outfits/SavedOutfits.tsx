@@ -30,10 +30,12 @@ interface SavedOutfitsProps {
   onChanged: () => Promise<void>
   /** Opens the outfit in the studio, to change it. */
   onOpen: (outfit: Outfit) => void
+  /** To the studio, to make a new outfit. */
+  onCreate: () => void
 }
 
 /** The outfits the user keeps or has worn: to wear again, change, rename or delete. */
-export default function SavedOutfits({ garments, data, onChanged, onOpen }: SavedOutfitsProps) {
+export default function SavedOutfits({ garments, data, onChanged, onOpen, onCreate }: SavedOutfitsProps) {
   const [filter, setFilter] = useState<Filter>('all')
   const [error, setError] = useState('')
   const kept = data.outfits.filter((outfit) => outfit.favorite || outfit.kind === 'manual' || outfit.wornAt)
@@ -76,7 +78,8 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen }: Save
       <section className="empty-state">
         <div className="empty-mark" aria-hidden="true">♡</div>
         <h2>Aún no hay outfits.</h2>
-        <p>Guarda los que te gusten o marca «Me lo pongo hoy», y aquí tendrás tu historial.</p>
+        <p>Crea uno: Molt te propone el de hoy según la ocasión y el tiempo, y lo cambias pieza a pieza. Los que guardes o te pongas aparecerán aquí.</p>
+        <button className="button button-dark" type="button" onClick={onCreate}>Crear outfit</button>
       </section>
     )
   }
@@ -96,6 +99,7 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen }: Save
           const title = outfit.name || outfit.occasion
           return (
             <article className="outfit-card" key={outfit.id}>
+              <span className="saved-origin" data-kind={outfit.kind}>{outfit.kind === 'manual' ? 'Creado por ti' : 'Idea de Molt'}</span>
               <input className="saved-name" aria-label="Nombre del outfit" defaultValue={title} key={title} onBlur={(event) => rename(outfit, event.target.value === outfit.occasion ? '' : event.target.value)} maxLength={60} />
               {outfitGarments.length > 0 && <OutfitBoard garments={outfitGarments} />}
               {outfitGarments.length < outfit.garmentIds.length && <p className="outfit-explanation">Algunas prendas de este outfit ya no están en el armario.</p>}

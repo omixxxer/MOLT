@@ -40,6 +40,13 @@ function setup(garments = wardrobe(), extra: Partial<Parameters<typeof OutfitGen
   return { user: userEvent.setup(), onAvailabilityChange }
 }
 
+/** Outfits opens on «Mis outfits»: the studio, from «Crear outfit». */
+async function studio(garments = wardrobe(), extra: Partial<Parameters<typeof OutfitGenerator>[0]> = {}) {
+  const view = setup(garments, extra)
+  await view.user.click((await screen.findAllByRole('button', { name: 'Crear outfit' }))[0]!)
+  return view
+}
+
 /** The garments on the board, read from the photos of its pieces. */
 function onBoard() {
   return within(screen.getByRole('region', { name: 'Outfit' })).queryAllByRole('img').map((image) => image.getAttribute('alt'))
@@ -73,7 +80,7 @@ describe('OutfitGenerator', () => {
   })
 
   it('opens with an outfit already made, with shoes, and says why', async () => {
-    setup()
+    await studio()
     await boardReady()
     const shown = onBoard()
     expect(shown).toContain('zapatillas')
@@ -83,7 +90,7 @@ describe('OutfitGenerator', () => {
   })
 
   it('keeps a fixed piece when asking for another combination', async () => {
-    const { user } = setup()
+    const { user } = await studio()
     await boardReady()
     const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
     await user.click(screen.getByRole('button', { name: `Fijar ${top}` }))
@@ -93,7 +100,7 @@ describe('OutfitGenerator', () => {
   })
 
   it('changes one piece without touching the others', async () => {
-    const { user } = setup()
+    const { user } = await studio()
     await boardReady()
     const before = onBoard()
     const top = before.find((name) => name === 'camisa' || name === 'polo')!
@@ -104,7 +111,7 @@ describe('OutfitGenerator', () => {
   })
 
   it('chooses a garment by hand, which stays fixed, and sends others to the wash from the picker', async () => {
-    const { user, onAvailabilityChange } = setup()
+    const { user, onAvailabilityChange } = await studio()
     await boardReady()
     const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
     const other = top === 'camisa' ? 'polo' : 'camisa'
@@ -120,7 +127,7 @@ describe('OutfitGenerator', () => {
 
   it('brings back a garment from the wash in the picker', async () => {
     const garments = [...wardrobe(), makeGarment('lavada', 'Top', { availability: 'laundry' })]
-    const { user, onAvailabilityChange } = setup(garments)
+    const { user, onAvailabilityChange } = await studio(garments)
     await boardReady()
     expect(onBoard()).not.toContain('lavada')
     const top = onBoard().find((name) => name === 'camisa' || name === 'polo')!
@@ -130,10 +137,15 @@ describe('OutfitGenerator', () => {
   })
 
   it('saves and wears the same outfit as a single record, with feedback', async () => {
-    const { user } = setup()
+    const { user } = await studio()
     await boardReady()
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    // Saving shows the outfit, with a name already proposed.
+    const dialog = within(screen.getByRole('dialog', { name: 'Guardar outfit' }))
+    expect((dialog.getByRole('textbox', { name: 'Nombre' }) as HTMLInputElement).value).toMatch(/^Diario: /)
+    await user.click(dialog.getByRole('button', { name: 'Guardar en Mis outfits' }))
     expect(await screen.findByRole('button', { name: 'Guardado' })).toBeDisabled()
+    expect(screen.getByText(/está en Mis outfits/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Me lo pongo hoy' }))
     expect(await screen.findByRole('button', { name: 'Puesto hoy' })).toBeDisabled()
 
@@ -144,7 +156,7 @@ describe('OutfitGenerator', () => {
   })
 
   it('does not propose a discarded combination again', async () => {
-    const { user } = setup()
+    const { user } = await studio()
     await boardReady()
     const discarded = [...onBoard()].sort().join()
     await user.click(screen.getByRole('button', { name: 'No me convence' }))
@@ -154,7 +166,7 @@ describe('OutfitGenerator', () => {
   })
 
   it('starts empty and completes the outfit around what was chosen', async () => {
-    const { user } = setup()
+    const { user } = await studio()
     await boardReady()
     await user.click(screen.getByRole('button', { name: 'Empezar de cero' }))
     expect(within(screen.getByRole('region', { name: 'Outfit' })).queryAllByRole('img')).toHaveLength(0)
@@ -175,39 +187,65 @@ describe('OutfitGenerator', () => {
   })
 
   it('tells what is missing when no outfit can be made', async () => {
-    setup([makeGarment('camisa', 'Top')])
+    await studio([makeGarment('camisa', 'Top')])
     expect(await screen.findByRole('status')).toHaveTextContent(/una de abajo/)
   })
 
-  it('keeps the board while looking at the saved outfits, which can be renamed, opened and deleted', async () => {
+  it('opens on Mis outfits, with a button to create one', async () => {
     const { user } = setup()
+    expect(await screen.findByText('Aún no hay outfits.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Mis outfits/ })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Outfit' })).not.toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: 'Crear outfit' })[0]!)
+    expect(screen.getByRole('heading', { name: /Crear outfit/ })).toBeInTheDocument()
+    await boardReady()
+  })
+
+  it('keeps the board while looking at the saved outfits, which can be renamed, opened and deleted', async () => {
+    const { user } = await studio()
     await boardReady()
     const shown = onBoard()
-    await user.click(screen.getByRole('tab', { name: 'Mis outfits' }))
+    await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
     expect(await screen.findByText('Aún no hay outfits.')).toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: 'Crear' }))
+    await user.click(screen.getAllByRole('button', { name: 'Crear outfit' })[0]!)
     expect(onBoard()).toEqual(shown)
 
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
-    await screen.findByRole('button', { name: 'Guardado' })
-    await user.click(screen.getByRole('tab', { name: 'Mis outfits' }))
-    const name = await screen.findByRole('textbox', { name: 'Nombre del outfit' })
+    const name = within(screen.getByRole('dialog', { name: 'Guardar outfit' })).getByRole('textbox', { name: 'Nombre' })
     await user.clear(name)
-    await user.type(name, 'Oficina')
+    await user.type(name, 'Oficina{Enter}')
+    await screen.findByRole('button', { name: 'Guardado' })
+    await user.click(screen.getByRole('button', { name: 'Ver Mis outfits' }))
+    const card = (await screen.findByRole('textbox', { name: 'Nombre del outfit' })).closest('article')!
+    expect(within(card).getByText('Idea de Molt')).toBeInTheDocument()
+    const title = within(card).getByRole('textbox', { name: 'Nombre del outfit' })
+    expect(title).toHaveValue('Oficina')
+    await user.clear(title)
+    await user.type(title, 'Reunión')
     await user.tab()
-    await waitFor(async () => expect((await database.outfits.toArray())[0]?.name).toBe('Oficina'))
+    await waitFor(async () => expect((await database.outfits.toArray())[0]?.name).toBe('Reunión'))
 
     await user.click(screen.getByRole('button', { name: 'Cambiar' }))
     expect(onBoard().sort()).toEqual([...shown].sort())
 
-    await user.click(screen.getByRole('tab', { name: 'Mis outfits' }))
-    await user.click(await screen.findByRole('button', { name: 'Eliminar Oficina' }))
+    await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
+    await user.click(await screen.findByRole('button', { name: 'Eliminar Reunión' }))
     await user.click(await screen.findByRole('button', { name: 'Eliminar outfit' }))
     await waitFor(async () => expect(await database.outfits.count()).toBe(0))
   })
 
+  it('closes the save dialog without saving', async () => {
+    const { user } = await studio()
+    await boardReady()
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
+    expect(await database.outfits.count()).toBe(0)
+  })
+
   it('remembers preferences as they are chosen', async () => {
-    const { user } = setup()
+    const { user } = await studio()
     await boardReady()
     await user.selectOptions(screen.getByLabelText('Estilo preferido'), 'Formal')
     await waitFor(async () => expect((await database.preferences.get('current'))?.preferredDressLevel).toBe('Formal'))

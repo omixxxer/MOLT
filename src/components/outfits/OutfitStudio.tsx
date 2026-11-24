@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
 import { Add01Icon, Alert02Icon, FavouriteIcon, ShuffleIcon, SparklesIcon, SquareLock02Icon, SquareUnlock02Icon, ThumbsDownIcon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -25,6 +25,7 @@ import { useDayForecast } from '../../weather/useDayForecast'
 import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
 import GarmentPicker from './GarmentPicker'
+import SaveOutfitDialog from './SaveOutfitDialog'
 import WeatherBar from '../weather/WeatherBar'
 import type { OutfitData } from './outfitData'
 
@@ -41,17 +42,22 @@ interface OutfitStudioProps {
   manualTemperature: string
   onChanged: () => Promise<void>
   onAvailabilityChange: (garment: Garment) => Promise<void>
+  /** To «Mis outfits», from the notice after saving or wearing. */
+  onShowSaved: () => void
 }
 
 /**
  * Where outfits are made: it opens with today's proposal, each piece can be kept, changed or chosen by hand (the
  * garments that go best first), and whatever is on the board can be worn or saved.
  */
-export default function OutfitStudio({ garments, data, start, desiredStyle, manualTemperature, onChanged, onAvailabilityChange }: OutfitStudioProps) {
+export default function OutfitStudio({ garments, data, start, desiredStyle, manualTemperature, onChanged, onAvailabilityChange, onShowSaved }: OutfitStudioProps) {
   const [occasion, setOccasion] = useState<OutfitTemplate>('Diario')
   const forecast = useDayForecast()
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** After saving or wearing: what happened, with a way to «Mis outfits». */
+  const [kept, setKept] = useState('')
+  const [saving, setSaving] = useState(false)
   const [looks, setLooks] = useState<OutfitCandidate[]>([])
   const [board, setBoard] = useState<Garment[]>([])
   const [locked, setLocked] = useState<string[]>([])
@@ -86,6 +92,9 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
   const saved = sameOutfit.some((outfit) => outfit.favorite || outfit.kind === 'manual')
   const wornToday = sameOutfit.some((outfit) => outfit.wornAt && localDay(new Date(outfit.wornAt)) === localDay())
   const hasBase = board.some((garment) => garment.role === 'Una pieza') || (board.some((garment) => garment.role === 'Top') && board.some((garment) => garment.role === 'Bottom'))
+
+  // The notice after saving or wearing is about that outfit: another one on the board clears it.
+  useEffect(() => setKept(''), [boardKey])
 
   const propose = useCallback((more: boolean, keep: string[] = locked) => {
     setError('')
@@ -202,6 +211,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
     if (!current) return
     setError('')
     setNotice('')
+    setKept('')
     try {
       const at = new Date().toISOString()
       const existing = sameOutfit[0]
@@ -215,9 +225,15 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
         await database.outfitFeedback.add(createOutfitFeedback(eventType, outfit.garmentIds, outfit.id, at))
       })
       await onChanged()
+      setKept(eventType === 'saved' ? `«${outfit.name || outfit.occasion}» está en Mis outfits.` : 'Apuntado: te lo pones hoy.')
     } catch {
       setError('No se pudo guardar el outfit en este dispositivo.')
     }
+  }
+
+  async function save(name: string) {
+    await keep({ favorite: true, ...(name ? { name } : {}) }, 'saved')
+    setSaving(false)
   }
 
   async function discard() {
@@ -322,6 +338,12 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
 
         <aside className="studio-side">
           {notice && <p className="outfit-notice" role="status">{notice}</p>}
+          {kept && (
+            <p className="outfit-notice outfit-kept" role="status">
+              <HugeiconsIcon icon={Tick02Icon} size={14} />{kept}
+              <button type="button" className="studio-link" onClick={onShowSaved}>Ver Mis outfits</button>
+            </p>
+          )}
           {current && (
             <div className="studio-verdict">
               <p className="studio-fit">{fitLabel(current.score)}</p>
@@ -341,7 +363,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
           {hasBase && (
             <div className="studio-actions">
               <button type="button" className="button button-dark" onClick={() => void keep({ wornAt: new Date().toISOString() }, 'worn')} disabled={wornToday}>{wornToday ? 'Puesto hoy' : 'Me lo pongo hoy'}</button>
-              <button type="button" className="button button-outline" onClick={() => void keep({ favorite: true }, 'saved')} disabled={saved}><HugeiconsIcon icon={FavouriteIcon} size={15} />{saved ? 'Guardado' : 'Guardar'}</button>
+              <button type="button" className="button button-outline" onClick={() => setSaving(true)} disabled={saved}><HugeiconsIcon icon={saved ? Tick02Icon : FavouriteIcon} size={15} />{saved ? 'Guardado' : 'Guardar'}</button>
               <button type="button" className="icon-button" onClick={() => void discard()} aria-label="No me convence" title="No me convence: no volverá a proponerse"><HugeiconsIcon icon={ThumbsDownIcon} size={16} /></button>
             </div>
           )}
@@ -372,6 +394,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
         </aside>
       </div>
 
+      {saving && <SaveOutfitDialog garments={board} occasion={occasion} onSave={save} onClose={() => setSaving(false)} />}
       {picking && (
         <GarmentPicker
           title={`Elige ${SLOT_LABELS[picking].toLocaleLowerCase('es')}`}

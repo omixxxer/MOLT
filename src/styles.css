@@ -1293,3 +1293,21 @@ img[data-transparent] { mix-blend-mode: normal; }
   .trip-credit { top: 10px; right: auto; bottom: auto; left: 10px; max-width: calc(100% - 150px); }
   .trip-day-chip { flex-basis: 58px; }
 }
+
+/* Outfits: «Mis outfits» first, with «Crear outfit»; the studio with a way back (.trip-back). */
+.outfit-create { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.outfit-generator > .trip-back { margin-top: -10px; }
+.saved-origin { justify-self: start; padding: 2px 8px; border-radius: 10px; background: var(--soft-surface); font-size: var(--text-caption); font-weight: 650; }
+.saved-origin[data-kind=manual] { background: var(--ink); color: var(--white); }
+.outfit-kept { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.outfit-kept .studio-link { margin-left: auto; font-weight: 650; }
+/* Saving an outfit: how it looks, its name, and where it goes. */
+.save-outfit { width: min(520px, 100%); }
+.save-outfit-preview { padding: 12px; border-radius: 12px; background: var(--soft-surface); }
+.save-outfit-preview .outfit-garments { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.save-outfit .form-field input { width: 100%; }
+.save-outfit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+@media (max-width: 720px) {
+  .outfit-heading { align-items: center; }
+  .save-outfit-actions .button { flex: 1; }
+}
