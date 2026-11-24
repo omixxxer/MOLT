@@ -1302,10 +1302,6 @@ img[data-transparent] { mix-blend-mode: normal; }
 .outfit-kept { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .outfit-kept .studio-link { margin-left: auto; font-weight: 650; }
 /* Saving an outfit: how it looks, its name, and where it goes. */
-.save-outfit { width: min(520px, 100%); }
-.save-outfit-preview { padding: 12px; border-radius: 12px; background: var(--soft-surface); }
-.save-outfit-preview .outfit-garments { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
-.save-outfit .form-field input { width: 100%; }
 .save-outfit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 @media (max-width: 720px) {
   .outfit-heading { align-items: center; }
@@ -1319,4 +1315,70 @@ img[data-transparent] { mix-blend-mode: normal; }
   .studio-plan > .choice-row .choice-chip { flex: none; }
   .studio-board { order: -2; }
   .studio-ideas { order: -1; }
+}
+
+/* An outfit as a collage (OutfitCollage): the garments laid out together on a light board, like a flat lay. */
+.outfit-collage { position: relative; width: 100%; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 14px; background: #FBFAFD; }
+.outfit-collage-piece { position: absolute; display: block; padding: 0; border: 0; background: transparent; }
+.outfit-collage-piece img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(45, 40, 56, .14)); }
+.outfit-collage-piece img:not([data-transparent]) { mix-blend-mode: multiply; filter: none; }
+button.outfit-collage-piece { cursor: pointer; border-radius: 10px; transition: transform .15s ease; }
+button.outfit-collage-piece:hover { transform: scale(1.03); }
+button.outfit-collage-piece:focus-visible { outline: 2px solid var(--lavender); outline-offset: 2px; }
+.outfit-collage-compact { width: 72px; border-radius: 8px; }
+.outfit-collage-compact .outfit-collage-piece img { filter: none; }
+@media (prefers-reduced-motion: reduce) { button.outfit-collage-piece { transition: none; } button.outfit-collage-piece:hover { transform: none; } }
+
+/* The studio around the collage: the outfit big, a hint, and its pieces in a list to pin or swap. */
+.studio-board[data-collage] { display: grid; gap: 12px; }
+.studio-collage { width: min(100%, 460px); justify-self: center; box-shadow: 0 10px 30px rgba(45, 40, 56, .1); }
+.studio-hint { margin: 0; font-size: var(--text-label); text-align: center; opacity: .75; }
+.studio-pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.studio-piece { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 10px; background: var(--white); }
+.studio-piece[data-locked] { border-color: var(--ink); }
+.studio-piece > img { flex: none; width: 36px; height: 44px; object-fit: contain; }
+.studio-piece > img:not([data-transparent]) { mix-blend-mode: multiply; }
+.studio-piece-text { display: grid; flex: 1; min-width: 0; font-size: var(--text-body); overflow-wrap: anywhere; }
+.studio-piece-text small { font-size: var(--text-caption); font-weight: 650; text-transform: uppercase; letter-spacing: .04em; opacity: .65; }
+.studio-piece .icon-button { flex: none; width: 34px; height: 34px; }
+.studio-piece .icon-button[aria-pressed=true] { color: var(--white); background: var(--ink); }
+.studio-ideas button { display: block; grid-template-columns: none; padding: 3px; }
+
+/* «Mis outfits» as a board of collages, as on Pinterest: the collage first, the name and the actions under it. */
+.saved-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
+.saved-card { gap: 8px; padding: 10px; border-radius: 18px; }
+.saved-art { position: relative; }
+.saved-art .saved-origin { position: absolute; top: 8px; left: 8px; z-index: 6; box-shadow: 0 1px 4px rgba(45, 40, 56, .12); }
+.saved-card .saved-name { font-size: 19px; }
+.saved-meta { margin: -4px 0 0; font-size: var(--text-label); opacity: .75; }
+.saved-meta::first-letter { text-transform: uppercase; }
+.saved-card .outfit-actions .button { min-height: 36px; padding: 0 11px; font-size: var(--text-label); }
+@media (max-width: 720px) {
+  .saved-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .saved-card { padding: 6px; border-radius: 14px; }
+  .saved-card .saved-name { font-size: 15px; }
+  .saved-card .outfit-actions { gap: 5px; }
+  .saved-card .outfit-actions .button { flex: 1 1 auto; min-height: 34px; padding: 0 6px; }
+  .studio-pieces { grid-template-columns: minmax(0, 1fr); }
+}
+/* Saving: the collage beside the name on a wide screen, above it on a phone. */
+.save-outfit { width: min(620px, 100%); }
+.save-outfit-body { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 16px; }
+.save-outfit-fields { display: grid; gap: 8px; }
+.save-outfit-name { display: flex; gap: 6px; }
+.save-outfit-name input { flex: 1; min-width: 0; min-height: 42px; padding: 8px 10px; border: 1px solid var(--mist); border-radius: 8px; background: var(--white); font: inherit; font-family: var(--serif); font-size: 18px; }
+.save-outfit-name .icon-button { width: 42px; height: 42px; }
+@media (max-width: 560px) {
+  .save-outfit-body { grid-template-columns: minmax(0, 1fr); }
+  .save-outfit-collage { width: min(220px, 70%); justify-self: center; }
+}
+.saved-card .outfit-actions { flex-wrap: nowrap; gap: 6px; }
+.saved-card .outfit-actions .button { flex: 1 1 auto; min-width: 0; padding: 0 8px; white-space: nowrap; }
+.saved-card .outfit-remove { flex: none; width: 34px; height: 34px; margin-left: 0; }
+@media (max-width: 720px) {
+  /* Two collages a row on a phone: «Me lo pongo hoy» on its own line, «Cambiar» and delete under it. */
+  .saved-card { min-width: 0; }
+  .saved-card .outfit-actions { flex-wrap: wrap; }
+  .saved-card .outfit-actions .button-dark { flex-basis: 100%; }
+  .saved-card .outfit-actions .button { white-space: normal; }
 }

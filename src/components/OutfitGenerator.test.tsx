@@ -142,7 +142,13 @@ describe('OutfitGenerator', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
     // Saving shows the outfit, with a name already proposed.
     const dialog = within(screen.getByRole('dialog', { name: 'Guardar outfit' }))
-    expect((dialog.getByRole('textbox', { name: 'Nombre' }) as HTMLInputElement).value).toMatch(/^Diario: /)
+    // An original name, from the colour, the plan and the season, never the garments' names; «Otro nombre» changes it.
+    const nameField = dialog.getByRole('textbox', { name: 'Nombre' }) as HTMLInputElement
+    const proposed = nameField.value
+    expect(proposed).toBeTruthy()
+    expect(proposed).not.toMatch(/camisa|polo|vaqueros|chinos|zapatillas/)
+    await user.click(dialog.getByRole('button', { name: 'Otro nombre' }))
+    expect(nameField.value).not.toBe(proposed)
     await user.click(dialog.getByRole('button', { name: 'Guardar en Mis outfits' }))
     expect(await screen.findByRole('button', { name: 'Guardado' })).toBeDisabled()
     expect(screen.getByText(/está en Mis outfits/)).toBeInTheDocument()

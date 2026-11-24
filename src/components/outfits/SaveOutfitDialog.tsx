@@ -1,28 +1,25 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Cancel01Icon, DiceIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { outfitName } from '../../outfits/outfitNames'
 import type { Garment } from '../../types/domain'
-import OutfitBoard from '../OutfitBoard'
-
-/** «Diario: camisa y vaqueros»: the plan and the main pieces, to tell outfits apart in «Mis outfits». */
-export function suggestedOutfitName(garments: Garment[], occasion: string) {
-  const piece = (role: Garment['role']) => garments.find((garment) => garment.role === role)
-  const main = [piece('Una pieza') ?? piece('Top'), piece('Una pieza') ? undefined : piece('Bottom')]
-    .filter((garment): garment is Garment => Boolean(garment))
-    .map((garment) => (garment.subcategory || garment.name || garment.category).toLocaleLowerCase('es'))
-  return main.length ? `${occasion}: ${main.join(' y ')}`.slice(0, 60) : occasion
-}
+import OutfitCollage from './OutfitCollage'
 
 interface SaveOutfitDialogProps {
   garments: Garment[]
-  occasion: string
+  /** The plan and the weather, which the proposed names come from. */
+  context: { occasion: string; temperatureCelsius?: number; weatherConditions?: string[] }
   onSave: (name: string) => Promise<void>
   onClose: () => void
 }
 
-/** Saving an outfit: how it looks, a name to find it again (one is proposed), and where it goes. */
-export default function SaveOutfitDialog({ garments, occasion, onSave, onClose }: SaveOutfitDialogProps) {
-  const [name, setName] = useState(() => suggestedOutfitName(garments, occasion))
+/**
+ * Saving an outfit: the collage it will have in «Mis outfits», and a name to find it again. One is proposed from its
+ * colour, plan and season («Cena en negro»), and «Otro nombre» gives another.
+ */
+export default function SaveOutfitDialog({ garments, context, onSave, onClose }: SaveOutfitDialogProps) {
+  const [variant, setVariant] = useState(0)
+  const [name, setName] = useState(() => outfitName(garments, context))
   const [saving, setSaving] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
@@ -39,6 +36,13 @@ export default function SaveOutfitDialog({ garments, occasion, onSave, onClose }
       previous?.focus?.()
     }
   }, [onClose])
+
+  function another() {
+    const next = variant + 1
+    setVariant(next)
+    setName(outfitName(garments, context, next))
+    input.current?.focus()
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -57,11 +61,17 @@ export default function SaveOutfitDialog({ garments, occasion, onSave, onClose }
           <h2 id="save-outfit-title">Guardar outfit</h2>
           <button className="close-button" type="button" onClick={onClose} aria-label="Cerrar"><HugeiconsIcon icon={Cancel01Icon} size={16} /></button>
         </header>
-        <div className="save-outfit-preview"><OutfitBoard garments={garments} /></div>
-        <label className="form-field">Nombre
-          <input ref={input} value={name} onChange={(event) => setName(event.target.value)} maxLength={60} placeholder={occasion} />
-        </label>
-        <p className="picker-note">Lo tendrás en «Mis outfits», para ponértelo otro día o cambiarlo.</p>
+        <div className="save-outfit-body">
+          <OutfitCollage garments={garments} className="save-outfit-collage" />
+          <div className="save-outfit-fields">
+            <label className="form-field" htmlFor="save-outfit-name">Nombre</label>
+            <div className="save-outfit-name">
+              <input id="save-outfit-name" ref={input} value={name} onChange={(event) => setName(event.target.value)} maxLength={60} placeholder={context.occasion} />
+              <button type="button" className="icon-button" onClick={another} aria-label="Otro nombre" title="Otro nombre"><HugeiconsIcon icon={DiceIcon} size={17} /></button>
+            </div>
+            <p className="picker-note">Lo tendrás en «Mis outfits» con este collage, para ponértelo otro día o cambiarlo.</p>
+          </div>
+        </div>
         <footer className="save-outfit-actions">
           <button type="button" className="button button-outline" onClick={onClose}>Cancelar</button>
           <button type="submit" className="button button-dark" disabled={saving}>{saving ? 'Guardando…' : 'Guardar en Mis outfits'}</button>

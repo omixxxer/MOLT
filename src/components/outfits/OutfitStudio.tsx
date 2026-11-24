@@ -25,6 +25,7 @@ import { useDayForecast } from '../../weather/useDayForecast'
 import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
 import GarmentPicker from './GarmentPicker'
+import OutfitCollage from './OutfitCollage'
 import SaveOutfitDialog from './SaveOutfitDialog'
 import WeatherBar from '../weather/WeatherBar'
 import type { OutfitData } from './outfitData'
@@ -308,9 +309,36 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <div className="studio-layout">
-        <section className="studio-board" aria-label="Outfit" onTouchStart={(event) => { touchStart.current = { x: event.touches[0]?.clientX ?? 0, y: event.touches[0]?.clientY ?? 0 } }} onTouchEnd={finishSwipe}>
+        <section className="studio-board" aria-label="Outfit" data-collage={hasBase ? '' : undefined} onTouchStart={(event) => { touchStart.current = { x: event.touches[0]?.clientX ?? 0, y: event.touches[0]?.clientY ?? 0 } }} onTouchEnd={finishSwipe}>
+          {hasBase ? (
+            <>
+              {/* The outfit as it will look: a collage; touching a garment changes it. */}
+              <OutfitCollage
+                garments={board}
+                onSelect={(garment) => setPicking(garment.role)}
+                label={(garment) => `Elegir ${SLOT_LABELS[garment.role].toLocaleLowerCase('es')}: ahora, ${garmentLabel(garment)}`}
+                className="studio-collage"
+              />
+              <p className="studio-hint">Toca una prenda para elegir otra. Fija las que quieras mantener y pide otra combinación.</p>
+              <ul className="studio-pieces" aria-label="Prendas del outfit">
+                {slots.flatMap(({ role, garment }) => garment ? [{ role, garment }] : []).map(({ role, garment }) => {
+                  const isLocked = locked.includes(garment.id)
+                  return (
+                    <li key={garment.id} className="studio-piece" data-locked={isLocked ? '' : undefined}>
+                      <GarmentThumbnail garment={garment} alt="" />
+                      <span className="studio-piece-text"><small>{SLOT_LABELS[role]}</small>{garmentLabel(garment)}</span>
+                      <button type="button" className="icon-button" aria-pressed={isLocked} onClick={() => toggleLock(garment)} aria-label={`${isLocked ? 'Soltar' : 'Fijar'} ${garmentLabel(garment)}`} title={isLocked ? 'Fijada: no cambiará' : 'Fijar esta prenda'}>
+                        <HugeiconsIcon icon={isLocked ? SquareLock02Icon : SquareUnlock02Icon} size={15} />
+                      </button>
+                      <button type="button" className="icon-button" onClick={() => swap(garment)} aria-label={`Cambiar ${garmentLabel(garment)}`} title="Probar otra"><HugeiconsIcon icon={ShuffleIcon} size={15} /></button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          ) : (
           <ul className="studio-slots">
-            {slots.filter(({ garment }) => garment || !hasBase).map(({ role, garment }) => (
+            {slots.map(({ role, garment }) => (
               <li key={role} className={garment ? 'studio-slot' : 'studio-slot studio-slot-empty'}>
                 {garment ? (
                   <>
@@ -334,6 +362,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
               </li>
             ))}
           </ul>
+          )}
           {/* Once the outfit can be worn, what could still be added is a small button, not a place as big as a garment. */}
           {hasBase && slots.some(({ garment }) => !garment) && (
             <div className="studio-add-row">
@@ -394,7 +423,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
                   return (
                     <li key={key}>
                       <button type="button" aria-pressed={key === boardKey} aria-label={`Idea ${index + 1}: ${look.garments.map(garmentLabel).join(', ')}`} onClick={() => showLook(look)}>
-                        {look.garments.filter((garment) => garment.role !== 'Accesorio').slice(0, 4).map((garment) => <GarmentThumbnail key={garment.id} garment={garment} alt="" />)}
+                        <OutfitCollage garments={look.garments} compact />
                       </button>
                     </li>
                   )
@@ -405,7 +434,7 @@ export default function OutfitStudio({ garments, data, start, desiredStyle, manu
         </aside>
       </div>
 
-      {saving && <SaveOutfitDialog garments={board} occasion={occasion} onSave={save} onClose={() => setSaving(false)} />}
+      {saving && <SaveOutfitDialog garments={board} context={{ ...context, occasion }} onSave={save} onClose={() => setSaving(false)} />}
       {picking && (
         <GarmentPicker
           title={`Elige ${SLOT_LABELS[picking].toLocaleLowerCase('es')}`}
