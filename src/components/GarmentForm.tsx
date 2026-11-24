@@ -314,6 +314,14 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     void readLabel(file)
   }
 
+  /** The label photo turned or cropped: it replaces the photo, and what it reads replaces brand, size and composition. */
+  function editLabelPhoto(edited: Blob) {
+    setLabelError('')
+    setLabelPhoto(edited)
+    setMovedLabel(undefined)
+    void readLabel(edited)
+  }
+
   function removeLabelPhoto() {
     setMovedLabel(undefined)
     labelRequestId.current += 1
@@ -558,6 +566,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
                   disabled={saving}
                   onSelect={selectLabelPhoto}
                   onRead={(photo) => void readLabel(photo)}
+                  onEdit={editLabelPhoto}
                   onRemove={removeLabelPhoto}
                 />
                 <div className="form-field">

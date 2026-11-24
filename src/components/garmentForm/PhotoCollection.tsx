@@ -1,10 +1,11 @@
 import { useState, type DragEvent } from 'react'
-import { Add01Icon, Cancel01Icon, Image02Icon, PencilEdit02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Cancel01Icon, Image02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { MAX_PHOTO_MB } from '../../db/photoLimits'
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
 import TakePhoto from '../TakePhoto'
+import EditIcon from '../EditIcon'
 import PhotoEditor from './PhotoEditor'
 
 interface PhotoCollectionProps {
@@ -94,8 +95,8 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
           {isMain && canToggleCutout && !cuttingOut && (
             <button type="button" className="photo-stage-pill" onClick={onToggleCutout} disabled={disabled}>{cutout ? 'Ver con fondo' : 'Quitar fondo'}</button>
           )}
-          <button type="button" className="photo-stage-pill photo-stage-icon" onClick={() => setEditing(true)} disabled={disabled} aria-label={`Editar foto ${index + 1}: recortar o girar`} title="Recortar o girar la foto">
-            <HugeiconsIcon icon={PencilEdit02Icon} size={16} />
+          <button type="button" className="photo-stage-pill edit-photo" onClick={() => setEditing(true)} disabled={disabled} aria-label={`Editar foto ${index + 1}: recortar o girar`} title="Recortar o girar la foto">
+            <EditIcon />
           </button>
         </div>
       </div>

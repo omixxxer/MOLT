@@ -1,6 +1,9 @@
+import { useState } from 'react'
+import EditIcon from '../EditIcon'
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
 import TakePhoto from '../TakePhoto'
+import PhotoEditor from './PhotoEditor'
 
 /** [field, value used, text as read] for each field the label gave. */
 export type LabelFinding = readonly [string, string | undefined, string | undefined]
@@ -15,16 +18,24 @@ interface LabelPhotoSlotProps {
   disabled: boolean
   onSelect: (file: File | undefined) => void
   onRead: (photo: Blob) => void
+  /** The label photo turned or cropped (PhotoEditor): it replaces the photo and is read again. */
+  onEdit: (edited: Blob) => void
   onRemove: () => void
 }
 
 /** The care label's own photo: only read for brand, size and composition, never classified. */
-export default function LabelPhotoSlot({ photo, reading, read, findings, error, disabled, onSelect, onRead, onRemove }: LabelPhotoSlotProps) {
+export default function LabelPhotoSlot({ photo, reading, read, findings, error, disabled, onSelect, onRead, onEdit, onRemove }: LabelPhotoSlotProps) {
+  const [editing, setEditing] = useState(false)
   return (
     <section className="label-slot" aria-label="Foto de la etiqueta">
       {photo ? (
         <div className="label-slot-body">
-          <GarmentPhoto image={photo} alt="Etiqueta de la prenda" />
+          <div className="label-slot-photo">
+            <GarmentPhoto image={photo} alt="Etiqueta de la prenda" />
+            <button type="button" className="edit-photo label-slot-edit" onClick={() => setEditing(true)} disabled={disabled || reading} aria-label="Editar la foto de la etiqueta: recortar o girar" title="Recortar o girar la foto">
+              <EditIcon />
+            </button>
+          </div>
           <div className="label-slot-reading" role="status">
             {reading && <LatticeLoader label="Leyendo la etiqueta" pattern="snake" fontSize={10} cellSize={4} />}
             {!reading && findings.length > 0 && (
@@ -75,6 +86,16 @@ export default function LabelPhotoSlot({ photo, reading, read, findings, error, 
       )}
       {!photo && <TakePhoto label="Hacer foto de la etiqueta" ariaLabel="Hacer una foto de la etiqueta" className="button button-outline label-take-photo" onTake={(files) => onSelect(files?.[0])} />}
       {!photo && error && <p className="form-error" role="alert">{error}</p>}
+      {editing && photo && (
+        <PhotoEditor
+          photo={photo}
+          onCancel={() => setEditing(false)}
+          onApply={(edited) => {
+            setEditing(false)
+            onEdit(edited)
+          }}
+        />
+      )}
     </section>
   )
 }
