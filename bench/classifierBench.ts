@@ -168,6 +168,104 @@ function render(result: Awaited<ReturnType<typeof run>>) {
   link.hidden = false
 }
 
+/**
+ * The cut-out drawn on a colour. The analyzer flattens transparency onto white (normalizeImage), so a cut-out as it is
+ * reaches the model on white; on the model's own pad colour (the mean of ImageNet) it sees «nothing» around the garment.
+ */
+async function onColour(image: Blob, colour: string): Promise<Blob> {
+  const bitmap = await createImageBitmap(image)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const context = canvas.getContext('2d')!
+  context.fillStyle = colour
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'))
+}
+
+/** The original photo cropped to where the garment is (the cut-out's box), background and all. */
+async function cropTo(image: Blob, place: { x: number; y: number; width: number; height: number }): Promise<Blob> {
+  const bitmap = await createImageBitmap(image, { imageOrientation: 'from-image' })
+  const x = Math.round(place.x * bitmap.width)
+  const y = Math.round(place.y * bitmap.height)
+  const width = Math.max(1, Math.round(place.width * bitmap.width))
+  const height = Math.max(1, Math.round(place.height * bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  canvas.getContext('2d')!.drawImage(bitmap, x, y, width, height, 0, 0, width, height)
+  bitmap.close()
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.92))
+}
+
+type Mode = 'original' | 'cutout' | 'cutoutGrey' | 'crop' | 'average'
+const MODES: Array<[Mode, string]> = [
+  ['original', 'A: foto original (como ahora)'],
+  ['cutout', 'B: el recorte (la app lo pasaría sobre blanco)'],
+  ['cutoutGrey', 'G: el recorte sobre el gris neutro del modelo'],
+  ['crop', 'Z: la foto recortada a la prenda, con su fondo'],
+  ['average', 'C: media de la foto y el recorte']
+]
+
+/**
+ * ?compare: the classifier on the original photo, on its cut-out (as the form makes it: appCutoutOptions with the
+ * category the original gave), on the cut-out over white, and on both averaged (the app's own way of combining photos).
+ * A photo the cut-out gives up on keeps the original in every mode, as the app does.
+ */
+export async function compare(set: string, options: { limit?: number } = {}) {
+  const { appCutoutOptions } = await import('../src/ai/cutoutOptions')
+  const list = await (await fetch(`/test-photos/${set}/list.json`)).json() as { source: string; split: string; photos: Photo[] }
+  const photos = options.limit ? list.photos.slice(0, options.limit) : list.photos
+  const rows: Array<{ id: string; category: string; subcategory: string | null; cut: boolean } & Record<Mode, { category: string; subcategory: string | null }>> = []
+  const started = performance.now()
+  for (const [index, photo] of photos.entries()) {
+    say(`${index + 1}/${photos.length}: ${photo.file}`)
+    const blob = await (await fetch(`/test-photos/${set}/${photo.file}`)).blob()
+    const read = (suggestion: Awaited<ReturnType<typeof analyzeGarmentImage>>) => ({ category: categoryId.get(suggestion.category) ?? suggestion.category, subcategory: subcategoryId.get(suggestion.subcategory) ?? null })
+    const original = await analyzeGarmentImage([blob])
+    const map = original.segmentations[0] as SegmentationMap | undefined
+    const [cut] = map ? await cutOutGarments(blob, map, 'single', appCutoutOptions(original.category)) : []
+    const a = read(original)
+    const row = { id: photo.id, category: photo.category, subcategory: photo.subcategory, cut: Boolean(cut), original: a, cutout: a, cutoutGrey: a, crop: a, average: a }
+    if (cut) {
+      row.cutout = read(await analyzeGarmentImage([cut.image]))
+      row.cutoutGrey = read(await analyzeGarmentImage([await onColour(cut.image, 'rgb(124, 116, 104)')]))
+      row.crop = read(await analyzeGarmentImage([await cropTo(blob, cut.place)]))
+      row.average = read(await analyzeGarmentImage([blob, cut.image]))
+    }
+    rows.push(row)
+  }
+  const withSub = rows.filter((row) => row.subcategory)
+  const summary = Object.fromEntries(MODES.map(([mode, label]) => {
+    const category = scores(rows.map((row) => row.category), rows.map((row) => row[mode].category))
+    const subcategory = scores(withSub.map((row) => row.subcategory!), withSub.map((row) => row[mode].subcategory ?? '(ninguna)'))
+    // Only the photos that were cut out, where the modes can differ.
+    const cutRows = rows.filter((row) => row.cut)
+    const cutSub = cutRows.filter((row) => row.subcategory)
+    return [mode, {
+      label,
+      category: { accuracy: category.accuracy, macroF1: category.macroF1 },
+      subcategory: { accuracy: subcategory.accuracy, macroF1: subcategory.macroF1 },
+      onCutPhotos: {
+        n: cutRows.length,
+        category: scores(cutRows.map((row) => row.category), cutRows.map((row) => row[mode].category)).accuracy,
+        subcategory: scores(cutSub.map((row) => row.subcategory!), cutSub.map((row) => row[mode].subcategory ?? '(ninguna)')).accuracy
+      }
+    }]
+  }))
+  // Photos one mode gets right and the original gets wrong, and the other way round.
+  const changes = Object.fromEntries(MODES.slice(1).map(([mode]) => [mode, {
+    fixes: withSub.filter((row) => row[mode].subcategory === row.subcategory && row.original.subcategory !== row.subcategory).length,
+    breaks: withSub.filter((row) => row[mode].subcategory !== row.subcategory && row.original.subcategory === row.subcategory).length
+  }]))
+  const result = { set, photos: rows.length, cutOut: rows.filter((row) => row.cut).length, seconds: Math.round((performance.now() - started) / 1000), summary, subcategoryChanges: changes, rows }
+  output.innerHTML = `<h2>Clasificar antes o después de quitar el fondo</h2><pre>${JSON.stringify({ ...result, rows: undefined }, null, 1)}</pre>`
+  say(`Terminado: ${rows.length} fotos.`)
+  return result
+}
+
 /** With ?keepcuts the cut-outs stay here by photo id, to compare their pixels between two versions. */
 const cutoutImages = new Map<string, Blob>()
 const keepCutouts = new URLSearchParams(location.search).has('keepcuts')
@@ -177,7 +275,11 @@ window.runClassifierBench = run
 window.benchCutouts = cutoutImages
 const params = new URLSearchParams(location.search)
 const set = params.get('set')
-if (set && params.has('auto')) {
+if (set && params.has('compare')) {
+  void compare(set, { limit: params.get('limit') ? Number(params.get('limit')) : undefined })
+    .then((result) => { window.classifierBenchResult = result })
+    .catch((error: unknown) => say(`Error: ${String(error)}`))
+} else if (set && params.has('auto')) {
   void run(set, { limit: params.get('limit') ? Number(params.get('limit')) : undefined, colorsOnly: params.has('colors'), cutouts: !params.has('nocut') })
     .then((result) => { window.classifierBenchResult = result })
     .catch((error: unknown) => say(`Error: ${String(error)}`))
