@@ -116,7 +116,9 @@ const sampler = (async () => {
 await send('Page.navigate', { url })
 let result
 let status = ''
-while (!result && Date.now() - started < 60 * 60 * 1000) {
+// BENCH_MINUTES: how long to wait for the page (60 by default; a comparison of 600 photos takes longer).
+const limitMs = Number(process.env.BENCH_MINUTES ?? 60) * 60 * 1000
+while (!result && Date.now() - started < limitMs) {
   await sleep(3000)
   const now = await evaluate(`document.querySelector('#status')?.textContent ?? ''`).catch(() => '')
   if (now !== status) process.stdout.write(`\r${Math.round((Date.now() - started) / 1000)} s · ${(status = now).slice(0, 60)}   `)
