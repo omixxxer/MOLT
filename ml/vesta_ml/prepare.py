@@ -106,6 +106,7 @@ def main() -> None:
     oi.add_argument("--max-per-subcategory", type=int)
     folders = commands.add_parser("photo-folders", help="Fotos de Unsplash/Pexels en carpetas con nombre de subcategoría")
     folders.add_argument("folder", type=Path, help="Carpeta raíz; sustituye a la importación anterior")
+    folders.add_argument("--append", action="store_true", help="Añade las fotos a la importación anterior en vez de sustituirla")
     own = commands.add_parser("vesta-export", help="Importa el ZIP exportado desde la app")
     own.add_argument("archive", type=Path)
     commands.add_parser("merge", help="Une las fuentes preparadas en manifest.jsonl con splits")
@@ -120,7 +121,7 @@ def main() -> None:
     elif arguments.command == "open-images":
         open_images.prepare(root, arguments.subsets, arguments.max_per_subcategory)
     elif arguments.command == "photo-folders":
-        photo_folders.prepare(root, arguments.folder)
+        photo_folders.prepare(root, arguments.folder, append=arguments.append)
     elif arguments.command == "vesta-export":
         vesta_export.prepare(root, arguments.archive)
     else:

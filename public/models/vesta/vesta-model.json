@@ -1,7 +1,7 @@
 {
   "format": "vesta-model",
-  "name": "heads-v4",
-  "taxonomyVersion": 5,
+  "name": "heads-v5",
+  "taxonomyVersion": 6,
   "preprocessing": {
     "backbone": "facebook/dinov2-small",
     "inputSize": 224,
@@ -35,9 +35,10 @@
         "one-piece",
         "outerwear",
         "footwear",
-        "accessory"
+        "accessory",
+        "jewellery"
       ],
-      "temperature": 0.6699
+      "temperature": 0.6667
     },
     {
       "name": "subcategory",
@@ -83,9 +84,13 @@
         "bufanda",
         "gafas",
         "corbata",
-        "reloj"
+        "reloj",
+        "collar",
+        "pulsera",
+        "pendientes",
+        "anillo"
       ],
-      "temperature": 0.6909
+      "temperature": 0.7352
     },
     {
       "name": "sleeve",
@@ -96,7 +101,7 @@
         "tres-cuartos",
         "larga"
       ],
-      "temperature": 0.5762
+      "temperature": 0.608
     },
     {
       "name": "fit",
@@ -107,7 +112,7 @@
         "ancho",
         "campana"
       ],
-      "temperature": 1.1037
+      "temperature": 1.2594
     },
     {
       "name": "pattern",
@@ -124,7 +129,7 @@
         "grafico",
         "otro"
       ],
-      "temperature": 0.5147
+      "temperature": 0.5402
     }
   ],
   "rules": {
@@ -177,5 +182,5 @@
     }
   },
   "file": "model_quantized.onnx",
-  "bytes": 25739503
+  "bytes": 25744513
 }

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from ..common import make_record, reset_dir, save_image, write_jsonl
+from ..common import make_record, read_jsonl, reset_dir, save_image, write_jsonl
 from ..taxonomy import Taxonomy, load_taxonomy
 
 SOURCE = "photo-folders"
@@ -81,16 +81,23 @@ def scan(folder: Path, taxonomy: Taxonomy) -> tuple[list[dict], list[str]]:
     return photos, rejected
 
 
-def prepare(root: Path, folder: Path) -> Path:
+def prepare(root: Path, folder: Path, append: bool = False) -> Path:
+    """Imports the photos under `folder`. By default they replace the previous import; with `append` they are added
+    to it (a photo already there, by its site and id, is kept as it was), so a new batch does not lose the others."""
     photos, rejected = scan(folder, load_taxonomy())
     for line in rejected:
         print(f"  rechazada {line}")
-    output = reset_dir(root / "sources" / SOURCE)
-    records = []
+    target = root / "sources" / SOURCE
+    previous = list(read_jsonl(target / "manifest.jsonl")) if append and (target / "manifest.jsonl").exists() else []
+    output = target if append and previous else reset_dir(target)
+    known = {record["id"] for record in previous}
+    records = list(previous)
     for photo in photos:
         name, license_url, photo_url = LICENSES[photo["site"]]
         key = f"{photo['site']}-{photo['photo_id']}" + (f"-{photo['crop']}" if photo["crop"] > 1 else "")
         destination = output / "images" / f"{key}.jpg"
+        if f"{SOURCE}:{key.replace('-', ':', 1)}" in known:
+            continue
         try:
             with Image.open(photo["path"]) as image:
                 width, height = save_image(image, destination)
@@ -106,5 +113,5 @@ def prepare(root: Path, folder: Path) -> Path:
         ))
     manifest = output / "manifest.jsonl"
     count = write_jsonl(manifest, records)
-    print(f"{SOURCE}: {count} fotos importadas, {len(rejected)} rechazadas")
+    print(f"{SOURCE}: {count - len(previous)} fotos importadas ({count} en total), {len(rejected)} rechazadas")
     return manifest
