@@ -7,8 +7,8 @@ import { matchLabel, taxonomy, TAXONOMY_VERSION } from './taxonomy'
 import modelDescription from '../../public/models/vesta/vesta-model.json'
 
 // Taxonomy v5 added necklaces, bracelets and earrings, and gold and silver as colours; v6 took them, the watch and a
-// new ring out of the accessories into «Joyería». Chosen by hand for now: the model (trained on v5) does not predict
-// them, and the app shares its «accessory» out between both categories (clothingAnalyzer.splitCategories).
+// new ring out of the accessories into «Joyería». heads-v5 is trained on v6; a model of v5 still works, the app
+// sharing its «accessory» out between both categories (clothingAnalyzer.splitCategories).
 describe('jewellery (taxonomy v6)', () => {
   it('reads the new accessories from free text, with their synonyms and plurals', () => {
     expect(matchLabel('subcategory', 'Collar dorado')).toBe('collar')
@@ -51,9 +51,12 @@ describe('jewellery (taxonomy v6)', () => {
     expect(colorName(150, 150, 150)).toBe('Gris')
   })
 
-  it('reads the model trained on v5, which has no jewellery category', () => {
+  it('reads its model, trained on v6 with jewellery, and one of v5, which has none', () => {
     expect(TAXONOMY_VERSION).toBe(6)
-    expect(compatibleTaxonomy(modelDescription.taxonomyVersion)).toBe(true)
+    expect(modelDescription.taxonomyVersion).toBe(6)
+    expect(modelDescription.heads.find((head) => head.name === 'category')?.values).toContain('jewellery')
+    expect(modelDescription.heads.find((head) => head.name === 'subcategory')?.values).toEqual(expect.arrayContaining(['collar', 'pulsera', 'pendientes', 'anillo', 'reloj']))
+    expect(compatibleTaxonomy(5)).toBe(true)
     expect(compatibleTaxonomy(4)).toBe(false)
   })
 

@@ -141,7 +141,9 @@
       "Sandal": "sandalias",
       "Boot": "botas",
       "Scarf": "bufanda",
-      "Belt": "cinturon"
+      "Belt": "cinturon",
+      "Necklace": "collar",
+      "Earring": "pendientes"
     },
     "commercialLicenses": ["https://creativecommons.org/licenses/by/2.0/"],
     "maxPerSubcategory": 800

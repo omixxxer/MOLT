@@ -221,6 +221,22 @@ class PhotoFoldersTest(unittest.TestCase):
             self.assertEqual(len(rejected), 3)
 
 
+    def test_append_keeps_the_previous_import(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, first, second = Path(directory) / "data", Path(directory) / "uno", Path(directory) / "dos"
+            for folder, relative in ((first, "Zuecos/pexels-ana-111111.jpg"), (second, "Anillos/luis-gil-AbCdEfGhIjK-unsplash.jpg"),
+                                     (second, "Zuecos/pexels-ana-111111.jpg")):
+                (folder / relative).parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (8, 8)).save(folder / relative, "JPEG")
+            photo_folders.prepare(root, first)
+            manifest = photo_folders.prepare(root, second, append=True)
+            records = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(sorted(record["labels"]["subcategory"] for record in records), ["anillo", "zuecos"])
+            # Without --append, an import replaces the previous one.
+            manifest = photo_folders.prepare(root, second)
+            self.assertEqual(len(manifest.read_text(encoding="utf-8").splitlines()), 2)
+
+
 class VestaExportTest(unittest.TestCase):
     def test_imports_app_export(self):
         image = io.BytesIO()
