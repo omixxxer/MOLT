@@ -47,7 +47,8 @@ describe('wardrobe backup', () => {
   it('restores garments with every photo, outfits, preferences and code counters', async () => {
     await garmentRepository.create(makeGarment('a', {
       additionalImages: [new Blob(['espalda'], { type: 'image/png' })],
-      labelImage: new Blob(['etiqueta'], { type: 'image/webp' })
+      labelImage: new Blob(['etiqueta'], { type: 'image/webp' }),
+      additionalLabelImages: [new Blob(['etiqueta detrás'], { type: 'image/jpeg' })]
     }))
     await garmentRepository.create(makeGarment('b'))
     await garmentRepository.remove('b') // SDC-002 must never be given again
@@ -71,6 +72,7 @@ describe('wardrobe backup', () => {
     expect(await text(restored?.additionalImages?.[0])).toBe('espalda')
     expect(restored?.additionalImages?.[0]?.type).toBe('image/png')
     expect(await text(restored?.labelImage)).toBe('etiqueta')
+    expect(await text(restored?.additionalLabelImages?.[0])).toBe('etiqueta detrás')
     expect(await database.outfits.get('o1')).toMatchObject({ garmentIds: ['a'] })
     expect(await database.preferences.get('current')).toMatchObject({ preferredColors: ['Gris'] })
     await garmentRepository.create(makeGarment('c'))

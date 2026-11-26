@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { database } from '../db/database'
-import { analyzeGarmentImage, readGarmentLabel } from '../ai/clothingAnalyzer'
+import { analyzeGarmentImage, readGarmentLabels } from '../ai/clothingAnalyzer'
 import { importWardrobeBackup, readWardrobeBackup } from '../db/wardrobeBackup'
 import { cutOutGarments } from '../ai/cutout'
 
@@ -11,7 +11,7 @@ import { cutOutGarments } from '../ai/cutout'
 vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
   ...await importOriginal<typeof import('../ai/clothingAnalyzer')>(),
   analyzeGarmentImage: vi.fn(),
-  readGarmentLabel: vi.fn(),
+  readGarmentLabels: vi.fn(),
   MODEL_DOWNLOAD_SIZE: 'test model'
 }))
 
@@ -292,7 +292,7 @@ describe('wardrobe flow', () => {
       segmentations: [],
       analyzedAt: '2026-10-30T12:00:00.000Z'
     })
-    vi.mocked(readGarmentLabel).mockResolvedValue({
+    vi.mocked(readGarmentLabels).mockResolvedValue({
       lines: [{ text: 'M', score: 0.95 }, { text: 'EUR 42', score: 0.95 }],
       brand: { brand: 'Nike', score: 0.95, text: 'NIKE' },
       composition: { value: '100 % piel', text: '100% LEATHER', score: 0.9 }
@@ -303,13 +303,13 @@ describe('wardrobe flow', () => {
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
     await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['shoe'], 'zapatilla.png', { type: 'image/png' }))
     const label = new File(['label'], 'etiqueta.png', { type: 'image/png' })
-    await user.upload(screen.getByLabelText('Seleccionar foto de la etiqueta'), label)
+    await user.upload(screen.getByLabelText('Seleccionar fotos de la etiqueta'), label)
 
     // A shoe takes the number on the label, not the letter.
     await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('42'))
     expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
     expect(screen.getByLabelText('Composición')).toHaveValue('100 % piel')
-    expect(readGarmentLabel).toHaveBeenCalledWith(label)
+    expect(readGarmentLabels).toHaveBeenCalledWith([label])
     // The label never goes through the garment classifier.
     expect(vi.mocked(analyzeGarmentImage).mock.calls.every(([images]) => !(images as Blob[]).includes(label))).toBe(true)
 
@@ -344,7 +344,7 @@ describe('wardrobe flow', () => {
         ? [{ text: '100% COTTON', score: 0.95 }, { text: 'MADE IN PORTUGAL', score: 0.95 }, { text: 'M', score: 0.9 }]
         : [])
     }))
-    vi.mocked(readGarmentLabel).mockResolvedValue({
+    vi.mocked(readGarmentLabels).mockResolvedValue({
       lines: [{ text: '100% COTTON', score: 0.95 }],
       composition: { value: '100 % algodón', text: '100% COTTON', score: 0.9 }
     })
@@ -358,7 +358,7 @@ describe('wardrobe flow', () => {
 
     expect(await screen.findByText(/Una de las fotos es la etiqueta/)).toBeInTheDocument()
     await waitFor(() => expect(screen.getByLabelText('Composición')).toHaveValue('100 % algodón'))
-    expect(readGarmentLabel).toHaveBeenCalledWith(label)
+    expect(readGarmentLabels).toHaveBeenCalledWith([label])
     // The garment is analysed again without the label.
     await waitFor(() => expect(vi.mocked(analyzeGarmentImage).mock.lastCall?.[0]).toEqual([garment]))
 
@@ -400,7 +400,7 @@ describe('wardrobe flow', () => {
       segmentations: [],
       analyzedAt: '2026-10-30T12:00:00.000Z'
     })
-    vi.mocked(readGarmentLabel)
+    vi.mocked(readGarmentLabels)
       .mockResolvedValueOnce({ lines: [{ text: 'XL', score: 0.95 }], brand: { brand: 'Nike', score: 0.95, text: 'NIKE' } })
       .mockResolvedValueOnce({ lines: [{ text: '-XXL-', score: 0.95 }], composition: { value: '100 % algodón', text: '100% COTTON', score: 0.9 } })
     const user = userEvent.setup()
@@ -412,15 +412,23 @@ describe('wardrobe flow', () => {
     await user.type(screen.getByLabelText('Talla'), 'S')
     await user.type(screen.getByLabelText('Composición'), '50 % lino')
 
-    await user.upload(screen.getByLabelText('Seleccionar foto de la etiqueta'), new File(['label 1'], 'etiqueta.png', { type: 'image/png' }))
+    await user.upload(screen.getByLabelText('Seleccionar fotos de la etiqueta'), new File(['label 1'], 'etiqueta.png', { type: 'image/png' }))
     await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('XL'))
     expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
     expect(screen.getByLabelText('Composición')).toHaveValue('50 % lino') // not read on this label
 
-    await user.upload(screen.getByLabelText('Cambiar foto de la etiqueta'), new File(['label 2'], 'etiqueta-2.png', { type: 'image/png' }))
+    await user.upload(screen.getByLabelText('Añadir otra foto de la etiqueta'), new File(['label two'], 'etiqueta-2.png', { type: 'image/png' }))
     await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('XXL'))
     expect(screen.getByLabelText('Composición')).toHaveValue('100 % algodón')
     expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
+    // The second photo (the label's other side) is added, and both are read together and saved.
+    expect(vi.mocked(readGarmentLabels).mock.lastCall?.[0]).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
+    await waitFor(async () => expect(await database.garments.count()).toBe(1))
+    const [saved] = await database.garments.toArray()
+    const savedPhotos = await database.garmentPhotos.get(saved!.id)
+    expect(savedPhotos?.labelImage).toBeDefined()
+    expect(savedPhotos?.additionalLabelImages).toHaveLength(1)
   })
 
   it('filters the visible catalogue by category and search', async () => {

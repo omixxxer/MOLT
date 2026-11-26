@@ -101,6 +101,8 @@ export interface GarmentPhotos {
   additionalImages?: Blob[]
   /** Close-up of the care label, only read for brand, size and composition; not a garment photo. */
   labelImage?: Blob
+  /** More photos of the label (its other side, a second label): read together with the first. */
+  additionalLabelImages?: Blob[]
   /** The main photo cut out on a transparent background (segmentation + SlimSAM); the thumbnail is made from it. */
   cutout?: Blob
 }

@@ -427,8 +427,8 @@ export async function saveBatch(onProgress: (saved: number) => void): Promise<nu
     const brand = reading?.brand?.brand ?? suggestion.brand?.brand ?? ''
     const composition = reading?.composition?.value ?? ''
     const [image, ...additionalImages] = await Promise.all(garment.photoIds.map((id) => reducePhoto(photoById(id)!.file))) as [Blob, ...Blob[]]
-    const labelFile = garment.labelIds[0] ? photoById(garment.labelIds[0])?.file : undefined
-    const labelImage = labelFile ? await reducePhoto(labelFile) : undefined
+    // Every label photo is kept (both sides of a label, say), the first as the main one.
+    const [labelImage, ...additionalLabelImages] = await Promise.all(garment.labelIds.map((id) => photoById(id)?.file).filter((file): file is File => Boolean(file)).map(reducePhoto))
     const cutout = garment.keepBackground ? undefined : garment.cutout
     const { thumbnail, width, height } = await createThumbnail(cutout ?? image, { transparent: Boolean(cutout) })
     const usage = suggestUsage({ category, subcategory, sleeve: suggestion.sleeve?.value, composition })
@@ -451,6 +451,7 @@ export async function saveBatch(onProgress: (saved: number) => void): Promise<nu
       image,
       ...(additionalImages.length ? { additionalImages } : {}),
       ...(labelImage ? { labelImage } : {}),
+      ...(additionalLabelImages.length ? { additionalLabelImages } : {}),
       ...(cutout ? { cutout } : {}),
       thumbnail,
       width,

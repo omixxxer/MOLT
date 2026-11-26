@@ -5,6 +5,7 @@ import {
   CLOTHING_MODEL_ID,
   labelSize,
   readGarmentLabel,
+  readGarmentLabels,
   type HeadProbabilities
 } from './clothingAnalyzer'
 
@@ -169,6 +170,17 @@ describe('clothing analyzer', () => {
     expect(labelSize(reading, 'Parte superior')?.value).toBe('M')
     expect(labelSize(reading, 'Calzado')?.value).toBe('40')
     expect(labelSize(undefined, 'Calzado')).toBeUndefined()
+  })
+
+  it('reads several label photos as one label: the brand on one side, size and composition on the other', async () => {
+    const normalize = vi.fn(async (image: Blob) => ({ blob: image, pixels: makePixels(), width: 20, height: 20 }))
+    const read = vi.fn(async (image: Blob) => image.size === 5 // «front»
+      ? [{ text: 'ZARA', score: 0.97 }, { text: 'M', score: 0.95 }]
+      : [{ text: '100% COTTON', score: 0.9 }, { text: 'MADE IN PORTUGAL', score: 0.9 }])
+    const reading = await readGarmentLabels([new Blob(['front']), new Blob(['back'])], normalize, read)
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(reading).toMatchObject({ brand: { brand: 'Zara' }, composition: { value: '100 % algodón' } })
+    expect(labelSize(reading, 'Parte superior')?.value).toBe('M')
   })
 
   it('rejects invalid predictions instead of simulating a result', async () => {

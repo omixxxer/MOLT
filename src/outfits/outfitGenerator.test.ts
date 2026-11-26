@@ -569,3 +569,87 @@ describe('shorts only for heat', () => {
     expect(bottoms({ occasion: 'Diario', temperatureCelsius: 12, includeGarmentIds: ['short'] })).toEqual(new Set(['short']))
   })
 })
+
+describe('basic garments', () => {
+  // A plain white T-shirt has no style and needs a jacket in autumn: none of that should keep it out.
+  const tee = garment('tee', 'Top', { subcategory: 'Camiseta', colors: ['Blanco'], pattern: 'Liso' })
+  const sweatshirt = garment('sweatshirt', 'Top', { subcategory: 'Sudadera', colors: ['Azul marino'], pattern: 'Liso', styles: ['Urbano'] })
+  const trousers = garment('trousers', 'Bottom', { subcategory: 'Pantalón', colors: ['Gris'], pattern: 'Liso' })
+  const trainers = garment('trainers', 'Calzado', { subcategory: 'Zapatillas', colors: ['Negro'], pattern: 'Liso', styles: ['Urbano'] })
+  const jacket = garment('jacket', 'Capa', { subcategory: 'Chaqueta', colors: ['Beige'], pattern: 'Liso' })
+  const autumn = { occasion: 'Diario', season: 'Otoño' as const }
+
+  it('one styled piece among garments without style is not a clash of styles', () => {
+    const oneStyled = scoreOutfit([tee, trousers, trainers], autumn).scores.visualStyle
+    const noneStyled = scoreOutfit([tee, trousers, garment('plain-shoes', 'Calzado', { subcategory: 'Zapatillas', colors: ['Negro'], pattern: 'Liso' })], autumn).scores.visualStyle
+    expect(oneStyled).toBeGreaterThanOrEqual(noneStyled)
+  })
+
+  it('taste counts per garment: an extra piece in no preferred colour does not lower it', () => {
+    const preferences = { id: 'current' as const, preferredColors: ['Rojo'], preferredStyles: [], feedbackWeights: {}, updatedAt: '' }
+    const three = scoreOutfit([tee, trousers, trainers], autumn, { preferences }).scores.preference
+    const four = scoreOutfit([tee, trousers, jacket, trainers], autumn, { preferences }).scores.preference
+    expect(four).toBe(three)
+  })
+
+  it('a T-shirt under a jacket, a little warm for the day, is close to a sweatshirt that is just right', () => {
+    const withJacket = scoreOutfit([tee, trousers, jacket, trainers], autumn)
+    const sweat = scoreOutfit([sweatshirt, trousers, trainers], autumn)
+    expect(withJacket.scores.thermal).toBeGreaterThanOrEqual(92)
+    expect(sweat.score - withJacket.score).toBeLessThan(2)
+    // Too warm without anything to take off is still a real cost.
+    const heavy = garment('heavy', 'Top', { subcategory: 'Jersey', composition: '100% lana', colors: ['Gris'] })
+    expect(scoreOutfit([heavy, trousers, trainers], { ...autumn, temperatureCelsius: 22 }).scores.thermal).toBeLessThan(85)
+  })
+
+  it('says «Un solo estampado» only when there is one print', () => {
+    expect(scoreOutfit([tee, trousers, trainers], autumn).explanation).not.toContain('Un solo estampado')
+    const printed = { ...tee, pattern: 'Rayas' }
+    expect(scoreOutfit([printed, trousers, trainers], autumn).explanation).toContain('Un solo estampado')
+  })
+
+  it('come out in autumn about as often as the other tops', () => {
+    const tops = ['a', 'b', 'c', 'd'].map((id) => ({ ...sweatshirt, id: `sweat-${id}` }))
+    const wardrobe = [tee, ...tops, trousers, garment('jeans', 'Bottom', { subcategory: 'Vaqueros', colors: ['Azul'], pattern: 'Liso' }), trainers, jacket]
+    let withTee = 0
+    for (const day of ['1', '2', '3', '4', '5', '6']) {
+      withTee += generateOutfitCandidates(wardrobe, autumn, { seed: day }).filter((outfit) => outfit.garments.includes(tee)).length
+    }
+    // One top in five: about 6 of the 30 outfits.
+    expect(withTee).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe('accessories and jewellery', () => {
+  const base = [garment('top', 'Top'), garment('bottom', 'Bottom'), garment('shoe', 'Calzado')]
+  const earrings = garment('earrings', 'Joya', { subcategory: 'Pendientes', colors: ['Dorado'] })
+  const hoops = garment('hoops', 'Joya', { subcategory: 'Pendientes', colors: ['Dorado'] })
+  const watch = garment('watch', 'Joya', { subcategory: 'Reloj', colors: ['Plateado'] })
+  const bag = garment('bag', 'Accesorio', { subcategory: 'Bolso' })
+  const belt = garment('belt', 'Accesorio', { subcategory: 'Cinturón' })
+
+  it('are added to those worn, as many as wanted, or take the place of the one touched', () => {
+    const worn = withGarment(withGarment(withGarment(base, earrings), hoops), bag)
+    expect(worn.map((item) => item.id)).toEqual(['top', 'bottom', 'shoe', 'earrings', 'hoops', 'bag'])
+    expect(withGarment(worn, belt, bag).map((item) => item.id)).toEqual(['top', 'bottom', 'shoe', 'earrings', 'hoops', 'belt'])
+    // The same piece is not worn twice.
+    expect(withGarment(worn, hoops).filter((item) => item.id === 'hoops')).toHaveLength(1)
+  })
+
+  it('are offered together in the accessory place, without those already worn', () => {
+    const offered = optionsForRole('Accesorio', [...base, earrings], [...base, earrings, hoops, watch, bag], diario).map((option) => option.garment.id)
+    expect(offered.sort()).toEqual(['bag', 'hoops', 'watch'])
+    // Each is scored added to what is worn, not instead of it.
+    const withHoops = optionsForRole('Joya', [...base, earrings], [...base, earrings, hoops], diario)[0]!
+    expect(withHoops.candidate.garments.map((item) => item.id)).toContain('earrings')
+  })
+
+  it('pinned several at once, all of them go in every outfit proposed', () => {
+    const wardrobe = [...base, garment('top-2', 'Top'), earrings, hoops, bag, belt]
+    const context = { occasion: 'Diario', includeGarmentIds: ['earrings', 'hoops', 'bag', 'belt'] }
+    const results = generateOutfitCandidates(wardrobe, context)
+    expect(results.length).toBeGreaterThan(0)
+    for (const result of results) expect(result.garments.map((item) => item.id)).toEqual(expect.arrayContaining(['earrings', 'hoops', 'bag', 'belt']))
+    expect(explainNoOutfits(wardrobe, context)).not.toMatch(/no pueden ir juntas/)
+  })
+})

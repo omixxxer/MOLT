@@ -32,12 +32,13 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete,
   const photos = stored ? [stored.image, ...(stored.additionalImages ?? [])] : []
   // The cut-out first (as in the gallery), then the photos, and the label photo last, apart from them.
   const first = stored?.cutout ? 1 : 0
-  const viewable = [...(stored?.cutout ? [stored.cutout] : []), ...photos, ...(stored?.labelImage ? [stored.labelImage] : [])]
+  const labels = stored?.labelImage ? [stored.labelImage, ...(stored.additionalLabelImages ?? [])] : []
+  const viewable = [...(stored?.cutout ? [stored.cutout] : []), ...photos, ...labels]
   const photosStatus = !stored && (
     <p className="loading-state" role="status">{photosFailed ? 'No se pudieron leer las fotografías de esta prenda.' : 'Cargando fotografías…'}</p>
   )
   const selectedPhoto = viewable[selectedPhotoIndex] ?? photos[0]
-  const thumbLabel = (index: number) => index < first ? 'Ver sin fondo' : index >= first + photos.length ? 'Ver etiqueta' : `Ver foto ${index - first + 1}`
+  const thumbLabel = (index: number) => index < first ? 'Ver sin fondo' : index >= first + photos.length ? (labels.length > 1 ? `Ver etiqueta ${index - first - photos.length + 1}` : 'Ver etiqueta') : `Ver foto ${index - first + 1}`
 
   useEffect(() => {
     setSelectedPhotoIndex(0)

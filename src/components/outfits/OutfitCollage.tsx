@@ -28,6 +28,26 @@ function layout(roles: Set<GarmentRole>): Partial<Record<GarmentRole, Spot>> & {
   }
 }
 
+/**
+ * The gap for the nth accessory. Any number can be worn (several earrings, a watch, a bag): past the gaps, each goes
+ * over one of them, a little smaller and to one side, so every piece shows and can be touched.
+ */
+function extraSpot(gaps: Spot[], index: number): Spot {
+  const gap = gaps[index % gaps.length]!
+  const round = Math.floor(index / gaps.length)
+  if (!round) return gap
+  const scale = 0.8 ** round
+  const width = gap.width * scale
+  const height = gap.height * scale
+  return {
+    left: Math.min(100 - width, gap.left + round * 6),
+    top: Math.min(100 - height, gap.top + round * 5),
+    width,
+    height,
+    z: gap.z + round
+  }
+}
+
 const style = ({ left, top, width, height, z }: Spot): CSSProperties => ({ left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%`, zIndex: z })
 
 interface OutfitCollageProps {
@@ -49,7 +69,7 @@ export default function OutfitCollage({ garments, onSelect, label = garmentLabel
     const own = garment.role === 'Accesorio' || garment.role === 'Joya' ? undefined : spots[garment.role]
     // A second piece of the same kind, or an accessory, goes to the next free gap.
     const taken = own && garments.findIndex((item) => item.role === garment.role) !== garments.indexOf(garment)
-    const spot = own && !taken ? own : spots.extra[extra++ % spots.extra.length]!
+    const spot = own && !taken ? own : extraSpot(spots.extra, extra++)
     return { garment, spot }
   })
   return (

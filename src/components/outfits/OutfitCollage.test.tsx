@@ -24,6 +24,18 @@ describe('OutfitCollage', () => {
     expect(Number(pieces[0]!.style.zIndex)).toBeLessThan(Number(pieces[1]!.style.zIndex))
   })
 
+  it('gives every accessory a place of its own however many there are, the later ones over the earlier', () => {
+    const jewellery = ['pendientes-1', 'pendientes-2', 'pendientes-3', 'reloj', 'pulsera', 'collar', 'anillo'].map((id) => garment(id, 'Joya'))
+    const { container } = render(<OutfitCollage garments={[...look, ...jewellery]} />)
+    const pieces = [...container.querySelectorAll<HTMLElement>('.outfit-collage-piece')]
+    expect(pieces).toHaveLength(13)
+    expect(new Set(pieces.map((piece) => `${piece.style.left},${piece.style.top}`)).size).toBe(13)
+    for (const piece of pieces) {
+      expect(parseFloat(piece.style.left) + parseFloat(piece.style.width)).toBeLessThanOrEqual(100)
+      expect(parseFloat(piece.style.top) + parseFloat(piece.style.height)).toBeLessThanOrEqual(100)
+    }
+  })
+
   it('makes each garment a button when it can be changed', async () => {
     const onSelect = vi.fn()
     render(<OutfitCollage garments={look} onSelect={onSelect} label={(item) => `Elegir ${item.name}`} />)

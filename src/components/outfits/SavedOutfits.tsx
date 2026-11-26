@@ -99,10 +99,11 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen, onCrea
           const title = outfit.name || outfit.occasion
           return (
             <article className="outfit-card saved-card" key={outfit.id}>
-              <div className="saved-art">
+              {/* The picture opens the outfit, as one expects of a card; «Cambiar» says the same in words. */}
+              <button type="button" className="saved-art" onClick={() => onOpen(outfit)} aria-label={`Abrir ${title}`} title="Abrir el outfit">
                 {outfitGarments.length > 0 && <OutfitCollage garments={outfitGarments} />}
                 <span className="saved-origin" data-kind={outfit.kind}>{outfit.kind === 'manual' ? 'Creado por ti' : 'Idea de Molt'}</span>
-              </div>
+              </button>
               <input className="saved-name" aria-label="Nombre del outfit" defaultValue={title} key={title} onBlur={(event) => rename(outfit, event.target.value === outfit.occasion ? '' : event.target.value)} maxLength={60} />
               <p className="saved-meta">
                 {outfit.occasion} · {outfit.wornAt ? `puesto ${daysAgo(outfit.wornAt)}${count > 1 ? ` · ${count} veces` : ''}` : `guardado ${daysAgo(outfit.createdAt)}`}

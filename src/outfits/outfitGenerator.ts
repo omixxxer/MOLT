@@ -166,8 +166,12 @@ function thermalScore(garments: Garment[], context: OutfitContext) {
   let score = 72
   if (temperature !== undefined) {
     const difference = wornWarmth(garments, context) - warmthNeeded(temperature)
-    // Being cold is worse than being warm: a layer can come off.
-    score = 100 - Math.abs(difference) * (difference < 0 ? 24 : 18)
+    // Being cold is worse than being warm: a layer can come off. Warmth that is no more than what a layer adds (a
+    // jacket over a T-shirt) is the lightest case: take the jacket off and it fits.
+    const removable = Math.max(0, ...garments.filter((garment) => garment.role === 'Capa').map(warmth))
+    score = 100 - (difference < 0
+      ? -difference * 24
+      : Math.min(difference, removable) * 9 + Math.max(0, difference - removable) * 18)
   }
   if (hasRain(context)) {
     if (garments.some((garment) => RAIN_LAYERS.has(subcategoryId(garment) ?? ''))) score += 8
@@ -272,7 +276,9 @@ function colorHarmony(garments: Garment[]): { score: number; reason: string } {
 function styleCompatibility(garments: Garment[], desiredStyle?: string) {
   const styles = garments.flatMap((garment) => garment.styles.map(normalize))
   const defined = new Set(styles)
-  let score = defined.size === 0 ? 72 : defined.size === 1 && styles.length > 1 ? 92 : styles.length > defined.size ? 84 : 66
+  // Garments without a style (a basic T-shirt, plain trousers) go with any: one styled piece among them is not a
+  // clash, only different styles side by side are.
+  let score = defined.size === 0 ? 72 : defined.size === 1 ? (styles.length > 1 ? 92 : 78) : styles.length > defined.size ? 84 : 66
   if (desiredStyle) {
     const target = normalize(desiredStyle)
     const known = garments.filter((garment) => garment.styles.length > 0)
@@ -395,16 +401,20 @@ function preferenceScore(garments: Garment[], options: OutfitGenerationOptions) 
   }
   let score = 55 + signal
   const preferences = options.preferences
-  if (preferences) {
+  if (preferences && garments.length) {
+    let taste = 0
     for (const garment of garments) {
       if (preferences.preferredColors.length && garment.colors.length) {
-        score += garment.colors.some((color) => preferences.preferredColors.some((preferred) => normalize(color) === normalize(preferred))) ? 5 : -2
+        taste += garment.colors.some((color) => preferences.preferredColors.some((preferred) => normalize(color) === normalize(preferred))) ? 5 : -2
       }
       if (preferences.preferredStyles.length && garment.styles.length) {
-        score += garment.styles.some((style) => preferences.preferredStyles.some((preferred) => normalize(style) === normalize(preferred))) ? 5 : -2
+        taste += garment.styles.some((style) => preferences.preferredStyles.some((preferred) => normalize(style) === normalize(preferred))) ? 5 : -2
       }
-      if (preferences.preferredDressLevel && garment.dressLevels.length) score += garment.dressLevels.includes(preferences.preferredDressLevel) ? 4 : -2
+      if (preferences.preferredDressLevel && garment.dressLevels.length) taste += garment.dressLevels.includes(preferences.preferredDressLevel) ? 4 : -2
     }
+    // Per garment, at the scale of a usual three-piece outfit: otherwise each extra piece (a jacket over a T-shirt,
+    // a watch) would move the score just for being there.
+    score += taste / garments.length * 3
   }
   return Math.max(0, Math.min(100, score))
 }
@@ -485,7 +495,7 @@ export function scoreOutfit(garments: Garment[], context: OutfitContext, options
     context.occasion === 'Frío y capas' && garments.some((garment) => garment.role === 'Capa') ? 'Lleva capa de abrigo' : '',
     ...climate.reasons,
     harmony.reason,
-    patterns === 88 ? 'Un solo estampado' : '',
+    garments.filter((garment) => garment.pattern && normalize(garment.pattern) !== 'liso').length === 1 && patterns === 88 ? 'Un solo estampado' : '',
     context.desiredStyle && garments.some((garment) => garment.styles.some((style) => normalize(style) === normalize(context.desiredStyle!))) ? `Estética ${context.desiredStyle.toLocaleLowerCase('es')}` : '',
     forgotten ? 'Recupera una prenda que hace tiempo que no usas' : ''
   ].filter(Boolean)
@@ -572,6 +582,8 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
   const layers = byRole('Capa')
   const shoes = byRole('Calzado')
   const accessories = byRole('Accesorio')
+  // Accessories go several at once (earrings, a watch and a bag): everything pinned goes together.
+  const pinnedAccessories = garments.filter((garment) => garment.role === 'Accesorio' && includedIds.has(garment.id))
   const hasPinnedRole = (role: GarmentRole) => garments.some((garment) => includedIds.has(garment.id) && garment.role === role)
   // Jewellery is not searched with the rest (it would multiply the combinations): what is pinned goes in every
   // outfit, and otherwise one piece is added at the end to the outfits it suits.
@@ -579,8 +591,8 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
   const candidates: OutfitCandidate[] = []
   const seen = new Set<string>()
 
-  const add = (base: Garment[], layer?: Garment, shoe?: Garment, accessory?: Garment) => {
-    const selected = [...base, layer, shoe, accessory, ...pinnedJewels].filter((item): item is Garment => Boolean(item))
+  const add = (base: Garment[], layer?: Garment, shoe?: Garment, extras: Garment[] = []) => {
+    const selected = [...base, layer, shoe, ...extras, ...pinnedJewels].filter((item): item is Garment => Boolean(item))
     // What the user pins is respected; the rules below are about what Molt proposes on its own.
     const proposed = selected.filter((item) => !includedIds.has(item.id))
     if (context.occasion === 'Formal' && proposed.some((item) => !fitsFormal(item))) return
@@ -603,12 +615,10 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
     const shoeOptions: Array<Garment | undefined> = hasPinnedRole('Calzado')
       ? shoes.filter((shoe) => includedIds.has(shoe.id))
       : suitableShoes.length ? suitableShoes : [undefined]
-    const accessoryOptions: Array<Garment | undefined> = hasPinnedRole('Accesorio')
-      ? accessories.filter((item) => includedIds.has(item.id))
-      : [undefined, ...accessories]
+    const accessoryOptions: Garment[][] = pinnedAccessories.length ? [pinnedAccessories] : [[], ...accessories.map((item) => [item])]
     for (const layer of layerOptions) {
       for (const shoe of shoeOptions) {
-        for (const accessory of accessoryOptions) add(base, layer, shoe, accessory)
+        for (const extras of accessoryOptions) add(base, layer, shoe, extras)
       }
     }
   }
@@ -677,8 +687,19 @@ function pickVaried(candidates: OutfitCandidate[], limit: number, shown: Map<str
   return picked
 }
 
-/** The outfit with this garment in its place: same role replaced; a dress takes the place of a top and a bottom. */
-export function withGarment(outfit: Garment[], garment: Garment): Garment[] {
+/** Accessories and jewellery: one place in the outfit where any number of them go (earrings, a watch, a bag…). */
+export function isAccessory(garment: Pick<Garment, 'role'>): boolean {
+  return garment.role === 'Accesorio' || garment.role === 'Joya'
+}
+
+/**
+ * The outfit with this garment in its place: same role replaced; a dress takes the place of a top and a bottom. An
+ * accessory is added to the others, or takes the place of `replacing` (the one the user touched).
+ */
+export function withGarment(outfit: Garment[], garment: Garment, replacing?: Garment): Garment[] {
+  if (isAccessory(garment)) {
+    return [...outfit.filter((item) => item.id !== garment.id && item.id !== replacing?.id), garment]
+  }
   const replaced = (item: Garment) => item.role === garment.role
     || (garment.role === 'Una pieza' && (item.role === 'Top' || item.role === 'Bottom'))
     || ((garment.role === 'Top' || garment.role === 'Bottom') && item.role === 'Una pieza')
@@ -690,11 +711,15 @@ export interface GarmentOption {
   candidate: OutfitCandidate
 }
 
-/** The garments that could take a role in this outfit, best first: what the picker shows and «cambiar» goes through. */
-export function optionsForRole(role: GarmentRole, outfit: Garment[], allGarments: Garment[], context: OutfitContext, options: OutfitGenerationOptions = {}): GarmentOption[] {
+/**
+ * The garments that could take a role in this outfit, best first: what the picker shows and «cambiar» goes through.
+ * For an accessory, accessories and jewellery alike, added to those worn or in the place of `replacing`.
+ */
+export function optionsForRole(role: GarmentRole, outfit: Garment[], allGarments: Garment[], context: OutfitContext, options: OutfitGenerationOptions = {}, replacing?: Garment): GarmentOption[] {
+  const fits = (garment: Garment) => isAccessory({ role }) ? isAccessory(garment) : garment.role === role
   return allGarments
-    .filter((garment) => garment.role === role && isAvailable(garment) && !outfit.some((item) => item.id === garment.id))
-    .map((garment) => ({ garment, candidate: scoreOutfit(withGarment(outfit, garment), context, options) }))
+    .filter((garment) => fits(garment) && isAvailable(garment) && !outfit.some((item) => item.id === garment.id))
+    .map((garment) => ({ garment, candidate: scoreOutfit(withGarment(outfit, garment, replacing), context, options) }))
     .sort((a, b) => b.candidate.score - a.candidate.score || a.garment.id.localeCompare(b.garment.id))
 }
 
@@ -703,7 +728,8 @@ export function explainNoOutfits(allGarments: Garment[], context: OutfitContext)
   const garments = allGarments.filter((garment) => isAvailable(garment) && !context.excludeGarmentIds?.includes(garment.id))
   const count = (role: GarmentRole, items = garments) => items.filter((garment) => garment.role === role).length
   const pinned = allGarments.filter((garment) => context.includeGarmentIds?.includes(garment.id))
-  const pinnedConflict = (['Top', 'Bottom', 'Calzado', 'Capa', 'Accesorio', 'Una pieza'] as GarmentRole[]).some((role) => count(role, pinned) > 1)
+  // Accessories and jewellery can be several; every other role, one.
+  const pinnedConflict = (['Top', 'Bottom', 'Calzado', 'Capa', 'Una pieza'] as GarmentRole[]).some((role) => count(role, pinned) > 1)
     || (pinned.some((garment) => garment.role === 'Una pieza') && pinned.some((garment) => garment.role === 'Top' || garment.role === 'Bottom'))
   if (pinnedConflict) return 'Las prendas fijadas no pueden ir juntas en un mismo outfit. Suelta alguna.'
   const offered = (role: GarmentRole) => context.occasion === 'Formal' ? garments.filter((garment) => garment.role === role && fitsFormal(garment)).length : count(role)
