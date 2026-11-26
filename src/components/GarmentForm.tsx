@@ -32,7 +32,7 @@ import {
 import ColorPalette from './ColorPalette'
 import AnalysisCard from './garmentForm/AnalysisCard'
 import { analysisRecord } from './garmentForm/analysisRecord'
-import { ChipsField, FormFold, FieldHeading, FormSection, SuggestedBadge } from './garmentForm/fields'
+import { ChipsField, FormFold, FieldHeading, FormSection, SuggestedBadge, SuggestInput } from './garmentForm/fields'
 import { createSuggestedGarmentName } from './garmentForm/garmentName'
 import LabelPhotoSlot, { type LabelFinding } from './garmentForm/LabelPhotoSlot'
 import PhotoCollection from './garmentForm/PhotoCollection'
@@ -55,6 +55,8 @@ type SuggestedField = 'category' | 'subcategory' | 'colors' | 'pattern' | 'brand
 // Suggested from the garment type (usageRules) and kept up to date with it until the user changes them.
 type UsageField = 'seasons' | 'dressLevels' | 'styles'
 const usageFields: UsageField[] = ['seasons', 'dressLevels', 'styles']
+type KeptField = 'type' | 'colors' | 'pattern'
+const keptFieldOf: Partial<Record<SuggestedField, KeptField>> = { category: 'type', subcategory: 'type', colors: 'colors', pattern: 'pattern' }
 
 interface GarmentFormProps {
   garment?: Garment
@@ -109,6 +111,11 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   typed.current = { brand, size, composition, suggested, category, subcategory, labelPhoto }
   // A saved garment keeps the use the user gave it; a new one follows the suggestion until the user changes it.
   const usageTouched = useRef(new Set<UsageField>(garment ? usageFields : []))
+  // What the user chose (or a saved garment holds) is not replaced when photos are added, edited or removed: only
+  // «Analizar de nuevo» does that. Category and subcategory go together, so they never contradict each other.
+  const keptByUser = useRef(new Set<KeptField>(garment
+    ? ['type', ...(garment.colors.length ? ['colors' as const] : []), ...(garment.pattern ? ['pattern' as const] : [])]
+    : []))
 
   // Several photos taken minutes apart are, most likely, several garments (as «Varias prendas» groups them: photos
   // of one garment are taken within SAME_GARMENT_SECONDS). Only a suggestion: the user decides. Without capture
@@ -169,6 +176,8 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   }
 
   function edited(field: SuggestedField) {
+    const kept = keptFieldOf[field]
+    if (kept) keptByUser.current.add(kept)
     setSuggested((current) => {
       if (!current.has(field)) return current
       const next = new Set(current)
@@ -193,6 +202,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
       return
     }
     const nextPhotos = [...photos, ...validFiles]
+    if (!photos.length) setUseCutout(true)
     setPhotos(nextPhotos)
     setImageChanged(true)
     setAnalysisSuggestion(undefined)
@@ -211,6 +221,8 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   }
 
   function updatePhotos(nextPhotos: Blob[]) {
+    // «Ver con fondo» was chosen for that photo; another main photo starts without background, as any new one.
+    if (nextPhotos[0] !== photos[0]) setUseCutout(true)
     setCutout(undefined)
     setPhotos(nextPhotos)
     setImageChanged(true)
@@ -225,6 +237,9 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
    * and read there, and the rest are analysed again without it.
    */
   async function analyzeImage(imagesToAnalyze: Blob[] = photos, fresh?: Set<Blob>) {
+    // A cut-out still running belongs to the photos being replaced: it will never report back (its request is no
+    // longer current), so its «Quitando el fondo» would stay on if this analysis fails or finds no garment.
+    setCuttingOut(false)
     if (!imagesToAnalyze.length) {
       analysisRequestId.current += 1
       setAnalyzing(false)
@@ -251,13 +266,20 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
         void analyzeImage(rest)
         return
       }
-      const filled: SuggestedField[] = ['category', 'subcategory', 'colors']
+      const kept = keptByUser.current
+      const filled: SuggestedField[] = []
       setAnalysisSuggestion(suggestion)
-      void cutOutMainPhoto(imagesToAnalyze[0]!, suggestion.segmentations[0], suggestion.category, requestId)
-      setCategory(suggestion.category)
-      setSubcategory(suggestion.subcategory)
-      setColors(suggestion.colors)
-      if (suggestion.pattern) {
+      void cutOutMainPhoto(imagesToAnalyze[0]!, suggestion.segmentations[0], kept.has('type') ? typed.current.category : suggestion.category, requestId)
+      if (!kept.has('type')) {
+        setCategory(suggestion.category)
+        setSubcategory(suggestion.subcategory)
+        filled.push('category', 'subcategory')
+      }
+      if (!kept.has('colors')) {
+        setColors(suggestion.colors)
+        filled.push('colors')
+      }
+      if (suggestion.pattern && !kept.has('pattern')) {
         setPattern(suggestion.pattern.label)
         filled.push('pattern')
       }
@@ -527,7 +549,11 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
                 edited('category')
                 edited('subcategory')
               }}
-              onAnalyze={() => void analyzeImage()}
+              onAnalyze={() => {
+                // Asked for on purpose: its suggestion replaces type, colours and pattern, whoever chose them.
+                keptByUser.current.clear()
+                void analyzeImage()
+              }}
             />
 
             <FormSection title="La prenda">
@@ -543,8 +569,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
               </div>
               <div className="form-field">
                 <FieldHeading htmlFor={`${fieldId}-subcategory`} label="Subcategoría" suggested={suggested.has('subcategory')} />
-                <input id={`${fieldId}-subcategory`} list={`${fieldId}-subcategories`} value={subcategory} onChange={(event) => { setSubcategory(event.target.value); edited('subcategory') }} placeholder="p. ej. Camiseta" maxLength={50} />
-                <datalist id={`${fieldId}-subcategories`}>{subcategoryOptions.map((value) => <option key={value} value={value} />)}</datalist>
+                <SuggestInput id={`${fieldId}-subcategory`} value={subcategory} onChange={(value) => { setSubcategory(value); edited('subcategory') }} options={subcategoryOptions} placeholder="p. ej. Camiseta" maxLength={50} />
               </div>
               <ChipsField label="Colores" values={colors} onChange={(values) => { setColors(values); edited('colors') }} options={colorOptions} placeholder="Elige abajo o escribe uno" suggested={suggested.has('colors')} swatch={colorSwatch} />
               <div className="form-field full">
