@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ClothingAnalysisSuggestion } from '../../ai/clothingAnalyzer'
+import { analyzeGarmentImage } from '../../ai/clothingAnalyzer'
 import { database } from '../../db/database'
 import type { GarmentCategory } from '../../types/domain'
 import {
@@ -10,6 +11,7 @@ import {
   mergeInto,
   movePhoto,
   replacePhoto,
+  retryFailed,
   savable,
   saveBatch,
   splitPhoto,
@@ -176,6 +178,25 @@ describe('many garments at once', () => {
     expect(getBatch().photos.find((entry) => entry.id === backId)!.file.size).toBe(7)
     expect(getBatch().garments[0]!.photoIds).toEqual([mainId, backId])
     expect(vi.mocked(cutOutGarments).mock.calls.length).toBe(calls + 1)
+  })
+
+  it('an edited photo whose new analysis fails stops waiting for its cut-out, and retrying keeps it in its garment', async () => {
+    await addPhotos([photo('Parte superior|Camiseta|Negro|0'), photo('Parte superior|Camiseta|Negro|8')])
+    await analysed()
+    const [mainId, backId] = getBatch().garments[0]!.photoIds
+
+    vi.mocked(analyzeGarmentImage).mockRejectedValueOnce(new Error('model failed'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    replacePhoto(mainId!, new Blob(['cropped'], { type: 'image/jpeg' }))
+    await analysed()
+    expect(getBatch().photos.find((entry) => entry.id === mainId)!.status).toBe('failed')
+    expect(getBatch().garments[0]).toMatchObject({ cutoutStatus: 'none' })
+
+    retryFailed()
+    await analysed()
+    expect(getBatch().photos.find((entry) => entry.id === mainId)!.status).toBe('done')
+    expect(getBatch().garments).toHaveLength(1)
+    expect(getBatch().garments[0]).toMatchObject({ photoIds: [mainId, backId], cutoutStatus: 'done' })
   })
 
   it('saves the chosen garments with their photos, label, cut-out and what the label says', async () => {

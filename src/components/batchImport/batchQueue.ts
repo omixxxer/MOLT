@@ -223,7 +223,12 @@ async function reanalyze(photoId: string, current: number) {
     }
   } catch (error) {
     console.error('No se pudo analizar de nuevo una foto editada:', error)
-    if (current === generation) updatePhoto(photoId, { status: 'failed' })
+    if (current === generation) {
+      updatePhoto(photoId, { status: 'failed' })
+      // Its cut-out waited for this analysis: without a map of the edited photo there is none to make.
+      const owner = state.garments.find((garment) => garment.photoIds[0] === photoId)
+      if (owner?.cutoutStatus === 'waiting') updateGarment(owner.id, { cutoutStatus: 'none' })
+    }
   } finally {
     if (current === generation) set({ runAnalyzed: state.runAnalyzed + 1 })
   }
@@ -397,7 +402,10 @@ function queueCutout(garmentId: string) {
 export function retryFailed() {
   const failed = state.photos.filter((photo) => photo.status === 'failed')
   set({ photos: state.photos.map((photo) => photo.status === 'failed' ? { ...photo, status: 'waiting' as const } : photo) })
-  jobs.push(...failed.map((photo): Job => ({ kind: 'analyze', photoId: photo.id })))
+  // A photo already in a garment failed its new analysis after being edited: it is analysed again where it is,
+  // not grouped again (that would put it in a second garment).
+  const grouped = new Set(state.garments.flatMap((garment) => [...garment.photoIds, ...garment.labelIds]))
+  jobs.push(...failed.map((photo): Job => ({ kind: grouped.has(photo.id) ? 'reanalyze' : 'analyze', photoId: photo.id })))
   void run()
 }
 

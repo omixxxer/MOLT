@@ -5,6 +5,7 @@ import App from './App'
 import { database } from '../db/database'
 import { analyzeGarmentImage, readGarmentLabel } from '../ai/clothingAnalyzer'
 import { importWardrobeBackup, readWardrobeBackup } from '../db/wardrobeBackup'
+import { cutOutGarments } from '../ai/cutout'
 
 // Only the functions that load models are replaced; the rest (e.g. labelSize) are the real ones.
 vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
@@ -15,6 +16,13 @@ vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
 }))
 
 vi.mock('../components/PatternWaves.jsx', () => ({ default: () => null }))
+
+// Cutting out loads a model too; only called when an analysis gives a segmentation.
+vi.mock('../ai/cutout', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../ai/cutout')>(),
+  cutOutGarments: vi.fn(),
+  cutoutColors: vi.fn(async () => [])
+}))
 
 // A test photo named «name|seconds.jpg» was taken at that second; others have no capture time.
 vi.mock('../ai/photoTime', () => ({
@@ -488,6 +496,73 @@ describe('wardrobe flow', () => {
     await user.upload(screen.getByLabelText('Seleccionar fotografía de la prenda'), new File(['c'], 'c|310.jpg', { type: 'image/jpeg' }))
     await user.click(await screen.findByRole('button', { name: 'Pasar a Varias prendas' }))
     expect(await screen.findByRole('heading', { name: /añadir varias prendas/i })).toBeInTheDocument()
+  })
+
+  it('keeps the type and colours the user chose when another photo is added, until «Analizar de nuevo»', async () => {
+    const shirt = {
+      category: 'Parte superior' as const,
+      subcategory: 'Camisa',
+      colors: ['Gris'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9 },
+      unknownAttributes: [],
+      modelId: 'molt/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      segmentations: [],
+      analyzedAt: '2026-11-25T12:00:00.000Z'
+    }
+    vi.mocked(analyzeGarmentImage).mockResolvedValue(shirt)
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['a'], 'a.jpg', { type: 'image/jpeg' }))
+    const subcategory = await screen.findByRole('combobox', { name: /Subcategoría/ })
+    await waitFor(() => expect(subcategory).toHaveValue('Camisa'))
+
+    await user.clear(subcategory)
+    await user.type(subcategory, 'Blusa')
+    await user.click(screen.getByRole('button', { name: 'Quitar Gris' }))
+    await user.upload(screen.getByLabelText('Seleccionar fotografía de la prenda'), new File(['b'], 'b.jpg', { type: 'image/jpeg' }))
+    await waitFor(() => expect(analyzeGarmentImage).toHaveBeenCalledTimes(2))
+    await screen.findByText('Molt cree que es')
+    expect(subcategory).toHaveValue('Blusa')
+    expect(screen.queryByRole('button', { name: 'Quitar Gris' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Analizar de nuevo' }))
+    await waitFor(() => expect(subcategory).toHaveValue('Camisa'))
+    expect(screen.getByRole('button', { name: 'Quitar Gris' })).toBeInTheDocument()
+  })
+
+  it('does not keep «Quitando el fondo» from a removed photo when the next analysis fails', async () => {
+    // The first photo's cut-out never finishes: it is still running when the photo is removed.
+    vi.mocked(cutOutGarments).mockReturnValue(new Promise(() => {}))
+    vi.mocked(analyzeGarmentImage).mockResolvedValueOnce({
+      category: 'Parte superior',
+      subcategory: 'Camiseta',
+      colors: ['Negro'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9 },
+      unknownAttributes: [],
+      modelId: 'molt/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      segmentations: [{ classes: ['background', 'garment'], grid: 1, probabilities: new Float32Array([0, 1]) }],
+      analyzedAt: '2026-11-25T12:00:00.000Z'
+    }).mockRejectedValueOnce(new Error('model failed'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['a'], 'a.jpg', { type: 'image/jpeg' }))
+    expect(await screen.findByText('Quitando el fondo, en curso')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Quitar foto 1' }))
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['b'], 'b.jpg', { type: 'image/jpeg' }))
+
+    expect(await screen.findByText(/No se pudo cargar o ejecutar el modelo/)).toBeInTheDocument()
+    expect(screen.queryByText('Quitando el fondo, en curso')).not.toBeInTheDocument()
+    expect(screen.getByText('Foto principal')).toBeInTheDocument()
   })
 
   it('offers the three ways of adding garments as tabs', async () => {

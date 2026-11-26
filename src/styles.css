@@ -334,6 +334,12 @@ button.photo-stage-pill { text-decoration: underline; }
 .choice-field > legend { margin-bottom: 7px; padding: 0; color: var(--ink); font-size: var(--text-label); font-weight: 650; }
 .choice-field > legend .suggested-badge { margin-left: 8px; vertical-align: 1px; }
 .choice-field > legend small { margin-left: 8px; font-size: var(--text-small); font-weight: 400; opacity: .75; }
+.suggest-field { position: relative; min-width: 0; }
+.suggest-field input { padding-right: 34px !important; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+.suggest-list { position: absolute; top: 100%; right: 0; left: 0; z-index: 8; max-height: 260px; margin: 4px 0 0; padding: 4px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--white); box-shadow: 0 10px 30px rgba(45, 40, 56, .18); list-style: none; }
+.suggest-list li { padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: var(--text-body); }
+.suggest-list li[aria-selected=true], .suggest-list li:hover { background: var(--soft-surface); }
+.suggest-list li[data-current] { font-weight: 650; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 13px; }
 .form-field { min-width: 0; display: grid; gap: 7px; border: 0; padding: 0; }
 .form-field.full { grid-column: 1 / -1; }
