@@ -2,6 +2,7 @@ import { subcategoryFromShape } from '../ai/garmentShape'
 import { suggestUsage } from '../ai/usageRules'
 import { taxonomy } from '../ml/taxonomy'
 import type { Garment } from '../types/domain'
+import { fixNameAgreement } from '../components/garmentForm/garmentName'
 
 /** The subcategories that moved from «Accesorio» to «Joyería» in taxonomy v6. */
 const JEWELLERY = new Set(taxonomy.subcategories.filter((entry) => entry.category === 'jewellery').map((entry) => entry.label))
@@ -33,4 +34,14 @@ export function upgradeGarmentToV6<T extends Garment>(garment: T): T | undefined
     }
   }
   return changed
+}
+
+/**
+ * The colours of a proposed name agreeing with its garment, as names are made now (database version 10, and backups
+ * made before it): «Sudadera blanco» was proposed for a while and is «Sudadera blanca». Only names that end in
+ * colours change, and only their grammar. Returns the garment changed, or undefined when nothing changes.
+ */
+export function upgradeGarmentName<T extends Garment>(garment: T): T | undefined {
+  const name = fixNameAgreement(garment.name)
+  return name ? { ...garment, name } : undefined
 }

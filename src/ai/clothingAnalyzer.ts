@@ -434,6 +434,15 @@ export async function readGarmentLabel(
   return { lines, ...(brand ? { brand } : {}), ...(composition ? { composition } : {}) }
 }
 
+/** Several photos of the label (both sides, a second label): what all of them read, as one label. */
+export async function readGarmentLabels(images: Blob[], normalize: ImageNormalizer = normalizeImage, read: TextReader = readText): Promise<LabelReading> {
+  const lines: TextLine[] = []
+  for (const image of images) lines.push(...(await readGarmentLabel(image, normalize, read)).lines)
+  const brand = findBrand(lines)
+  const composition = findComposition(lines)
+  return { lines, ...(brand ? { brand } : {}), ...(composition ? { composition } : {}) }
+}
+
 /** The size on a label for a garment category (the category label shown in the app). */
 export function labelSize(reading: LabelReading | undefined, category: GarmentCategory): LabelValue | undefined {
   if (!reading) return undefined

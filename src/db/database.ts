@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { DressLevel, Garment, GarmentPhotos, LegacyFormality, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
 import { assignMissingCodes, codeCounters } from './garmentCodes'
-import { upgradeGarmentToV6 } from './garmentUpgrades'
+import { upgradeGarmentName, upgradeGarmentToV6 } from './garmentUpgrades'
 import { DEMO_DATABASE_NAME, isDemo } from '../demo/demoMode'
 
 const levelOfFormality: Record<LegacyFormality, DressLevel> = { Casual: 'Diario', 'Smart casual': 'Arreglado', Formal: 'Formal' }
@@ -124,6 +124,15 @@ export class WardrobeDatabase extends Dexie {
       .upgrade(async (transaction) => {
         await transaction.table('garments').toCollection().modify((garment: Garment, ref: { value: Garment }) => {
           const upgraded = upgradeGarmentToV6(garment)
+          if (upgraded) ref.value = upgraded
+        })
+      })
+    // Proposed names with the colour agreeing with the garment: «Sudadera blanca», «Botas negras y grises».
+    this.version(10)
+      .stores({})
+      .upgrade(async (transaction) => {
+        await transaction.table('garments').toCollection().modify((garment: Garment, ref: { value: Garment }) => {
+          const upgraded = upgradeGarmentName(garment)
           if (upgraded) ref.value = upgraded
         })
       })

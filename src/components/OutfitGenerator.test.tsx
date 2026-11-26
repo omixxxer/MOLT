@@ -307,6 +307,11 @@ describe('OutfitGenerator', () => {
     await user.click(screen.getByRole('button', { name: 'Cambiar' }))
     await waitFor(() => expect(onBoard().sort()).toEqual([...shown].sort()))
 
+    // The card's picture opens it too.
+    await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
+    await user.click(await screen.findByRole('button', { name: 'Abrir Reunión' }))
+    await waitFor(() => expect(onBoard().sort()).toEqual([...shown].sort()))
+
     await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
     await user.click(await screen.findByRole('button', { name: 'Eliminar Reunión' }))
     await user.click(await screen.findByRole('button', { name: 'Eliminar outfit' }))

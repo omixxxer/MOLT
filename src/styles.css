@@ -222,7 +222,8 @@ h1, h2, p { margin-top: 0; }
 .photo-drop-choose::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .photo-drop-choose input, .take-photo input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .take-photo, .take-photo.photo-thumb { position: relative; z-index: 1; display: none; cursor: pointer; }
-.label-take-photo { width: 100%; margin-top: 8px; }
+/* Next to the gallery's large button, the camera's small one. */
+.label-take-photo { flex: none; align-self: stretch; min-height: 64px; padding-inline: 16px; }
 @media (pointer: coarse) {
   .take-photo { display: inline-flex; }
   .take-photo.photo-thumb { display: flex; }
@@ -280,27 +281,35 @@ button.photo-stage-pill { text-decoration: underline; }
 .analysis-read q { opacity: .65; }
 
 .label-slot { grid-column: 1 / -1; display: grid; gap: 8px; }
-.label-upload { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--ink); border-radius: 8px; background: #F1EEF6; color: var(--ink); font-size: var(--text-body); font-weight: 650; cursor: pointer; }
+.label-slot-empty { display: flex; gap: 8px; }
+.label-upload { position: relative; flex: 1; min-width: 0; min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--ink); border-radius: 8px; background: #F1EEF6; color: var(--ink); font-size: var(--text-body); font-weight: 650; cursor: pointer; }
 .label-upload:hover { background: var(--soft-surface); }
-.label-upload > span[aria-hidden] { color: var(--lavender); font-size: 22px; font-weight: 400; }
+.label-upload > svg { flex: none; color: var(--lavender); }
 .label-upload small { display: block; margin-top: 2px; font-size: var(--text-label); font-weight: 400; opacity: .8; }
 .label-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .label-upload:focus-within { outline: 2px solid var(--lavender); outline-offset: 3px; }
-.label-slot-body { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft-surface); }
-.label-slot-photo { position: relative; width: 96px; height: 96px; }
-.label-slot-photo > img { width: 96px; height: 96px; border-radius: 6px; background: var(--white); object-fit: contain; }
+.label-slot-body { display: grid; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft-surface); }
+.label-slot-photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.label-slot-photo { position: relative; width: 88px; height: 88px; }
+.label-slot-photo > img { width: 88px; height: 88px; border-radius: 6px; background: var(--white); object-fit: contain; }
 .label-slot-edit { position: absolute; right: 4px; bottom: 4px; width: 28px; height: 28px; min-height: 28px; }
+.label-slot-remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 50%; background: rgba(45, 40, 56, .72); color: var(--white); }
+.label-slot-remove:hover { background: var(--ink); }
+.label-slot-add { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 88px; height: 88px; border: 1px dashed var(--ink); border-radius: 6px; background: var(--white); color: var(--ink); font-size: var(--text-label); font-weight: 650; text-align: center; cursor: pointer; }
+.label-slot-add:hover { background: #F1EEF6; }
+.label-slot-add:focus-within { outline: 2px solid var(--lavender); outline-offset: 2px; }
+.label-slot-add input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+/* The camera only on touch devices, as everywhere (TakePhoto). */
+.label-slot-camera { display: none; }
+@media (pointer: coarse) { .label-slot-camera { display: block; } .label-slot-camera .take-photo { display: flex; } }
 .label-slot-reading { min-width: 0; display: grid; gap: 8px; }
 .label-slot-reading .analysis-read > div { grid-template-columns: 76px minmax(0, 1fr); }
 .label-slot-reading .analysis-progress { margin: 0; }
 .label-slot-actions { display: flex; gap: 12px; }
 .label-slot-actions button { padding: 0; border: 0; background: transparent; color: var(--ink); font-size: var(--text-label); text-decoration: underline; }
-.label-slot-change { position: relative; color: var(--ink); font-size: var(--text-label); text-decoration: underline; cursor: pointer; }
 .moved-label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--lavender); border-radius: 8px; background: var(--soft-surface); font-size: var(--text-label); line-height: 1.5; }
 .moved-label button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--mist); border-radius: 16px; background: var(--white); font-size: var(--text-label); font-weight: 650; }
 .moved-label button:hover { background: var(--mist); }
-.label-slot-change input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.label-slot-change:focus-within { outline: 2px solid var(--lavender); outline-offset: 2px; }
 .detail-photo-list > button.label-thumb { border-style: dashed; }
 
 .form-section { min-width: 0; margin: 0; padding: 0; border: 0; }
@@ -1423,7 +1432,9 @@ button.outfit-collage-piece:focus-visible { outline: 2px solid var(--lavender); 
 /* «Mis outfits» as a board of collages, as on Pinterest: the collage first, the name and the actions under it. */
 .saved-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
 .saved-card { gap: 8px; padding: 10px; border-radius: 18px; }
-.saved-art { position: relative; }
+.saved-art { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: 12px; background: transparent; color: inherit; text-align: inherit; cursor: pointer; }
+.saved-art:hover .outfit-collage, .saved-art:focus-visible .outfit-collage { filter: brightness(.97); }
+.saved-art:focus-visible { outline: 2px solid var(--lavender); outline-offset: 3px; }
 .saved-art .saved-origin { position: absolute; top: 8px; left: 8px; z-index: 6; box-shadow: 0 1px 4px rgba(45, 40, 56, .12); }
 .saved-card .saved-name { font-size: 19px; }
 .saved-meta { margin: -4px 0 0; font-size: var(--text-label); opacity: .75; }

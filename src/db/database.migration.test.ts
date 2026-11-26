@@ -73,7 +73,7 @@ describe('database version 8', () => {
 
     const database = new WardrobeDatabase(NAME)
     await database.open()
-    expect(database.verno).toBe(9)
+    expect(database.verno).toBe(10)
 
     // The garment records keep every field except the images.
     const garments = await database.garments.orderBy('id').toArray()
@@ -137,7 +137,7 @@ describe('database version 8', () => {
 
     const fresh = new WardrobeDatabase(NAME)
     await fresh.open()
-    expect(fresh.verno).toBe(9)
+    expect(fresh.verno).toBe(10)
     expect(await fresh.garmentThumbnails.count()).toBe(0)
     fresh.close()
   })

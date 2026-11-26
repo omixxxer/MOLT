@@ -1,6 +1,6 @@
 import { blobBytes, createZip, readZip, type ZipEntry } from '../ml/zip'
 import type { Garment, GarmentWithPhotos, Outfit, OutfitFeedback, TrendPack, Trip, UserPreferences } from '../types/domain'
-import { upgradeGarmentToV6 } from './garmentUpgrades'
+import { upgradeGarmentName, upgradeGarmentToV6 } from './garmentUpgrades'
 import { database } from './database'
 import { codeCounters, codePrefix, nextCode } from './garmentCodes'
 import { garmentTables, getGarmentWithPhotos, putGarmentWithPhotos } from './garmentRepository'
@@ -26,6 +26,7 @@ export type GarmentRecord = Garment & {
     thumbnail: PhotoReference
     additionalImages?: PhotoReference[]
     labelImage?: PhotoReference
+    additionalLabelImages?: PhotoReference[]
     cutout?: PhotoReference
   }
 }
@@ -84,7 +85,7 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
   for (const id of await database.garments.toCollection().primaryKeys()) {
     const garment = await getGarmentWithPhotos(id)
     if (!garment) continue
-    const { image, thumbnail, additionalImages, labelImage, cutout, ...fields } = garment
+    const { image, thumbnail, additionalImages, labelImage, additionalLabelImages, cutout, ...fields } = garment
     garments.push({
       ...fields,
       photos: {
@@ -94,6 +95,9 @@ export async function createWardrobeBackup(exportedAt = new Date()): Promise<Blo
           ? { additionalImages: await Promise.all(additionalImages.map((photo, index) => addPhoto(id, `photo-${index + 1}`, photo))) }
           : {}),
         ...(labelImage ? { labelImage: await addPhoto(id, 'label', labelImage) } : {}),
+        ...(labelImage && additionalLabelImages?.length
+          ? { additionalLabelImages: await Promise.all(additionalLabelImages.map((photo, index) => addPhoto(id, `label-${index + 1}`, photo))) }
+          : {}),
         ...(cutout ? { cutout: await addPhoto(id, 'cutout', cutout) } : {})
       }
     })
@@ -148,8 +152,10 @@ export async function readWardrobeBackup(file: Blob): Promise<WardrobeBackup> {
     thumbnail: photo(photos.thumbnail),
     ...(photos.additionalImages ? { additionalImages: photos.additionalImages.map(photo) } : {}),
     ...(photos.labelImage ? { labelImage: photo(photos.labelImage) } : {}),
+    ...(photos.labelImage && photos.additionalLabelImages?.length ? { additionalLabelImages: photos.additionalLabelImages.map(photo) } : {}),
     ...(photos.cutout ? { cutout: photo(photos.cutout) } : {})
   })).map((garment) => upgradeGarmentToV6(garment) ?? garment) // A backup from before taxonomy v6, brought up to it.
+    .map((garment) => upgradeGarmentName(garment) ?? garment) // And from before names agreed in gender and number.
   return {
     exportedAt: manifest.exportedAt,
     garments,

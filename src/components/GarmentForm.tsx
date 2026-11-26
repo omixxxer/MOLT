@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
   analyzeGarmentImage,
   labelSize,
-  readGarmentLabel,
+  readGarmentLabels,
   type ClothingAnalysisSuggestion,
   type LabelReading
 } from '../ai/clothingAnalyzer'
@@ -45,6 +45,8 @@ const dressLevelHints: Record<DressLevel, string> = {
   Formal: 'Boda, evento, traje'
 }
 const maxPhotos = 4
+// Both sides of a care label, or a second label: read together.
+const maxLabelPhotos = 3
 const colorOptions = taxonomy.attributes.colors.values.map((value) => value.label)
 const patternOptions = taxonomy.attributes.pattern.values.map((value) => value.label)
 // How dressed up a garment is goes in «Estilo» (dress levels); these are aesthetics.
@@ -98,17 +100,17 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   const [analysisSuggestion, setAnalysisSuggestion] = useState<ClothingAnalysisSuggestion>()
   const [suggested, setSuggested] = useState<Set<SuggestedField>>(() => new Set())
   // The care label has its own photo, read only for text, so it never weighs on the garment photos' results.
-  const [labelPhoto, setLabelPhoto] = useState<Blob | undefined>(stored?.labelImage)
+  const [labelPhotos, setLabelPhotos] = useState<Blob[]>(() => stored?.labelImage ? [stored.labelImage, ...(stored.additionalLabelImages ?? [])] : [])
   const [labelReading, setLabelReading] = useState<LabelReading>()
   const [readingLabel, setReadingLabel] = useState(false)
   const [labelError, setLabelError] = useState('')
-  // A label photo chosen among the garment photos, moved to the label's own place (it can be put back).
-  const [movedLabel, setMovedLabel] = useState<Blob>()
+  // Label photos chosen among the garment photos, moved to the label's own place (they can be put back).
+  const [movedLabels, setMovedLabels] = useState<Blob[]>([])
   const analysisRequestId = useRef(0)
   const labelRequestId = useRef(0)
   // Analyses finish later; they must see what the user typed meanwhile, not the values when they started.
-  const typed = useRef({ brand, size, composition, suggested, category, subcategory, labelPhoto })
-  typed.current = { brand, size, composition, suggested, category, subcategory, labelPhoto }
+  const typed = useRef({ brand, size, composition, suggested, category, subcategory, labelPhotos })
+  typed.current = { brand, size, composition, suggested, category, subcategory, labelPhotos }
   // A saved garment keeps the use the user gave it; a new one follows the suggestion until the user changes it.
   const usageTouched = useRef(new Set<UsageField>(garment ? usageFields : []))
   // What the user chose (or a saved garment holds) is not replaced when photos are added, edited or removed: only
@@ -207,17 +209,17 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     setImageChanged(true)
     setAnalysisSuggestion(undefined)
     setAnalysisError('')
-    setMovedLabel(undefined)
+    setMovedLabels([])
     void analyzeImage(nextPhotos, new Set(validFiles))
   }
 
-  /** Puts a label photo moved by the analysis back among the garment photos, and leaves it there. */
+  /** Puts the label photos moved by the analysis back among the garment photos, and leaves them there. */
   function keepMovedLabelAsPhoto() {
-    if (!movedLabel) return
-    const photo = movedLabel
-    setMovedLabel(undefined)
-    if (labelPhoto === photo) removeLabelPhoto()
-    if (photos.length < maxPhotos) updatePhotos([...photos, photo])
+    if (!movedLabels.length) return
+    const moved = movedLabels
+    setMovedLabels([])
+    changeLabelPhotos(labelPhotos.filter((photo) => !moved.includes(photo)))
+    updatePhotos([...photos, ...moved].slice(0, maxPhotos))
   }
 
   function updatePhotos(nextPhotos: Blob[]) {
@@ -232,9 +234,9 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   }
 
   /**
-   * `fresh`: the photos just chosen. When the label has no photo yet and one of them reads like a label (as in
-   * «Varias prendas»: its composition, or label words with more text or a size), it is moved to the label's place
-   * and read there, and the rest are analysed again without it.
+   * `fresh`: the photos just chosen. Those that read like a label (as in «Varias prendas»: its composition, or label
+   * words with more text or a size) are moved to the label's place while it has room, and read there; the rest are
+   * analysed again without them.
    */
   async function analyzeImage(imagesToAnalyze: Blob[] = photos, fresh?: Set<Blob>) {
     // A cut-out still running belongs to the photos being replaced: it will never report back (its request is no
@@ -251,18 +253,16 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     try {
       const suggestion = await analyzeGarmentImage(imagesToAnalyze)
       if (requestId !== analysisRequestId.current) return
-      const labelIndex = fresh && !typed.current.labelPhoto
-        ? imagesToAnalyze.findIndex((image, index) => fresh.has(image) && isLabelPhoto(suggestion.textByPhoto?.[index] ?? []))
-        : -1
-      if (labelIndex >= 0) {
-        const label = imagesToAnalyze[labelIndex]!
-        const rest = imagesToAnalyze.filter((_, index) => index !== labelIndex)
+      const labels = fresh
+        ? imagesToAnalyze.filter((image, index) => fresh.has(image) && isLabelPhoto(suggestion.textByPhoto?.[index] ?? []))
+          .slice(0, maxLabelPhotos - typed.current.labelPhotos.length)
+        : []
+      if (labels.length) {
+        const rest = imagesToAnalyze.filter((image) => !labels.includes(image))
         setCutout(undefined)
         setPhotos(rest)
-        setLabelPhoto(label)
-        setLabelError('')
-        setMovedLabel(label)
-        void readLabel(label)
+        changeLabelPhotos([...typed.current.labelPhotos, ...labels])
+        setMovedLabels(labels)
         void analyzeImage(rest)
         return
       }
@@ -328,41 +328,53 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     }
   }
 
-  function selectLabelPhoto(file: File | undefined) {
+  /** Label photos added from the gallery or the camera, after those there are, up to maxLabelPhotos. */
+  function selectLabelPhotos(files: File[]) {
     setLabelError('')
-    if (!file) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size === 0 || file.size > MAX_PHOTO_BYTES) {
-      setLabelError(`La foto de la etiqueta debe ser JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
+    if (!files.length) return
+    const valid = files.filter((file) => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size > 0 && file.size <= MAX_PHOTO_BYTES)
+    const room = maxLabelPhotos - labelPhotos.length
+    if (!valid.length || room <= 0) {
+      setLabelError(valid.length ? `Caben ${maxLabelPhotos} fotos de la etiqueta. Quita alguna para añadir otra.` : `Las fotos de la etiqueta deben ser JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
       return
     }
-    setLabelPhoto(file)
-    setMovedLabel(undefined)
-    void readLabel(file)
+    setMovedLabels([])
+    changeLabelPhotos([...labelPhotos, ...valid.slice(0, room)])
+    // After changeLabelPhotos, which clears the message.
+    if (valid.length < files.length) setLabelError(`Solo se añaden fotos JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
+    else if (valid.length > room) setLabelError(`Caben ${maxLabelPhotos} fotos de la etiqueta: se han añadido las primeras.`)
   }
 
-  /** The label photo turned or cropped: it replaces the photo, and what it reads replaces brand, size and composition. */
-  function editLabelPhoto(edited: Blob) {
+  /** A label photo turned or cropped: it replaces that photo, and the label is read again. */
+  function editLabelPhoto(index: number, edited: Blob) {
+    setMovedLabels([])
+    changeLabelPhotos(labelPhotos.map((photo, photoIndex) => photoIndex === index ? edited : photo))
+  }
+
+  function removeLabelPhoto(index: number) {
+    setMovedLabels([])
+    changeLabelPhotos(labelPhotos.filter((_, photoIndex) => photoIndex !== index))
+  }
+
+  /** The label photos change: what all of them read together is the label (none left: nothing is read). */
+  function changeLabelPhotos(next: Blob[]) {
+    setLabelPhotos(next)
     setLabelError('')
-    setLabelPhoto(edited)
-    setMovedLabel(undefined)
-    void readLabel(edited)
-  }
-
-  function removeLabelPhoto() {
-    setMovedLabel(undefined)
+    if (next.length) {
+      void readLabel(next)
+      return
+    }
     labelRequestId.current += 1
-    setLabelPhoto(undefined)
     setLabelReading(undefined)
     setReadingLabel(false)
-    setLabelError('')
   }
 
-  async function readLabel(image: Blob) {
+  async function readLabel(images: Blob[]) {
     const requestId = ++labelRequestId.current
     setReadingLabel(true)
     setLabelReading(undefined)
     try {
-      const reading = await readGarmentLabel(image)
+      const reading = await readGarmentLabels(images)
       if (requestId !== labelRequestId.current) return
       setLabelReading(reading)
       // A new label photo is the latest word on what it shows: what it reads replaces brand, size and composition,
@@ -419,7 +431,8 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     try {
       // Stored photos are reduced (≤ 2048 px); photos already saved are not processed again.
       const [image, ...additionalImages] = (imageChanged ? await Promise.all(photos.map(reducePhoto)) : photos) as [Blob, ...Blob[]]
-      const labelImage = labelPhoto && labelPhoto !== stored?.labelImage ? await reducePhoto(labelPhoto) : labelPhoto
+      const storedLabels = [stored?.labelImage, ...(stored?.additionalLabelImages ?? [])]
+      const [labelImage, ...additionalLabelImages] = await Promise.all(labelPhotos.map((photo) => storedLabels.includes(photo) ? photo : reducePhoto(photo)))
       // The gallery shows the cut-out when there is one; its thumbnail and size come from it.
       const savedCutout = useCutout ? cutout : undefined
       const processedImage = imageChanged || savedCutout !== stored?.cutout || !garment || !stored?.thumbnail || !garment.width || !garment.height
@@ -459,6 +472,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
         image,
         ...(additionalImages.length ? { additionalImages } : {}),
         ...(labelImage ? { labelImage } : {}),
+        ...(additionalLabelImages.length ? { additionalLabelImages } : {}),
         ...(savedCutout ? { cutout: savedCutout } : {}),
         thumbnail: processedImage.thumbnail,
         width: processedImage.width,
@@ -515,17 +529,19 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => onSwitchToBatch([...photos, ...(labelPhoto ? [labelPhoto] : [])].filter((photo): photo is File => photo instanceof File))}
+                onClick={() => onSwitchToBatch([...photos, ...labelPhotos].filter((photo): photo is File => photo instanceof File))}
               >
                 Pasar a Varias prendas
               </button>
             </p>
           )}
-          {movedLabel && labelPhoto === movedLabel && (
+          {movedLabels.length > 0 && movedLabels.every((photo) => labelPhotos.includes(photo)) && (
             <p className="moved-label" role="status">
               <span>
                 {hasPhotos
-                  ? 'Una de las fotos es la etiqueta: la hemos pasado a su apartado y se lee de ahí.'
+                  ? movedLabels.length > 1
+                    ? 'Algunas de las fotos son de la etiqueta: las hemos pasado a su apartado y se leen de ahí.'
+                    : 'Una de las fotos es la etiqueta: la hemos pasado a su apartado y se lee de ahí.'
                   : 'Esta foto es la etiqueta: la hemos pasado a su apartado. Añade una foto de la prenda.'}
               </span>
               <button type="button" onClick={keepMovedLabelAsPhoto} disabled={saving}>Deshacer</button>
@@ -587,14 +603,15 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
             <div>
               <FormFold title="Etiqueta" summary={labelSummary || 'Marca, talla y composición'} defaultOpen>
                 <LabelPhotoSlot
-                  photo={labelPhoto}
+                  photos={labelPhotos}
+                  max={maxLabelPhotos}
                   reading={readingLabel}
                   read={Boolean(labelReading)}
                   findings={readFromLabel}
                   error={labelError}
                   disabled={saving}
-                  onSelect={selectLabelPhoto}
-                  onRead={(photo) => void readLabel(photo)}
+                  onSelect={selectLabelPhotos}
+                  onRead={() => void readLabel(labelPhotos)}
                   onEdit={editLabelPhoto}
                   onRemove={removeLabelPhoto}
                 />

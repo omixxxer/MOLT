@@ -7,6 +7,7 @@ import {
   explainNoOutfits,
   fitLabel,
   generateOutfitCandidates,
+  isAccessory,
   optionsForRole,
   outfitKey,
   scoreOutfit,
@@ -31,8 +32,18 @@ import WeatherBar from '../weather/WeatherBar'
 import type { OutfitData } from './outfitData'
 
 const occasions: OutfitTemplate[] = ['Diario', 'Arreglado', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas']
-const SLOT_LABELS: Record<GarmentRole, string> = { Capa: 'Capa', Top: 'Parte de arriba', Bottom: 'Parte de abajo', 'Una pieza': 'Vestido o mono', Calzado: 'Calzado', Accesorio: 'Accesorio', Joya: 'Joya' }
-const SLOT_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado', 'Accesorio', 'Joya']
+// Jewellery is an accessory here: one place where any number of them go (several earrings, a watch, a bag…).
+const SLOT_LABELS: Record<GarmentRole, string> = { Capa: 'Capa', Top: 'Parte de arriba', Bottom: 'Parte de abajo', 'Una pieza': 'Vestido o mono', Calzado: 'Calzado', Accesorio: 'Accesorio', Joya: 'Accesorio' }
+const SLOT_ORDER: GarmentRole[] = ['Capa', 'Top', 'Una pieza', 'Bottom', 'Calzado']
+
+/** What the picker is choosing: a role's place, or (accessories) one to add or the one touched, to replace. */
+interface Picking {
+  role: GarmentRole
+  replacing?: Garment
+}
+
+/** «Añadir» for what is optional (a layer, accessories), «Elegir» for what the outfit needs. */
+const slotAction = (role: GarmentRole) => `${role === 'Capa' || isAccessory({ role }) ? 'Añadir' : 'Elegir'} ${SLOT_LABELS[role].toLocaleLowerCase('es')}`
 
 /**
  * What the studio opens with: an idea chosen in the wizard, a saved outfit to change (`lock`: every piece pinned), a
@@ -87,7 +98,7 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
   const [board, setBoard] = useState<Garment[]>([])
   const [locked, setLocked] = useState<string[]>([])
   const [edited, setEdited] = useState(false)
-  const [picking, setPicking] = useState<GarmentRole>()
+  const [picking, setPicking] = useState<Picking>()
   const [tried, setTried] = useState<Record<string, string[]>>({})
   const shownKeys = useRef(new Set<string>())
   const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -198,23 +209,30 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
     setLocked((list) => list.includes(garment.id) ? list.filter((id) => id !== garment.id) : [...list, garment.id])
   }
 
+  /** Opens the picker for this garment's place (for an accessory, that very one). */
+  function choose(garment: Garment) {
+    setPicking({ role: garment.role, ...(isAccessory(garment) ? { replacing: garment } : {}) })
+  }
+
   /** The next garment for this place, the best not tried yet; it starts over when all have been seen. */
   function swap(garment: Garment) {
-    const alternatives = optionsForRole(garment.role, board, garments, context, options)
+    const replacing = isAccessory(garment) ? garment : undefined
+    const alternatives = optionsForRole(garment.role, board, garments, context, options, replacing)
     if (!alternatives.length) {
       setNotice(`No hay otra prenda disponible de este tipo. Añade más al armario.`)
       return
     }
-    const seen = tried[garment.role] ?? []
+    const place = SLOT_LABELS[garment.role]
+    const seen = tried[place] ?? []
     const next = alternatives.find((option) => !seen.includes(option.garment.id)) ?? alternatives[0]!
-    setTried({ ...tried, [garment.role]: seen.length >= alternatives.length ? [garment.id] : [...seen, garment.id] })
+    setTried({ ...tried, [place]: seen.length >= alternatives.length ? [garment.id] : [...seen, garment.id] })
     setNotice('')
-    setBoard(withGarment(board, next.garment))
+    setBoard(withGarment(board, next.garment, replacing))
     setEdited(true)
   }
 
   function pick(garment: Garment) {
-    const nextBoard = withGarment(board, garment)
+    const nextBoard = withGarment(board, garment, picking?.replacing)
     setBoard(nextBoard)
     setLocked((list) => [...list.filter((id) => nextBoard.some((item) => item.id === id)), garment.id])
     setEdited(true)
@@ -222,10 +240,9 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
     setNotice('')
   }
 
-  function removeFromBoard(role: GarmentRole) {
-    const leaving = board.find((garment) => garment.role === role)
-    setBoard(board.filter((garment) => garment.role !== role))
-    if (leaving) setLocked((list) => list.filter((id) => id !== leaving.id))
+  function removeFromBoard(leaving: Garment) {
+    setBoard(board.filter((garment) => garment.id !== leaving.id))
+    setLocked((list) => list.filter((id) => id !== leaving.id))
     setEdited(true)
     setPicking(undefined)
   }
@@ -349,16 +366,21 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
     if (next) showLook(next)
   }
 
-  const slots = SLOT_ORDER.flatMap<{ role: GarmentRole; garment?: Garment }>((role) => {
-    const garment = board.find((item) => item.role === role)
-    if (garment) return [{ role, garment }]
-    // An empty place is offered when it makes sense: a dress leaves no place for a top.
-    const onePiece = board.some((item) => item.role === 'Una pieza')
-    if (role === 'Una pieza') return []
-    if (onePiece && (role === 'Top' || role === 'Bottom')) return []
-    return garments.some((item) => item.role === role) ? [{ role }] : []
-  }).sort((a, b) => Number(!a.garment) - Number(!b.garment)) // What is worn first, what could be added after it.
-  const pickerCurrent = picking && board.find((garment) => garment.role === picking)
+  const slots = [
+    ...SLOT_ORDER.flatMap<{ role: GarmentRole; garment?: Garment }>((role) => {
+      const garment = board.find((item) => item.role === role)
+      if (garment) return [{ role, garment }]
+      // An empty place is offered when it makes sense: a dress leaves no place for a top.
+      const onePiece = board.some((item) => item.role === 'Una pieza')
+      if (role === 'Una pieza') return []
+      if (onePiece && (role === 'Top' || role === 'Bottom')) return []
+      return garments.some((item) => item.role === role) ? [{ role }] : []
+    }),
+    // Every accessory worn, and always room for one more.
+    ...board.filter(isAccessory).map((garment) => ({ role: garment.role, garment })),
+    ...(garments.some(isAccessory) ? [{ role: 'Accesorio' as GarmentRole }] : [])
+  ].sort((a, b) => Number(!a.garment) - Number(!b.garment)) // What is worn first, what could be added after it.
+  const pickerCurrent = picking && (picking.replacing ?? (isAccessory(picking) ? undefined : board.find((garment) => garment.role === picking.role)))
 
   return (
     <div className="studio">
@@ -386,7 +408,7 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
               {/* The outfit as it will look: a collage; touching a garment changes it. */}
               <OutfitCollage
                 garments={board}
-                onSelect={(garment) => setPicking(garment.role)}
+                onSelect={choose}
                 label={(garment) => `Elegir ${SLOT_LABELS[garment.role].toLocaleLowerCase('es')}: ahora, ${garmentLabel(garment)}`}
                 className="studio-collage"
               />
@@ -410,10 +432,10 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
           ) : (
           <ul className="studio-slots">
             {slots.map(({ role, garment }) => (
-              <li key={role} className={garment ? 'studio-slot' : 'studio-slot studio-slot-empty'}>
+              <li key={garment?.id ?? role} className={garment ? 'studio-slot' : 'studio-slot studio-slot-empty'}>
                 {garment ? (
                   <>
-                    <button type="button" className="studio-slot-photo" onClick={() => setPicking(role)} aria-label={`Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}: ahora, ${garmentLabel(garment)}`}>
+                    <button type="button" className="studio-slot-photo" onClick={() => choose(garment)} aria-label={`Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}: ahora, ${garmentLabel(garment)}`}>
                       <span className="garment-tile"><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /></span>
                     </button>
                     <span className="studio-slot-tools">
@@ -425,9 +447,9 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
                     <span className="studio-slot-name">{garmentLabel(garment)}</span>
                   </>
                 ) : (
-                  <button type="button" className="studio-slot-add" onClick={() => setPicking(role)}>
+                  <button type="button" className="studio-slot-add" onClick={() => setPicking({ role })}>
                     <HugeiconsIcon icon={Add01Icon} size={18} />
-                    {role === 'Capa' || role === 'Accesorio' || role === 'Joya' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
+                    {slotAction(role)}
                   </button>
                 )}
               </li>
@@ -438,9 +460,9 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
           {hasBase && slots.some(({ garment }) => !garment) && (
             <div className="studio-add-row">
               {slots.filter(({ garment }) => !garment).map(({ role }) => (
-                <button key={role} type="button" className="trip-add" onClick={() => setPicking(role)}>
+                <button key={role} type="button" className="trip-add" onClick={() => setPicking({ role })}>
                   <HugeiconsIcon icon={Add01Icon} size={13} />
-                  {role === 'Capa' || role === 'Accesorio' || role === 'Joya' ? `Añadir ${SLOT_LABELS[role].toLocaleLowerCase('es')}` : `Elegir ${SLOT_LABELS[role].toLocaleLowerCase('es')}`}
+                  {slotAction(role)}
                 </button>
               ))}
             </div>
@@ -518,13 +540,13 @@ export default function OutfitStudio({ garments, data, start, initialOccasion, d
       )}
       {picking && (
         <GarmentPicker
-          title={`Elige ${SLOT_LABELS[picking].toLocaleLowerCase('es')}`}
-          options={optionsForRole(picking, board, garments, context, options)}
-          unavailable={garments.filter((garment) => garment.role === picking && (garment.availability === 'laundry' || garment.availability === 'unavailable'))}
+          title={isAccessory(picking) && !picking.replacing ? 'Añade un accesorio' : `Elige ${SLOT_LABELS[picking.role].toLocaleLowerCase('es')}`}
+          options={optionsForRole(picking.role, board, garments, context, options, picking.replacing)}
+          unavailable={garments.filter((garment) => (isAccessory(picking) ? isAccessory(garment) : garment.role === picking.role) && (garment.availability === 'laundry' || garment.availability === 'unavailable'))}
           current={pickerCurrent}
-          canRemove={picking === 'Capa' || picking === 'Accesorio' || picking === 'Joya' || picking === 'Calzado'}
+          canRemove={picking.role === 'Capa' || picking.role === 'Calzado' || isAccessory(picking)}
           onPick={pick}
-          onRemove={() => removeFromBoard(picking)}
+          onRemove={() => { if (pickerCurrent) removeFromBoard(pickerCurrent) }}
           onAvailability={(garment, availability) => void changeAvailability(garment, availability)}
           onClose={() => setPicking(undefined)}
         />

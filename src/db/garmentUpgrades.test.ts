@@ -65,10 +65,38 @@ describe('database version 9', () => {
 
     const database = new WardrobeDatabase(NAME)
     await database.open()
-    expect(database.verno).toBe(9)
+    expect(database.verno).toBe(10)
     expect(await database.garments.get('reloj')).toMatchObject({ category: 'Joyería', role: 'Joya', code: 'REL-001' })
     expect(await database.garments.get('short')).toMatchObject({ subcategory: 'Pantalón corto', code: 'VAQ-001' })
     expect(await database.garments.get('largo')).toMatchObject({ subcategory: 'Vaqueros' })
+    database.close()
+  })
+})
+
+describe('database version 10', () => {
+  const NAME = 'molt-v10-test'
+  afterEach(async () => { await Dexie.delete(NAME) })
+
+  it('makes the colours of proposed names agree with the garment, and leaves names typed by the user', async () => {
+    const legacy = new Dexie(NAME)
+    legacy.version(9).stores({
+      garments: 'id, category, name, updatedAt, &code', outfits: 'id, createdAt, favorite, kind', preferences: 'id', trendPacks: 'id, version, publishedAt',
+      outfitFeedback: 'id, type, createdAt', garmentCodeCounters: 'prefix', trips: 'id, startDate', garmentPhotos: 'garmentId', garmentThumbnails: 'garmentId'
+    })
+    await legacy.open()
+    await legacy.table('garments').bulkPut([
+      garment({ id: 'sudadera', code: 'SUD-001', name: 'Sudadera blanco · Pull&Bear', width: 300, height: 900 }),
+      garment({ id: 'botas', code: 'BOT-001', name: 'Botas negro y gris', width: 300, height: 900 }),
+      garment({ id: 'mia', code: 'CAM-001', name: 'Mi camiseta de la suerte', width: 300, height: 900 })
+    ])
+    legacy.close()
+
+    const database = new WardrobeDatabase(NAME)
+    await database.open()
+    expect(database.verno).toBe(10)
+    expect(await database.garments.get('sudadera')).toMatchObject({ name: 'Sudadera blanca · Pull&Bear' })
+    expect(await database.garments.get('botas')).toMatchObject({ name: 'Botas negras y grises' })
+    expect(await database.garments.get('mia')).toMatchObject({ name: 'Mi camiseta de la suerte' })
     database.close()
   })
 })
