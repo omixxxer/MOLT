@@ -304,15 +304,18 @@ describe('OutfitGenerator', () => {
     await user.tab()
     await waitFor(async () => expect((await database.outfits.toArray())[0]?.name).toBe('Reunión'))
 
-    await user.click(screen.getByRole('button', { name: 'Cambiar' }))
+    // In front only «Me lo pongo hoy»; turned, the card shows its garments, with «Cambiar» and «Eliminar».
+    expect(within(card).queryByRole('button', { name: 'Cambiar Reunión' })).not.toBeInTheDocument()
+    const flip = await screen.findByRole('button', { name: 'Reunión: dar la vuelta para ver sus prendas' })
+    expect(flip).toHaveAttribute('aria-pressed', 'false')
+    await user.click(flip)
+    expect(flip).toHaveAttribute('aria-pressed', 'true')
+    for (const garment of shown) expect(within(flip).getByText(garment!)).toBeInTheDocument()
+    await user.click(within(flip).getByRole('button', { name: 'Cambiar Reunión' }))
     await waitFor(() => expect(onBoard().sort()).toEqual([...shown].sort()))
 
-    // The card's picture opens it too.
     await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
-    await user.click(await screen.findByRole('button', { name: 'Abrir Reunión' }))
-    await waitFor(() => expect(onBoard().sort()).toEqual([...shown].sort()))
-
-    await user.click(screen.getByRole('button', { name: 'Mis outfits' }))
+    await user.click(await screen.findByRole('button', { name: 'Reunión: dar la vuelta para ver sus prendas' }))
     await user.click(await screen.findByRole('button', { name: 'Eliminar Reunión' }))
     await user.click(await screen.findByRole('button', { name: 'Eliminar outfit' }))
     await waitFor(async () => expect(await database.outfits.count()).toBe(0))
@@ -329,7 +332,8 @@ describe('OutfitGenerator', () => {
 
     // «Cambiar» opens it, says so, and saving changes that same outfit.
     await user.click(screen.getByRole('button', { name: 'Ver Mis outfits' }))
-    await user.click(await screen.findByRole('button', { name: 'Cambiar' }))
+    await user.click(await screen.findByRole('button', { name: /dar la vuelta para ver sus prendas/ }))
+    await user.click(await screen.findByRole('button', { name: `Cambiar ${stored!.name}` }))
     expect(screen.getByRole('heading', { name: /Cambiar outfit/ })).toBeInTheDocument()
     expect(screen.getByText(/Cambiando/)).toHaveTextContent(stored!.name!)
     expect(screen.getByRole('button', { name: 'Guardado' })).toBeDisabled()

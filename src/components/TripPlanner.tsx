@@ -9,6 +9,7 @@ import { emptyOutfitData, loadOutfitData, type OutfitData } from './outfits/outf
 import TripCard from './trips/TripCard'
 import TripForm from './trips/TripForm'
 import TripView from './trips/TripView'
+import StarButton from './StarButton'
 
 interface TripPlannerProps {
   garments: Garment[]
@@ -83,9 +84,9 @@ export default function TripPlanner({ garments, onAvailabilityChange, onAddGarme
       <div className="trip-planner-head">
         <h1 id="trip-title">Maleta<span>.</span></h1>
         {trips && trips.length > 0 && openId === undefined && garments.length > 0 && (
-          <button type="button" className="button button-dark" onClick={() => show('new')}>
+          <StarButton onClick={() => show('new')}>
             <HugeiconsIcon icon={Add01Icon} size={15} />Nuevo viaje
-          </button>
+          </StarButton>
         )}
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}

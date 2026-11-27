@@ -11,6 +11,7 @@ import { ChipsField, FormFold } from './garmentForm/fields'
 import { emptyOutfitData, emptyPreferences, loadOutfitData, type OutfitData } from './outfits/outfitData'
 import OutfitWizard from './outfits/OutfitWizard'
 import SavedOutfits from './outfits/SavedOutfits'
+import StarButton from './StarButton'
 
 interface OutfitGeneratorProps {
   garments: Garment[]
@@ -94,7 +95,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange, onAddG
       <div className="outfit-heading">
         <h1 id="outfits-title">{view === 'studio' ? (editing ? 'Cambiar outfit' : 'Crear outfit') : 'Mis outfits'}<span>.</span></h1>
         {garments.length > 0 && view === 'saved' && (
-          <button type="button" className="button button-dark outfit-create" onClick={createOutfit}><HugeiconsIcon icon={Add01Icon} size={15} />Crear outfit</button>
+          <StarButton className="outfit-create" onClick={createOutfit}><HugeiconsIcon icon={Add01Icon} size={15} />Crear outfit</StarButton>
         )}
       </div>
       {garments.length > 0 && view === 'studio' && (
