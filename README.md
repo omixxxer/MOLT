@@ -362,8 +362,15 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 - [x] Formulario: la subcategoría se abre con todas las opciones aunque ya tenga una; lo elegido a mano no se pierde al añadir o editar fotos; varias fotos de etiqueta con el botón de galería más grande.
 - [x] Nombres con el color concordando en género y número, con migración de los guardados.
 - [x] Camisetas básicas en las propuestas de outfits, en su proporción.
-- [x] Tocar un outfit de «Mis outfits» lo abre; accesorios y joyas en un solo sitio «Accesorio», sin límite de piezas.
-- [x] Outfits por capas: una camiseta debajo de un jersey, una sudadera o una camisa, en el motor, el collage, el estudio y la Maleta.
+- [x] Accesorios y joyas en un solo sitio «Accesorio», sin límite de piezas, en el estudio y en la Maleta.
+- [x] Outfits por capas: una camiseta debajo de un jersey, una sudadera, una camisa o una chaqueta de parte superior, en el motor, el collage, el estudio y la Maleta; también en otoño e invierno sin previsión.
+- [x] «Chaqueta» también en Parte superior, que en los outfits es la prenda de arriba y nunca la capa.
+- [x] «Analizar de nuevo» actualiza el nombre de la prenda si era el propuesto.
+- [x] Paneles lisos para todo el texto sobre el fondo animado, en todas las pantallas.
+- [x] Inicio: «Para hoy» sin la lista de prendas, animaciones en los botones principales, y «Te falta» y sus botones en lila.
+- [x] Componentes de React Bits: Star Border en el botón principal de cada pantalla, Pulse Heart en «Guardar» del estudio y Flip Card en «Mis outfits».
+- [x] «Mis outfits» rediseñado: la Flip Card es la tarjeta (se inclina con el ratón y, girada, enseña sus prendas con «Cambiar» y «Eliminar»), y debajo el nombre con «Me lo pongo hoy» como un botón pequeño.
+- [x] Nombres largos de outfit enteros, en varias líneas, en «Mis outfits».
 - [ ] Más capas: camisa debajo de un jersey, o tres capas.
 - [ ] Collages más limpios: lo que más los afea son los restos de colcha de algunos recortes y las prendas sin recorte, que se ven como un rectángulo con su fondo y tapan lo que tienen debajo (6 de 41 en el armario de desarrollo).
 
@@ -372,7 +379,6 @@ Cada paso de los modelos (cargar o una pasada) se abandona a los 2 minutos ([`ai
 Propuestas comentadas y aún sin hacer, de más a menos prioritarias:
 - [ ] **Traer la foto de una tienda.** Un navegador dentro de la app no es viable (las tiendas no se dejan mostrar dentro de otra web, una página no puede capturar lo que hay dentro, y pasar por un servidor rompería que todo quede en el dispositivo). En su lugar: pegar una imagen copiada (Ctrl+V), arrastrarla desde otra pestaña y «Compartir → Molt» en el móvil con la app instalada (Web Share Target). Las fotos de tienda deberían marcarse para que nunca entren en «Exportar datos de entrenamiento».
 - [ ] **Cancelar el recorte de una foto que ya no está** (quitada o editada): ahora se descarta su resultado pero sigue usando la CPU, y el recorte de la foto nueva puede tardar 30–60 s.
-- [ ] **Tarjetas de outfit animadas en escritorio:** una inclinación suave (*tilt*) al pasar el ratón por los collages de «Mis outfits», solo con ratón y respetando «reducir movimiento».
 - [ ] **Colores favoritos solo de la paleta:** las preferencias aceptan cualquier texto (en el armario de desarrollo había una «O»), que no coincide con ningún color y resta en todas las propuestas.
 - [ ] **Probar «Desde un look» con una foto real de cuerpo entero** tras los últimos cambios (solo revisado en el código) y las fotos de etiqueta con etiquetas reales.
 
