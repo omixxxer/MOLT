@@ -1669,3 +1669,9 @@ button.outfit-collage-piece:focus-visible { outline: 2px solid var(--lavender); 
   .saved-back-actions .button { min-height: 34px; }
 }
 @media (prefers-reduced-motion: reduce) { .saved-wear { transition: none; } .saved-wear:hover:not(:disabled) { transform: none; } }
+
+/* «Mis outfits»: a long name reads whole. The name wraps (its field grows with it, SavedOutfits.tsx), breaks a long word
+   rather than overflowing, and the «Hoy» button stays at the top beside it; on the back the title wraps too. */
+.saved-name { display: block; height: auto; overflow: hidden; resize: none; line-height: 1.2; overflow-wrap: anywhere; field-sizing: content; }
+.saved-back-title { overflow-wrap: anywhere; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.saved-foot .saved-meta { overflow-wrap: anywhere; }

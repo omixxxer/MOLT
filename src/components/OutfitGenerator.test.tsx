@@ -300,9 +300,11 @@ describe('OutfitGenerator', () => {
     const title = within(card).getByRole('textbox', { name: 'Nombre del outfit' })
     expect(title).toHaveValue('Oficina')
     await user.clear(title)
-    await user.type(title, 'Reunión')
-    await user.tab()
+    // Enter confirms the name, without a line break in it (the field wraps a long name onto more lines).
+    await user.type(title, 'Reunión{Enter}')
+    expect(title).not.toHaveFocus()
     await waitFor(async () => expect((await database.outfits.toArray())[0]?.name).toBe('Reunión'))
+    expect(title).toHaveValue('Reunión')
 
     // In front only «Me lo pongo hoy»; turned, the card shows its garments, with «Cambiar» and «Eliminar».
     expect(within(card).queryByRole('button', { name: 'Cambiar Reunión' })).not.toBeInTheDocument()
