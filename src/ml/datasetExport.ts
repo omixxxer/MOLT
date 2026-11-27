@@ -69,7 +69,11 @@ export function toTrainingRecord(garment: Garment, photos: Blob[]): TrainingReco
   }
 }
 
-/** Photos are read one garment at a time through loadPhotos; a garment whose photos are missing is left out. */
+/**
+ * Photos are read one garment at a time through loadPhotos; a garment whose photos are missing is left out, and so is
+ * one whose photos come from a shop or the internet (webPhoto): their licence is not the user's, so they never train
+ * the model (the model's data must allow commercial use).
+ */
 export async function createTrainingExport(
   garments: Garment[],
   loadPhotos: (garmentId: string) => Promise<GarmentPhotos | undefined>,
@@ -79,6 +83,7 @@ export async function createTrainingExport(
   const records: TrainingRecord[] = []
   const images: ZipEntry[] = []
   for (const garment of garments) {
+    if (garment.webPhoto) continue
     const stored = await loadPhotos(garment.id)
     if (!stored) continue
     const photos = photosOf(stored)

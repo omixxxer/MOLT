@@ -42,7 +42,15 @@ export default defineConfig({
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ],
-        lang: 'es'
+        lang: 'es',
+        // «Compartir → Molt» from the gallery, a shop's app or the browser, with the app installed (Android, ChromeOS):
+        // src/sw.ts receives the photos (src/sharedPhotos.ts). A shared link without a photo is told to share the photo.
+        share_target: {
+          action: '/compartir',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: { title: 'titulo', text: 'texto', url: 'enlace', files: [{ name: 'fotos', accept: ['image/jpeg', 'image/png', 'image/webp', 'image/*'] }] }
+        }
       }
     })
   ],

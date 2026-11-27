@@ -9,7 +9,8 @@ const props = {
   onAdd: vi.fn(),
   cuttingOut: false,
   canToggleCutout: false,
-  onToggleCutout: vi.fn()
+  onToggleCutout: vi.fn(),
+  onIntakeError: vi.fn()
 }
 
 describe('PhotoCollection', () => {

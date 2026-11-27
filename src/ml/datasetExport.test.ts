@@ -121,6 +121,16 @@ describe('training export', () => {
     expect(new TextDecoder().decode(entries[3]!.data)).toBe('detalle')
   })
 
+  it('leaves out the garments whose photos come from a shop or the internet', async () => {
+    const loaded: string[] = []
+    const archive = await createTrainingExport([makeGarment(), makeGarment({ id: 'tienda', webPhoto: true })], async (id) => { loaded.push(id); return stored }, new Date('2026-11-28T00:00:00.000Z'))
+    const entries = readStoredZip(await readBlob(archive))
+    expect(entries.some((entry) => entry.name.includes('tienda'))).toBe(false)
+    expect(JSON.parse(new TextDecoder().decode(entries[0]!.data))).toMatchObject({ garments: 1 })
+    // Its photos are not even read.
+    expect(loaded).toEqual(['g1'])
+  })
+
   it('computes standard CRC-32', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926)
   })

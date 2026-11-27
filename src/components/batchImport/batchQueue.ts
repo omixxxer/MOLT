@@ -27,6 +27,8 @@ export interface BatchPhoto {
   suggestion?: ClothingAnalysisSuggestion
   lines: TextLine[]
   label: boolean
+  /** Pasted, dragged from a web page or shared: a shop's photo, most likely. Its garment is saved as such. */
+  web?: boolean
 }
 
 export interface BatchGarment extends PhotoGroup {
@@ -120,10 +122,10 @@ export function reviewReasons(garment: BatchGarment): string[] {
   return reasons
 }
 
-export async function addPhotos(files: File[]) {
+export async function addPhotos(files: File[], web = false) {
   const photos = await Promise.all(files.map(async (file): Promise<BatchPhoto> => {
     const time = await captureTime(file)
-    return { id: crypto.randomUUID(), file, ...(time !== undefined ? { time } : {}), status: 'waiting', lines: [], label: false }
+    return { id: crypto.randomUUID(), file, ...(time !== undefined ? { time } : {}), status: 'waiting', lines: [], label: false, ...(web ? { web } : {}) }
   }))
   set({ photos: [...state.photos, ...photos] })
   jobs.push(...photos.map((photo): Job => ({ kind: 'analyze', photoId: photo.id })))
@@ -460,6 +462,8 @@ export async function saveBatch(onProgress: (saved: number) => void): Promise<nu
       suggestedAttributes: ['category', 'subcategory', 'colors', 'seasons', 'dressLevels', 'styles',
         ...(suggestion.pattern ? ['pattern'] : []), ...(brand ? ['brand'] : []), ...(size ? ['size'] : []), ...(composition ? ['composition'] : [])],
       analysis: analysisRecord({ suggestion, labelReading: reading, labelSize: size, imageChanged: true, garment: undefined, values }),
+      // A photo from a shop or the internet: never used to train the model (datasetExport.ts).
+      ...(garment.photoIds.some((id) => photoById(id)?.web) ? { webPhoto: true } : {}),
       createdAt: now,
       updatedAt: now
     })

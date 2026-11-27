@@ -3,6 +3,7 @@ import { ExpirationPlugin } from 'workbox-expiration'
 import { addPlugins, cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
 import { CacheFirst } from 'workbox-strategies'
+import { keepSharedPhotos, SHARE_ACTION, SHARED_PARAM } from './sharedPhotos'
 
 // The app's service worker (offline use). Besides precaching the app, it adds the cross-origin isolation headers
 // to every response it serves from its caches: without them a cached page or script loses the isolation the
@@ -42,4 +43,15 @@ registerRoute(
     cacheName: 'molt-inference-runtime',
     plugins: [new ExpirationPlugin({ maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 365 }), isolation]
   })
+)
+
+// «Compartir → Molt» (manifest share_target): the system posts the shared photos here. They are kept in a cache and the
+// app opens to take them (src/sharedPhotos.ts); 303, so the app's page is loaded with GET.
+registerRoute(
+  ({ url }) => url.pathname === SHARE_ACTION,
+  async ({ request }) => {
+    const count = await keepSharedPhotos(await request.formData()).catch(() => 0)
+    return Response.redirect(`/?${SHARED_PARAM}=${count}`, 303)
+  },
+  'POST'
 )

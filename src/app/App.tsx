@@ -16,6 +16,7 @@ import { DemoAddNotice, DemoBanner, DemoButton } from '../components/demo/DemoMo
 import { isDemo, takeAfterDemo, takeTourRequest } from '../demo/demoMode'
 import type { TourPage } from '../components/demo/GuidedTour'
 import StarButton from '../components/StarButton'
+import { SHARED_PARAM, takeSharedPhotos } from '../sharedPhotos'
 
 type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
 
@@ -100,6 +101,26 @@ function App() {
   const [reducedMotion, setReducedMotion] = useState(false)
   const [lookMessage, setLookMessage] = useState('')
   const [outfitAround, setOutfitAround] = useState<{ id: string; nonce: number }>()
+  // Photos shared to Molt from another app (src/sharedPhotos.ts): one opens «Una prenda» with it, several «Varias
+  // prendas»; a shared link with no photo is told to share the photo. Taken once, and the address is cleaned.
+  const [sharedPhotos, setSharedPhotos] = useState<File[]>()
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has(SHARED_PARAM)) return
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+    void takeSharedPhotos().then((files) => {
+      if (files.length === 1) {
+        setSharedPhotos(files)
+        setPage('add')
+      } else if (files.length > 1) {
+        void import('../components/batchImport/batchQueue').then(({ addPhotos }) => addPhotos(files, true))
+        setPage('batch')
+      } else {
+        setPage('wardrobe')
+        setLookMessage('No ha llegado ninguna foto. Desde la tienda o la galería, comparte la imagen (no el enlace) con Molt.')
+      }
+    })
+  }, [])
   // Used once: coming back to Outfits later does not start around that garment again.
   useEffect(() => {
     if (page !== 'outfits') setOutfitAround(undefined)
@@ -352,6 +373,7 @@ function App() {
                   onSave={createGarment}
                   onCancel={() => setPage('wardrobe')}
                   submitLabel="Guardar prenda"
+                  sharedPhotos={sharedPhotos}
                   onSwitchToBatch={(files) => {
                     // Loaded here, not with the app: the batch brings the analyser.
                     void import('../components/batchImport/batchQueue').then(({ addPhotos }) => addPhotos(files))
