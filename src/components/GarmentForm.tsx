@@ -17,7 +17,7 @@ import { suggestUsage } from '../ai/usageRules'
 import { createThumbnail, reducePhoto } from '../db/imageProcessing'
 import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
 import { isStorageFull, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
-import { taxonomy } from '../ml/taxonomy'
+import { subcategoryOptions, taxonomy } from '../ml/taxonomy'
 import {
   dressLevels,
   garmentCategories,
@@ -33,7 +33,7 @@ import ColorPalette from './ColorPalette'
 import AnalysisCard from './garmentForm/AnalysisCard'
 import { analysisRecord } from './garmentForm/analysisRecord'
 import { ChipsField, FormFold, FieldHeading, FormSection, SuggestedBadge, SuggestInput } from './garmentForm/fields'
-import { createSuggestedGarmentName } from './garmentForm/garmentName'
+import { createSuggestedGarmentName, isProposedName } from './garmentForm/garmentName'
 import LabelPhotoSlot, { type LabelFinding } from './garmentForm/LabelPhotoSlot'
 import PhotoCollection from './garmentForm/PhotoCollection'
 
@@ -494,7 +494,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   }
 
   const categoryId = taxonomy.categories.find((entry) => entry.label === category)?.id
-  const subcategoryOptions = taxonomy.subcategories.filter((entry) => entry.category === categoryId).map((entry) => entry.label)
+  const typeOptions = subcategoryOptions(categoryId)
   // A pattern typed in an earlier version of the form stays selectable.
   const patterns = pattern && !patternOptions.includes(pattern) ? [...patternOptions, pattern] : patternOptions
   const brandRead = labelReading?.brand ?? analysisSuggestion?.brand
@@ -566,8 +566,10 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
                 edited('subcategory')
               }}
               onAnalyze={() => {
-                // Asked for on purpose: its suggestion replaces type, colours and pattern, whoever chose them.
+                // Asked for on purpose: its suggestion replaces type, colours and pattern, whoever chose them, and the
+                // name follows it unless the user wrote one of their own.
                 keptByUser.current.clear()
+                if (isProposedName(name, taxonomy.subcategories.map((entry) => entry.label))) setNameManuallyEdited(false)
                 void analyzeImage()
               }}
             />
@@ -585,7 +587,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
               </div>
               <div className="form-field">
                 <FieldHeading htmlFor={`${fieldId}-subcategory`} label="Subcategoría" suggested={suggested.has('subcategory')} />
-                <SuggestInput id={`${fieldId}-subcategory`} value={subcategory} onChange={(value) => { setSubcategory(value); edited('subcategory') }} options={subcategoryOptions} placeholder="p. ej. Camiseta" maxLength={50} />
+                <SuggestInput id={`${fieldId}-subcategory`} value={subcategory} onChange={(value) => { setSubcategory(value); edited('subcategory') }} options={typeOptions} placeholder="p. ej. Camiseta" maxLength={50} />
               </div>
               <ChipsField label="Colores" values={colors} onChange={(values) => { setColors(values); edited('colors') }} options={colorOptions} placeholder="Elige abajo o escribe uno" suggested={suggested.has('colors')} swatch={colorSwatch} />
               <div className="form-field full">

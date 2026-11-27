@@ -15,6 +15,7 @@ import FirstSteps, { type FirstStep } from './FirstSteps'
 import Welcome, { type AddWay } from './Welcome'
 import { isDemo } from '../../demo/demoMode'
 import { DemoButton } from '../demo/DemoMode'
+import StarButton from '../StarButton'
 
 /** «Primeros pasos» hidden by hand (a convenience of this browser only: without storage it is offered again). */
 const FIRST_STEPS_KEY = 'molt-first-steps-hidden'
@@ -162,20 +163,19 @@ export default function HomeScreen({ garments, loading, onNavigate, onOpenGarmen
             <h2>{wornToday ? 'Hoy llevas' : 'Para hoy'}</h2>
             {todaysGarments.length > 0 ? (
               <>
+                {/* The outfit as a collage, with its name and what to do: the garments are in the picture, not listed. */}
                 <div className="home-today-look">
                   <OutfitCollage garments={todaysGarments} />
                   <div className="home-today-info">
                     <p className="home-today-name">{todaysName}</p>
-                    <ul>
-                      {todaysGarments.map((garment) => (
-                        <li key={garment.id}><button type="button" className="studio-link" onClick={() => onOpenGarment(garment)}>{garmentLabel(garment)}</button></li>
-                      ))}
-                    </ul>
+                    {!wornToday && proposal && proposal.candidate.explanation.length > 0 && (
+                      <p className="home-today-why">{proposal.candidate.explanation.slice(0, 2).join(' · ')}</p>
+                    )}
+                    <div className="outfit-actions home-actions">
+                      {!wornToday && <StarButton onClick={() => void wearProposal()}>Me lo pongo hoy</StarButton>}
+                      <button type="button" className="button button-outline" onClick={() => onNavigate('outfits')}>{wornToday ? 'Crear otro' : 'Ver y ajustar'}</button>
+                    </div>
                   </div>
-                </div>
-                <div className="outfit-actions">
-                  {!wornToday && <button type="button" className="button button-dark" onClick={() => void wearProposal()}>Me lo pongo hoy</button>}
-                  <button type="button" className="button button-outline" onClick={() => onNavigate('outfits')}>{wornToday ? 'Crear otro' : 'Ver y ajustar'}</button>
                 </div>
               </>
             ) : history && (

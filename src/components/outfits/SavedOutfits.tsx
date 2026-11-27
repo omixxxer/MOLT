@@ -1,14 +1,23 @@
 import { useState } from 'react'
-import { Delete02Icon } from '@hugeicons/core-free-icons'
+import { Tick02Icon, TShirtIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { database } from '../../db/database'
 import { createOutfitFeedback } from '../../outfits/outfitGenerator'
 import type { Garment, Outfit } from '../../types/domain'
 import { askConfirm } from '../confirmDialog'
+import { FlipCard } from './reactBitsOutfits'
+import { GarmentThumbnail } from '../GarmentPhoto'
+import { garmentLabel } from '../OutfitBoard'
 import OutfitCollage from './OutfitCollage'
 import type { OutfitData } from './outfitData'
 
 type Filter = 'all' | 'favorites' | 'worn'
+
+/** The card turns on any press: a button on its back keeps its own pointer and keys, so it acts instead. */
+const keepPress = {
+  onPointerDown: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+  onKeyDown: (event: { stopPropagation: () => void }) => event.stopPropagation()
+}
 
 const FILTERS: Array<[Filter, string]> = [['all', 'Todos'], ['favorites', 'Guardados'], ['worn', 'Usados']]
 
@@ -97,24 +106,73 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen, onCrea
           const outfitGarments = outfit.garmentIds.map((id) => garments.find((garment) => garment.id === id)).filter((garment): garment is Garment => Boolean(garment))
           const count = wearings(outfit)
           const title = outfit.name || outfit.occasion
+          const missing = outfit.garmentIds.length - outfitGarments.length
+          const wornToday = Boolean(outfit.wornAt) && sameDay(new Date(outfit.wornAt!), new Date())
           return (
-            <article className="outfit-card saved-card" key={outfit.id}>
-              {/* The picture opens the outfit, as one expects of a card; «Cambiar» says the same in words. */}
-              <button type="button" className="saved-art" onClick={() => onOpen(outfit)} aria-label={`Abrir ${title}`} title="Abrir el outfit">
-                {outfitGarments.length > 0 && <OutfitCollage garments={outfitGarments} />}
-                <span className="saved-origin" data-kind={outfit.kind}>{outfit.kind === 'manual' ? 'Creado por ti' : 'Idea de Molt'}</span>
-              </button>
-              <input className="saved-name" aria-label="Nombre del outfit" defaultValue={title} key={title} onBlur={(event) => rename(outfit, event.target.value === outfit.occasion ? '' : event.target.value)} maxLength={60} />
-              <p className="saved-meta">
-                {outfit.occasion} · {outfit.wornAt ? `puesto ${daysAgo(outfit.wornAt)}${count > 1 ? ` · ${count} veces` : ''}` : `guardado ${daysAgo(outfit.createdAt)}`}
-              </p>
-              {outfitGarments.length < outfit.garmentIds.length && <p className="outfit-explanation">Algunas prendas de este outfit ya no están en el armario.</p>}
-              <div className="outfit-actions">
-                <button type="button" className="button button-dark" onClick={() => void wear(outfit)} disabled={Boolean(outfit.wornAt) && sameDay(new Date(outfit.wornAt!), new Date())}>
-                  {outfit.wornAt && sameDay(new Date(outfit.wornAt), new Date()) ? 'Puesto hoy' : 'Me lo pongo hoy'}
+            <article className="saved-card" key={outfit.id}>
+              {/* React Bits' FlipCard is the card itself: the collage in front; touched (or dragged sideways) it turns to
+                  show its garments, with «Cambiar» and «Eliminar». Under it, the name, when it was worn and what to do today. */}
+              <FlipCard
+                className="saved-flip"
+                ariaLabel={`${title}: dar la vuelta para ver sus prendas`}
+                background="#FFFFFF"
+                color="#2D2838"
+                radius={16}
+                tiltMax={7}
+                glareOpacity={0.14}
+                hoverScale={1.015}
+                shadowColor="#2D2838"
+                shadowOpacity={0.18}
+                front={(
+                  <div className="saved-art">
+                    {outfitGarments.length > 0 && <OutfitCollage garments={outfitGarments} />}
+                    <span className="saved-tags">
+                      <span className="saved-origin" data-kind={outfit.kind}>{outfit.kind === 'manual' ? 'Creado por ti' : 'Idea de Molt'}</span>
+                      {missing > 0 && <span className="saved-missing" title="Algunas prendas de este outfit ya no están en el armario">{missing === 1 ? 'Falta 1 prenda' : `Faltan ${missing} prendas`}</span>}
+                    </span>
+                  </div>
+                )}
+                back={(
+                  <div className="saved-back">
+                    <p className="saved-back-title">{title}</p>
+                    <ul className="saved-back-list">
+                      {outfitGarments.map((garment) => (
+                        <li key={garment.id}>
+                          <span className="garment-tile"><GarmentThumbnail garment={garment} alt="" /></span>
+                          <span>{garmentLabel(garment)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="saved-back-actions">
+                      <button type="button" className="button button-dark" {...keepPress} onClick={(event) => { event.stopPropagation(); onOpen(outfit) }} aria-label={`Cambiar ${title}`}>
+                        Cambiar
+                      </button>
+                      <button type="button" className="saved-remove" {...keepPress} onClick={(event) => { event.stopPropagation(); void remove(outfit) }} aria-label={`Eliminar ${title}`}>
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              />
+              {/* Name and when, with «Me lo pongo hoy» as a small button beside them. */}
+              <div className="saved-foot">
+                <div className="saved-foot-text">
+                  <input className="saved-name" aria-label="Nombre del outfit" defaultValue={title} key={title} onBlur={(event) => rename(outfit, event.target.value === outfit.occasion ? '' : event.target.value)} maxLength={60} />
+                  <p className="saved-meta">
+                    {outfit.occasion} · {outfit.wornAt ? `puesto ${daysAgo(outfit.wornAt)}${count > 1 ? ` · ${count} veces` : ''}` : `guardado ${daysAgo(outfit.createdAt)}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="saved-wear"
+                  onClick={() => void wear(outfit)}
+                  disabled={wornToday}
+                  aria-label={wornToday ? 'Puesto hoy' : 'Me lo pongo hoy'}
+                  title={wornToday ? 'Puesto hoy' : 'Me lo pongo hoy'}
+                >
+                  <HugeiconsIcon icon={wornToday ? Tick02Icon : TShirtIcon} size={16} />
+                  <span>Hoy</span>
                 </button>
-                <button type="button" className="button button-outline" onClick={() => onOpen(outfit)}>Cambiar</button>
-                <button type="button" className="icon-button outfit-remove" onClick={() => void remove(outfit)} aria-label={`Eliminar ${title}`} title="Eliminar"><HugeiconsIcon icon={Delete02Icon} size={16} /></button>
               </div>
             </article>
           )

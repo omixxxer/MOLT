@@ -132,6 +132,54 @@ function subcategoryId(garment: Garment) {
   return id
 }
 
+// Tops in layers: a T-shirt (or a top) under a jumper, a sweatshirt or an open shirt. The outfit stays a list of
+// garments; which top is under comes from their types.
+/** From this temperature down, a T-shirt under a jumper is proposed even if it adds a little too much warmth. */
+const COLD_FOR_LAYERS = 12
+/** How much warmth score a T-shirt underneath may cost in that weather: about 0.7 units of warmth too many. */
+const LAYERING_COST = 12
+
+/**
+ * Weather for layers: 12 °C or less, or autumn and winter when there is no forecast (autumn dresses for 15 °C, but
+ * its mornings and evenings are cool, and a T-shirt under a sweatshirt is how it is worn).
+ */
+function layeringWeather(context: OutfitContext) {
+  if (context.occasion === 'Frío y capas') return true
+  if (context.temperatureCelsius === undefined && (context.season === 'Otoño' || context.season === 'Invierno')) return true
+  const temperature = dressingTemperature(context)
+  return temperature !== undefined && temperature <= COLD_FOR_LAYERS
+}
+const UNDER_TOPS = new Set(['camiseta', 'camiseta-manga-larga', 'camiseta-tirantes', 'top'])
+// A jacket worn as a top («Parte superior · Chaqueta») goes over a T-shirt too.
+const OVER_TOPS = new Set(['jersey', 'sudadera', 'sudadera-capucha', 'camisa', 'chaqueta'])
+
+/** Layers that are jackets themselves: none of them goes over a jacket worn as a top. */
+const JACKET_LAYERS = new Set(['chaqueta', 'blazer', 'cardigan', 'chaleco'])
+
+/** A jacket worn as a top («Parte superior · Chaqueta»): a top for the outfit, never its coat. */
+export function isJacketTop(garment: Garment): boolean {
+  return garment.role === 'Top' && subcategoryId(garment) === 'chaqueta'
+}
+
+/** A top that can be worn under another (a T-shirt). */
+export function goesUnder(garment: Garment): boolean {
+  return garment.role === 'Top' && UNDER_TOPS.has(subcategoryId(garment) ?? '')
+}
+
+/** A top that can go over a T-shirt (a jumper, a sweatshirt, a shirt). */
+export function goesOver(garment: Garment): boolean {
+  return garment.role === 'Top' && OVER_TOPS.has(subcategoryId(garment) ?? '')
+}
+
+/** The tops of an outfit: the one seen (`outer`) and, when there is one, the T-shirt under it. */
+export function topLayers(garments: Garment[]): { outer?: Garment; under?: Garment } {
+  const tops = garments.filter((garment) => garment.role === 'Top')
+  if (tops.length < 2) return { outer: tops[0] }
+  const under = tops.find(goesUnder)
+  const outer = tops.find((top) => top !== under && goesOver(top))
+  return outer && under ? { outer, under } : { outer: tops[0] }
+}
+
 function warmth(garment: Garment) {
   const base = WARMTH[subcategoryId(garment) ?? ''] ?? WARMTH_BY_ROLE[garment.role]
   const fibres = garment.composition ?? ''
@@ -158,14 +206,27 @@ function hasRain(context: OutfitContext) {
 /** How warm the outfit is to wear: on a day that cools down a layer spends most of the day in the hand. */
 function wornWarmth(garments: Garment[], context: OutfitContext) {
   const carried = coolsDown(context) ? 0.3 : 1
-  return garments.reduce((sum, garment) => sum + warmth(garment) * (garment.role === 'Capa' ? carried : 1), 0)
+  // A T-shirt under a jumper is a thin layer, covered: half of what it warms on its own.
+  const under = topLayers(garments).under
+  return garments.reduce((sum, garment) => sum + warmth(garment) * (garment.role === 'Capa' ? carried : garment === under ? 0.5 : 1), 0)
+}
+
+/**
+ * How much warmer (positive) or colder than needed the outfit is. In weather for layers, a T-shirt under a jumper is
+ * how it is worn, not too much: it adds what is missing and never makes the outfit too warm.
+ */
+function warmthDifference(garments: Garment[], context: OutfitContext, temperature: number) {
+  const difference = wornWarmth(garments, context) - warmthNeeded(temperature)
+  const under = topLayers(garments).under
+  if (!under || difference <= 0 || !layeringWeather(context)) return difference
+  return Math.max(0, difference - warmth(under) * 0.5)
 }
 
 function thermalScore(garments: Garment[], context: OutfitContext) {
   const temperature = dressingTemperature(context)
   let score = 72
   if (temperature !== undefined) {
-    const difference = wornWarmth(garments, context) - warmthNeeded(temperature)
+    const difference = warmthDifference(garments, context, temperature)
     // Being cold is worse than being warm: a layer can come off. Warmth that is no more than what a layer adds (a
     // jacket over a T-shirt) is the lightest case: take the jacket off and it fits.
     const removable = Math.max(0, ...garments.filter((garment) => garment.role === 'Capa').map(warmth))
@@ -454,7 +515,7 @@ function climateNotes(garments: Garment[], context: OutfitContext, thermal: numb
   const at = temperature !== undefined ? ` a ${temperature} °C` : ''
   const target = dressingTemperature(context)
   if (target !== undefined) {
-    const difference = wornWarmth(garments, context) - warmthNeeded(target)
+    const difference = warmthDifference(garments, context, target)
     if (difference > 1.5) warnings.push(`Puede darte calor${at}`)
     else if (difference < -1.5) warnings.push(`Puede darte frío${at}`)
     else if (temperature !== undefined && thermal >= 70) reasons.push(`Bien para ${temperature} °C`)
@@ -475,6 +536,7 @@ function climateNotes(garments: Garment[], context: OutfitContext, thermal: numb
 export function scoreOutfit(garments: Garment[], context: OutfitContext, options: OutfitGenerationOptions = {}): OutfitCandidate {
   const harmony = colorHarmony(garments)
   const patterns = patternCompatibility(garments)
+  const layered = topLayers(garments).under
   const scores = {
     occasion: occasionScore(garments, context),
     visualStyle: harmony.score * 0.5 + styleCompatibility(garments, context.desiredStyle) * 0.2 + patterns * 0.3,
@@ -493,6 +555,7 @@ export function scoreOutfit(garments: Garment[], context: OutfitContext, options
   const explanation = [
     TEMPLATE_LEVEL[context.occasion as OutfitTemplate] && scores.occasion >= 80 ? `Encaja con ${context.occasion.toLocaleLowerCase('es')}` : '',
     context.occasion === 'Frío y capas' && garments.some((garment) => garment.role === 'Capa') ? 'Lleva capa de abrigo' : '',
+    layered ? `Con ${layered.subcategory.toLocaleLowerCase('es')} debajo` : '',
     ...climate.reasons,
     harmony.reason,
     garments.filter((garment) => garment.pattern && normalize(garment.pattern) !== 'liso').length === 1 && patterns === 88 ? 'Un solo estampado' : '',
@@ -598,6 +661,20 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
     if (context.occasion === 'Formal' && proposed.some((item) => !fitsFormal(item))) return
     if (isWarmOutfit(context) && proposed.some((item) => item.role === 'Capa')) return
     if ([...includedIds].some((id) => !selected.some((garment) => garment.id === id))) return
+    // A jacket worn as a top (an overshirt) goes over a T-shirt when there is one, and under no other jacket: a coat, a
+    // puffer or a raincoat can go over it, a jacket, blazer, cardigan or waistcoat cannot.
+    const { outer, under } = topLayers(selected)
+    const jacketTop = outer && isJacketTop(outer) ? outer : undefined
+    if (jacketTop) {
+      if (!under && unders.length && !includedIds.has(jacketTop.id)) return
+      if (proposed.some((item) => item.role === 'Capa' && JACKET_LAYERS.has(subcategoryId(item) ?? ''))) return
+    }
+    // A T-shirt underneath only when it suits the weather better than the top alone, or, on a cold day (where it is how
+    // most people wear a jumper), when it costs little (unless it is pinned). Under a jacket worn as a top, always.
+    if (under && !includedIds.has(under.id) && !jacketTop) {
+      const gain = thermalScore(selected, context) - thermalScore(selected.filter((item) => item !== under), context)
+      if (gain <= 0 && !(layeringWeather(context) && gain > -LAYERING_COST)) return
+    }
     const key = outfitKey(selected)
     if (seen.has(key) || options.skip?.has(key) || disliked.has(key)) return
     seen.add(key)
@@ -623,10 +700,19 @@ export function generateOutfitCandidates(allGarments: Garment[], context: Outfit
     }
   }
 
+  // A T-shirt under a top that goes over one, when the day is not warm: the best two, and any pinned. Warmth
+  // decides whether it is worth it (a sweatshirt alone may be enough).
+  // Its season does not count: a summer T-shirt goes under a jumper in winter.
+  const underRank = new Map(garments.filter(goesUnder).map((garment) => [garment.id, rankForRole(garment, context, options, shown, worn)]))
+  const bestUnders = garments.filter(goesUnder).sort((a, b) => underRank.get(b.id)! - underRank.get(a.id)! || a.id.localeCompare(b.id)).slice(0, 2)
+  const unders = [...new Set([...bestUnders, ...garments.filter((garment) => goesUnder(garment) && includedIds.has(garment.id))])]
+  const underOptions = (top: Garment): Array<Garment | undefined> => goesOver(top) && !isWarmOutfit(context) ? [undefined, ...unders] : [undefined]
   const requiresOnePiece = hasPinnedRole('Una pieza') && (hasPinnedRole('Top') || hasPinnedRole('Bottom'))
   if (!requiresOnePiece) {
     for (const top of tops) {
-      for (const bottom of bottoms) optional([top, bottom])
+      for (const under of underOptions(top)) {
+        for (const bottom of bottoms) optional([...(under ? [under] : []), top, bottom])
+      }
     }
   }
   if (!hasPinnedRole('Top') && !hasPinnedRole('Bottom')) {
@@ -700,10 +786,24 @@ export function withGarment(outfit: Garment[], garment: Garment, replacing?: Gar
   if (isAccessory(garment)) {
     return [...outfit.filter((item) => item.id !== garment.id && item.id !== replacing?.id), garment]
   }
+  if (garment.role === 'Top') {
+    const { under } = topLayers(outfit)
+    // In the place of the T-shirt underneath (the one touched).
+    if (under && replacing?.id === under.id) return withUnder(outfit, garment)
+    // Another top on top: the T-shirt underneath stays if the new one also goes over it.
+    const keepUnder = under && goesOver(garment) && under.id !== garment.id ? under : undefined
+    return [...outfit.filter((item) => item === keepUnder || (item.role !== 'Top' && item.role !== 'Una pieza')), garment]
+  }
   const replaced = (item: Garment) => item.role === garment.role
     || (garment.role === 'Una pieza' && (item.role === 'Top' || item.role === 'Bottom'))
     || ((garment.role === 'Top' || garment.role === 'Bottom') && item.role === 'Una pieza')
   return [...outfit.filter((item) => !replaced(item)), garment]
+}
+
+/** The outfit with this T-shirt under its top, instead of the one there was. */
+export function withUnder(outfit: Garment[], garment: Garment): Garment[] {
+  const { under } = topLayers(outfit)
+  return [...outfit.filter((item) => item !== under && item.id !== garment.id), garment]
 }
 
 export interface GarmentOption {
@@ -716,10 +816,21 @@ export interface GarmentOption {
  * For an accessory, accessories and jewellery alike, added to those worn or in the place of `replacing`.
  */
 export function optionsForRole(role: GarmentRole, outfit: Garment[], allGarments: Garment[], context: OutfitContext, options: OutfitGenerationOptions = {}, replacing?: Garment): GarmentOption[] {
+  if (replacing && replacing.id === topLayers(outfit).under?.id) return optionsUnder(outfit, allGarments, context, options)
   const fits = (garment: Garment) => isAccessory({ role }) ? isAccessory(garment) : garment.role === role
   return allGarments
     .filter((garment) => fits(garment) && isAvailable(garment) && !outfit.some((item) => item.id === garment.id))
     .map((garment) => ({ garment, candidate: scoreOutfit(withGarment(outfit, garment, replacing), context, options) }))
+    .sort((a, b) => b.candidate.score - a.candidate.score || a.garment.id.localeCompare(b.garment.id))
+}
+
+/** The T-shirts that could go under this outfit's top, best first (none when the top does not go over one). */
+export function optionsUnder(outfit: Garment[], allGarments: Garment[], context: OutfitContext, options: OutfitGenerationOptions = {}): GarmentOption[] {
+  const { outer } = topLayers(outfit)
+  if (!outer || !goesOver(outer)) return []
+  return allGarments
+    .filter((garment) => goesUnder(garment) && isAvailable(garment) && !outfit.some((item) => item.id === garment.id))
+    .map((garment) => ({ garment, candidate: scoreOutfit(withUnder(outfit, garment), context, options) }))
     .sort((a, b) => b.candidate.score - a.candidate.score || a.garment.id.localeCompare(b.garment.id))
 }
 
@@ -729,7 +840,10 @@ export function explainNoOutfits(allGarments: Garment[], context: OutfitContext)
   const count = (role: GarmentRole, items = garments) => items.filter((garment) => garment.role === role).length
   const pinned = allGarments.filter((garment) => context.includeGarmentIds?.includes(garment.id))
   // Accessories and jewellery can be several; every other role, one.
-  const pinnedConflict = (['Top', 'Bottom', 'Calzado', 'Capa', 'Una pieza'] as GarmentRole[]).some((role) => count(role, pinned) > 1)
+  // Two tops only as a T-shirt under a top that goes over it.
+  const pinnedTops = pinned.filter((garment) => garment.role === 'Top')
+  const pinnedConflict = (['Bottom', 'Calzado', 'Capa', 'Una pieza'] as GarmentRole[]).some((role) => count(role, pinned) > 1)
+    || pinnedTops.length > 2 || (pinnedTops.length === 2 && !topLayers(pinnedTops).under)
     || (pinned.some((garment) => garment.role === 'Una pieza') && pinned.some((garment) => garment.role === 'Top' || garment.role === 'Bottom'))
   if (pinnedConflict) return 'Las prendas fijadas no pueden ir juntas en un mismo outfit. Suelta alguna.'
   const offered = (role: GarmentRole) => context.occasion === 'Formal' ? garments.filter((garment) => garment.role === role && fitsFormal(garment)).length : count(role)

@@ -74,3 +74,18 @@ export function categoryIdForLabel(label: GarmentCategory): string {
 export function categoryOfSubcategory(subcategoryId: string): string | null {
   return taxonomy.subcategories.find((entry) => entry.id === subcategoryId)?.category ?? null
 }
+
+/**
+ * Subcategories the app also offers under another category: a jacket worn as a top (an overshirt, a light jacket) is
+ * «Parte superior», and still «Abrigo» for the model. Only the lists change; training keeps one category per
+ * subcategory (datasetExport.ts takes it from the subcategory).
+ */
+const ALSO_UNDER: Record<string, string[]> = { top: ['chaqueta'] }
+
+/** The subcategory labels to choose from in a category (by its id), those of other categories it also takes last. */
+export function subcategoryOptions(categoryId: string | undefined): string[] {
+  if (!categoryId) return []
+  const own = taxonomy.subcategories.filter((entry) => entry.category === categoryId).map((entry) => entry.label)
+  const extra = (ALSO_UNDER[categoryId] ?? []).map((id) => taxonomy.subcategories.find((entry) => entry.id === id)?.label).filter((label): label is string => Boolean(label))
+  return [...own, ...extra.filter((label) => !own.includes(label))]
+}

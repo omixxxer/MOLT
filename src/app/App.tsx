@@ -15,6 +15,7 @@ import { ClickSpark, Counter, GradualBlur, LatticeLoader } from '../components/r
 import { DemoAddNotice, DemoBanner, DemoButton } from '../components/demo/DemoMode'
 import { isDemo, takeAfterDemo, takeTourRequest } from '../demo/demoMode'
 import type { TourPage } from '../components/demo/GuidedTour'
+import StarButton from '../components/StarButton'
 
 type Page = 'home' | 'wardrobe' | 'add' | 'batch' | 'look' | 'outfits' | 'history' | 'packing'
 
@@ -282,7 +283,7 @@ function App() {
                 </div>
                 <div className="page-actions">
                   {menu}
-                  <button className="button button-dark" type="button" onClick={() => setPage(lastAddPage())}>＋ Añadir prendas</button>
+                  <StarButton onClick={() => setPage(lastAddPage())}>＋ Añadir prendas</StarButton>
                 </div>
               </div>
               {notices}
