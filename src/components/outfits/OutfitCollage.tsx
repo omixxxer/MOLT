@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { topLayers } from '../../outfits/outfitGenerator'
 import type { Garment, GarmentRole } from '../../types/domain'
 import { GarmentThumbnail } from '../GarmentPhoto'
 import { garmentLabel } from '../OutfitBoard'
@@ -11,13 +12,17 @@ interface Spot { left: number; top: number; width: number; height: number; z: nu
  * and the bottom down the left, the shoes at the bottom right, the accessories in the gaps. Without a coat, the top
  * and the bottom take more room.
  */
-function layout(roles: Set<GarmentRole>): Partial<Record<GarmentRole, Spot>> & { extra: Spot[] } {
+function layout(roles: Set<GarmentRole>): Partial<Record<GarmentRole, Spot>> & { extra: Spot[]; under: Spot } {
   const layer = roles.has('Capa')
   const onePiece = roles.has('Una pieza')
   const shoes = roles.has('Calzado')
+  const top = layer ? { left: 2, top: 8, width: 46, height: 36, z: 3 } : { left: 6, top: 3, width: 58, height: 42, z: 3 }
   return {
     Capa: { left: 38, top: 2, width: 60, height: 44, z: 1 },
-    Top: layer ? { left: 2, top: 8, width: 46, height: 36, z: 3 } : { left: 6, top: 3, width: 58, height: 42, z: 3 },
+    Top: top,
+    // The T-shirt under the top: behind it, lower and to the right, so it shows below the hem, as worn.
+    // With a coat, further right, over the coat: next to a narrower top it would hide behind it.
+    under: { left: top.left + top.width * (layer ? 0.5 : 0.36), top: top.top + top.height * (layer ? 0.24 : 0.2), width: top.width * 0.78, height: top.height * 0.8, z: top.z - 1 },
     'Una pieza': layer ? { left: 2, top: 6, width: 48, height: 66, z: 3 } : { left: 8, top: 3, width: 56, height: 72, z: 3 },
     Bottom: layer ? { left: 4, top: 46, width: 50, height: 36, z: 2 } : { left: 10, top: 46, width: 52, height: shoes ? 40 : 48, z: 2 },
     Calzado: onePiece || layer ? { left: 56, top: 62, width: 40, height: 34, z: 4 } : { left: 60, top: 58, width: 36, height: 36, z: 4 },
@@ -64,8 +69,11 @@ interface OutfitCollageProps {
 /** An outfit as a collage, the garments laid out together on one board, as on a mood board. */
 export default function OutfitCollage({ garments, onSelect, label = garmentLabel, compact, className }: OutfitCollageProps) {
   const spots = layout(new Set(garments.map((garment) => garment.role)))
+  const { outer, under } = topLayers(garments)
   let extra = 0
   const placed = garments.map((garment) => {
+    if (garment === under) return { garment, spot: spots.under }
+    if (garment === outer) return { garment, spot: spots.Top! }
     const own = garment.role === 'Accesorio' || garment.role === 'Joya' ? undefined : spots[garment.role]
     // A second piece of the same kind, or an accessory, goes to the next free gap.
     const taken = own && garments.findIndex((item) => item.role === garment.role) !== garments.indexOf(garment)

@@ -60,12 +60,8 @@ function trailingColour(words: string[]): { colour: string; length: number } | u
   return undefined
 }
 
-/**
- * A name shaped like the proposed ones («Sudadera blanco · Pull&Bear», «Botas negro y gris») with its colours agreeing
- * with its own garment word («Sudadera blanca · Pull&Bear», «Botas negras y grises»); undefined when the name does
- * not end in colours or already agrees. Its words and colours stay: only the grammar changes.
- */
-export function fixNameAgreement(name: string): string | undefined {
+/** A name read as «garment words, one or two colours[, · brand]»; undefined when it does not end in colours. */
+function parseColouredName(name: string): { garmentWords: string; colours: string[]; rest: string[] } | undefined {
   const [main = '', ...rest] = name.split(' · ')
   let words = main.trim().split(/\s+/)
   const colours: string[] = []
@@ -81,7 +77,30 @@ export function fixNameAgreement(name: string): string | undefined {
     }
   }
   if (!words.length || words.at(-1) === 'y') return undefined
-  const garmentWords = words.join(' ')
+  return { garmentWords: words.join(' '), colours, rest }
+}
+
+/**
+ * A name that Molt proposed (or shaped like one): a type, maybe its colours, maybe « · brand». Re-analysing a garment
+ * replaces such a name with the new one; a name of the user's own («Top de entrenamiento») stays.
+ */
+export function isProposedName(name: string, types: string[]): boolean {
+  const main = (name.split(' · ')[0] ?? '').trim().toLocaleLowerCase('es')
+  if (!main) return true
+  if (types.some((type) => type.toLocaleLowerCase('es') === main)) return true
+  const parsed = parseColouredName(name)
+  return Boolean(parsed && types.some((type) => type.toLocaleLowerCase('es') === parsed.garmentWords.toLocaleLowerCase('es')))
+}
+
+/**
+ * A name shaped like the proposed ones («Sudadera blanco · Pull&Bear», «Botas negro y gris») with its colours agreeing
+ * with its own garment word («Sudadera blanca · Pull&Bear», «Botas negras y grises»); undefined when the name does
+ * not end in colours or already agrees. Its words and colours stay: only the grammar changes.
+ */
+export function fixNameAgreement(name: string): string | undefined {
+  const parsed = parseColouredName(name)
+  if (!parsed) return undefined
+  const { garmentWords, colours, rest } = parsed
   const agreement = garmentAgreement(garmentWords)
   const fixed = [[garmentWords, colours.map((colour) => agreeColour(colour, agreement)).join(' y ')].join(' '), ...rest].join(' · ')
   return fixed === name ? undefined : fixed

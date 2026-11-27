@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSuggestedGarmentName, fixNameAgreement } from './garmentName'
+import { createSuggestedGarmentName, fixNameAgreement, isProposedName } from './garmentName'
 
 describe('proposed garment names', () => {
   it('make the colours agree with the garment in gender and number', () => {
@@ -43,5 +43,18 @@ describe('fixing names saved before', () => {
     expect(fixNameAgreement('Top de entrenamiento')).toBeUndefined()
     expect(fixNameAgreement('Sudadera')).toBeUndefined()
     expect(fixNameAgreement('Negro')).toBeUndefined()
+  })
+})
+
+describe('names re-analysis may replace', () => {
+  const types = ['Camiseta', 'Sudadera con capucha', 'Chaqueta', 'Top']
+  it('are the proposed ones: a type, maybe colours and brand', () => {
+    expect(isProposedName('Sudadera con capucha negra y blanca · Pull&Bear', types)).toBe(true)
+    expect(isProposedName('Camiseta', types)).toBe(true)
+    expect(isProposedName('', types)).toBe(true)
+  })
+  it('not those written by the user', () => {
+    expect(isProposedName('Top de entrenamiento', types)).toBe(false)
+    expect(isProposedName('Mi chaqueta de la boda', types)).toBe(false)
   })
 })

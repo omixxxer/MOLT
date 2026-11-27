@@ -542,6 +542,36 @@ describe('wardrobe flow', () => {
     expect(screen.getByRole('button', { name: 'Quitar Gris' })).toBeInTheDocument()
   })
 
+  it('re-analysing a saved garment renames it when its name was the proposed one', async () => {
+    const analysis = (category: 'Parte superior' | 'Abrigo', subcategory: string) => ({
+      category, subcategory, colors: ['Negro'], alternatives: [], confidenceByAttribute: { category: 0.9 }, unknownAttributes: [],
+      modelId: 'molt/dinov2-small-heads', modelVersion: 'heads-test', calibrated: true, segmentations: [], analyzedAt: '2026-11-27T12:00:00.000Z'
+    })
+    vi.mocked(analyzeGarmentImage).mockResolvedValue(analysis('Parte superior', 'Sudadera con capucha'))
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['a'], 'a.jpg', { type: 'image/jpeg' }))
+    await waitFor(() => expect(screen.getByPlaceholderText('p. ej. Camiseta azul · Marca')).toHaveValue('Sudadera con capucha negra'))
+    await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
+
+    await user.click(await screen.findByRole('button', { name: 'Sudadera con capucha negra' }))
+    await user.click(await screen.findByRole('button', { name: 'Editar' }))
+    const name = await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca')
+    expect(name).toHaveValue('Sudadera con capucha negra')
+    vi.mocked(analyzeGarmentImage).mockResolvedValue(analysis('Abrigo', 'Chaqueta'))
+    await user.click(screen.getByRole('button', { name: 'Analizar de nuevo' }))
+    await waitFor(() => expect(name).toHaveValue('Chaqueta negra'))
+
+    // A name of the user's own stays.
+    await user.clear(name)
+    await user.type(name, 'Mi chaqueta de la suerte')
+    vi.mocked(analyzeGarmentImage).mockResolvedValue(analysis('Parte superior', 'Sudadera con capucha'))
+    await user.click(screen.getByRole('button', { name: 'Analizar de nuevo' }))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Subcategoría/ })).toHaveValue('Sudadera con capucha'))
+    expect(name).toHaveValue('Mi chaqueta de la suerte')
+  })
+
   it('does not keep «Quitando el fondo» from a removed photo when the next analysis fails', async () => {
     // The first photo's cut-out never finishes: it is still running when the photo is removed.
     vi.mocked(cutOutGarments).mockReturnValue(new Promise(() => {}))

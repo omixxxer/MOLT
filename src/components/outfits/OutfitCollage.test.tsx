@@ -36,6 +36,16 @@ describe('OutfitCollage', () => {
     }
   })
 
+  it('puts the T-shirt under the top behind it, showing below its hem', () => {
+    const tee = { ...garment('camiseta', 'Top'), subcategory: 'Camiseta' }
+    const jumper = { ...garment('jersey', 'Top'), subcategory: 'Jersey' }
+    const { container } = render(<OutfitCollage garments={[tee, jumper, garment('falda', 'Bottom')]} />)
+    const [under, over] = [...container.querySelectorAll<HTMLElement>('.outfit-collage-piece')]
+    expect(Number(under!.style.zIndex)).toBeLessThan(Number(over!.style.zIndex))
+    expect(parseFloat(under!.style.left)).toBeGreaterThan(parseFloat(over!.style.left))
+    expect(parseFloat(under!.style.top)).toBeGreaterThan(parseFloat(over!.style.top))
+  })
+
   it('makes each garment a button when it can be changed', async () => {
     const onSelect = vi.fn()
     render(<OutfitCollage garments={look} onSelect={onSelect} label={(item) => `Elegir ${item.name}`} />)

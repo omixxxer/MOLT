@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Garment, Outfit, OutfitFeedback } from '../types/domain'
-import { explainNoOutfits, fitLabel, generateOutfitCandidates, optionsForRole, outfitKey, scoreOutfit, seasonOfDate, withGarment } from './outfitGenerator'
+import { explainNoOutfits, fitLabel, generateOutfitCandidates, optionsForRole, optionsUnder, outfitKey, scoreOutfit, seasonOfDate, topLayers, withGarment, withUnder } from './outfitGenerator'
 
 const garment = (id: string, role: Garment['role'], extras: Partial<Garment> = {}): Garment => ({
   id,
@@ -393,8 +393,11 @@ describe('validation with random wardrobes', () => {
         expect(inRange(candidate.score), label).toBe(true)
         for (const value of Object.values(candidate.scores)) expect(inRange(value), label).toBe(true)
         expect(new Set(ids).size, label).toBe(ids.length)
-        // One garment per role, and a base of top and bottom or a one-piece, never both.
-        expect(new Set(roles).size, label).toBe(roles.length)
+        // One garment per role (two tops only as a T-shirt under one that goes over it), and a base of top and
+        // bottom or a one-piece, never both.
+        const layered = topLayers(candidate.garments).under ? 1 : 0
+        expect(roles.filter((role) => role === 'Top').length, label).toBeLessThanOrEqual(1 + layered)
+        expect(new Set(roles).size, label).toBe(roles.length - layered)
         const onePiece = roles.includes('Una pieza')
         expect(onePiece ? !roles.includes('Top') && !roles.includes('Bottom') : roles.includes('Top') && roles.includes('Bottom'), label).toBe(true)
         for (const id of pinned) expect(ids, label).toContain(id)
@@ -651,5 +654,109 @@ describe('accessories and jewellery', () => {
     expect(results.length).toBeGreaterThan(0)
     for (const result of results) expect(result.garments.map((item) => item.id)).toEqual(expect.arrayContaining(['earrings', 'hoops', 'bag', 'belt']))
     expect(explainNoOutfits(wardrobe, context)).not.toMatch(/no pueden ir juntas/)
+  })
+})
+
+describe('tops in layers', () => {
+  const tee = garment('tee', 'Top', { subcategory: 'Camiseta', colors: ['Blanco'], pattern: 'Liso' })
+  const longTee = garment('long-tee', 'Top', { subcategory: 'Camiseta de manga larga', colors: ['Gris'], pattern: 'Liso' })
+  const sweatshirt = garment('sweatshirt', 'Top', { subcategory: 'Sudadera', colors: ['Azul marino'], pattern: 'Liso' })
+  const jumper = garment('jumper', 'Top', { subcategory: 'Jersey', colors: ['Gris'], pattern: 'Liso' })
+  const polo = garment('polo', 'Top', { subcategory: 'Polo', colors: ['Blanco'], pattern: 'Liso' })
+  const jeans = garment('jeans', 'Bottom', { subcategory: 'Vaqueros', colors: ['Azul'], pattern: 'Liso' })
+  const trainers = garment('trainers', 'Calzado', { subcategory: 'Zapatillas', colors: ['Blanco'], pattern: 'Liso' })
+  const wardrobe = [tee, sweatshirt, jeans, trainers]
+
+  it('tells the top seen from the T-shirt under it', () => {
+    expect(topLayers([tee, sweatshirt, jeans])).toEqual({ outer: sweatshirt, under: tee })
+    expect(topLayers([sweatshirt, jeans])).toEqual({ outer: sweatshirt })
+    // A polo does not go over a T-shirt, and two T-shirts are not layers.
+    expect(topLayers([tee, polo]).under).toBeUndefined()
+    expect(topLayers([tee, longTee]).under).toBeUndefined()
+  })
+
+  it('puts a T-shirt under the sweatshirt on a cold day, and not on a warm one', () => {
+    const cold = generateOutfitCandidates(wardrobe, { occasion: 'Diario', temperatureCelsius: 10 })
+    expect(cold[0]!.garments.map((item) => item.id).sort()).toEqual(['jeans', 'sweatshirt', 'tee', 'trainers'])
+    expect(cold[0]!.explanation).toContain('Con camiseta debajo')
+    const warm = generateOutfitCandidates(wardrobe, { occasion: 'Diario', temperatureCelsius: 24 })
+    expect(warm.every((outfit) => !topLayers(outfit.garments).under)).toBe(true)
+    // Layered, it is warmer than the sweatshirt alone.
+    expect(scoreOutfit([tee, sweatshirt, jeans, trainers], { occasion: 'Diario', temperatureCelsius: 10 }).scores.thermal)
+      .toBeGreaterThan(scoreOutfit([sweatshirt, jeans, trainers], { occasion: 'Diario', temperatureCelsius: 10 }).scores.thermal)
+  })
+
+  it('a summer T-shirt still goes under a jumper in winter', () => {
+    const summerTee = { ...tee, seasons: ['Primavera' as const, 'Verano' as const] }
+    const winter = generateOutfitCandidates([summerTee, jumper, jeans, trainers, garment('coat', 'Capa', { subcategory: 'Abrigo', colors: ['Negro'] })], { occasion: 'Diario', temperatureCelsius: 4 })
+    expect(winter.some((outfit) => topLayers(outfit.garments).under?.id === 'tee')).toBe(true)
+    // Underneath it warms less than on its own: a thin layer, covered.
+    const alone = scoreOutfit([jumper, jeans, trainers], { occasion: 'Diario', temperatureCelsius: 4 }).scores.thermal
+    expect(scoreOutfit([summerTee, jumper, jeans, trainers], { occasion: 'Diario', temperatureCelsius: 4 }).scores.thermal).toBeGreaterThan(alone)
+  })
+
+  it('in autumn and winter without a forecast a T-shirt goes under the sweatshirt, never in summer', () => {
+    const tees = [tee, longTee, garment('tee-2', 'Top', { subcategory: 'Camiseta', colors: ['Negro'], pattern: 'Liso' })]
+    const sweatshirts = ['a', 'b', 'c'].map((id) => ({ ...sweatshirt, id: `sweatshirt-${id}` }))
+    const wardrobe = [...tees, ...sweatshirts, jeans, garment('trousers', 'Bottom', { subcategory: 'Pantalón', colors: ['Gris'], pattern: 'Liso' }), trainers]
+    const layered = (season: 'Otoño' | 'Invierno' | 'Verano') => ['1', '2', '3', '4', '5'].reduce((count, seed) =>
+      count + generateOutfitCandidates(wardrobe, { occasion: 'Diario', season }, { seed }).filter((outfit) => topLayers(outfit.garments).under).length, 0)
+    expect(layered('Otoño')).toBeGreaterThan(0)
+    expect(layered('Invierno')).toBeGreaterThan(0)
+    expect(layered('Verano')).toBe(0)
+    // In that weather a T-shirt underneath is how a sweatshirt is worn: it never makes the outfit «too warm».
+    const autumn = { occasion: 'Diario', season: 'Otoño' as const }
+    expect(scoreOutfit([tee, sweatshirt, jeans, trainers], autumn).scores.thermal).toBe(scoreOutfit([sweatshirt, jeans, trainers], autumn).scores.thermal)
+    expect(scoreOutfit([tee, sweatshirt, jeans, trainers], autumn).warnings).not.toContain('Puede darte calor')
+  })
+
+  it('a pinned T-shirt can get a sweatshirt over it when it is cold', () => {
+    const outfits = generateOutfitCandidates(wardrobe, { occasion: 'Diario', temperatureCelsius: 8, includeGarmentIds: ['tee'] })
+    expect(outfits.some((outfit) => topLayers(outfit.garments).under?.id === 'tee')).toBe(true)
+    expect(explainNoOutfits(wardrobe, { occasion: 'Diario', includeGarmentIds: ['tee', 'sweatshirt'] })).not.toMatch(/no pueden ir juntas/)
+    expect(explainNoOutfits([...wardrobe, jumper], { occasion: 'Diario', includeGarmentIds: ['jumper', 'sweatshirt'] })).toMatch(/no pueden ir juntas/)
+  })
+
+  it('keeps the T-shirt under a new top that also goes over it, and lets it be changed apart', () => {
+    const layered = [tee, sweatshirt, jeans]
+    expect(withGarment(layered, jumper).map((item) => item.id).sort()).toEqual(['jeans', 'jumper', 'tee'])
+    expect(withGarment(layered, polo).map((item) => item.id).sort()).toEqual(['jeans', 'polo'])
+    expect(withGarment(layered, longTee, tee).map((item) => item.id).sort()).toEqual(['jeans', 'long-tee', 'sweatshirt'])
+    expect(withUnder([sweatshirt, jeans], tee).map((item) => item.id).sort()).toEqual(['jeans', 'sweatshirt', 'tee'])
+    // What can go under: T-shirts only, and nothing under a polo.
+    expect(optionsUnder([sweatshirt, jeans], [tee, longTee, polo, jumper, sweatshirt, jeans], diario).map((option) => option.garment.id).sort()).toEqual(['long-tee', 'tee'])
+    expect(optionsUnder([polo, jeans], [tee, polo, jeans], diario)).toEqual([])
+    expect(optionsForRole('Top', layered, [tee, longTee, sweatshirt, jeans], diario, {}, tee).map((option) => option.garment.id)).toEqual(['long-tee'])
+  })
+})
+
+describe('a jacket worn as a top', () => {
+  const overshirt = garment('overshirt', 'Top', { category: 'Parte superior', subcategory: 'Chaqueta', colors: ['Beige'], pattern: 'Liso' })
+  const tee = garment('tee', 'Top', { subcategory: 'Camiseta', colors: ['Blanco'], pattern: 'Liso' })
+  const jeans = garment('jeans', 'Bottom', { subcategory: 'Vaqueros', colors: ['Azul'], pattern: 'Liso' })
+  const boots = garment('boots', 'Calzado', { subcategory: 'Botas', colors: ['Marrón'], pattern: 'Liso' })
+  const denimJacket = garment('denim-jacket', 'Capa', { subcategory: 'Chaqueta', colors: ['Azul'], pattern: 'Liso' })
+  const blazer = garment('blazer', 'Capa', { subcategory: 'Blazer', colors: ['Negro'], pattern: 'Liso' })
+  const coat = garment('coat', 'Capa', { subcategory: 'Abrigo', colors: ['Negro'], pattern: 'Liso' })
+  const withOvershirt = (outfits: ReturnType<typeof generateOutfitCandidates>) => outfits.filter((outfit) => outfit.garments.includes(overshirt))
+
+  it('is the top of the outfit, with a T-shirt under it, never its coat', () => {
+    const outfits = withOvershirt(generateOutfitCandidates([overshirt, tee, jeans, boots], { occasion: 'Diario', temperatureCelsius: 16 }))
+    expect(outfits.length).toBeGreaterThan(0)
+    for (const outfit of outfits) expect(topLayers(outfit.garments)).toEqual({ outer: overshirt, under: tee })
+  })
+
+  it('takes a coat over it on a cold day, but no other jacket, blazer or cardigan', () => {
+    const outfits = withOvershirt(generateOutfitCandidates([overshirt, tee, jeans, boots, denimJacket, blazer, coat], { occasion: 'Frío y capas', temperatureCelsius: 2 }))
+    expect(outfits.length).toBeGreaterThan(0)
+    for (const outfit of outfits) {
+      const layer = outfit.garments.find((item) => item.role === 'Capa')
+      expect(layer?.id).toBe('coat')
+    }
+  })
+
+  it('goes alone when there is no T-shirt in the wardrobe, and not on a hot day', () => {
+    expect(withOvershirt(generateOutfitCandidates([overshirt, jeans, boots], { occasion: 'Diario', temperatureCelsius: 14 })).length).toBeGreaterThan(0)
+    expect(withOvershirt(generateOutfitCandidates([overshirt, tee, jeans, boots], { occasion: 'Diario', temperatureCelsius: 28 }))).toEqual([])
   })
 })

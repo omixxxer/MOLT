@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert02Icon, Tag01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { colorSwatch } from '../../ai/colors'
-import { categoryIdForLabel, taxonomy } from '../../ml/taxonomy'
+import { categoryIdForLabel, subcategoryOptions } from '../../ml/taxonomy'
 import { garmentCategories, type GarmentCategory } from '../../types/domain'
 import ColorPalette from '../ColorPalette'
 import GarmentPhoto from '../GarmentPhoto'
@@ -62,7 +62,7 @@ export default function BatchCard({ garment, photos, disabled }: BatchCardProps)
 
   const subcategory = garmentSubcategory(garment)
   const categoryId = categoryIdForLabel(garment.category as GarmentCategory)
-  const options = taxonomy.subcategories.filter((entry) => entry.category === categoryId).map((entry) => entry.label)
+  const options = subcategoryOptions(categoryId)
   // A type outside the list (written by the user) is shown in the text field.
   const typing = writingOther || (subcategory !== '' && !options.includes(subcategory))
   const label = garmentLabel(garment)

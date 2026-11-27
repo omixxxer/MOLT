@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Add01Icon, Alert02Icon, ShuffleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { createOutfitRecord, isAccessory, optionsForRole, outfitKey, scoreOutfit, withGarment, type OutfitGenerationOptions } from '../../outfits/outfitGenerator'
+import { createOutfitRecord, goesOver, goesUnder, isAccessory, optionsForRole, optionsUnder, outfitKey, scoreOutfit, topLayers, withGarment, withUnder, type OutfitGenerationOptions } from '../../outfits/outfitGenerator'
 import { logWear } from '../../stats/wearLog'
 import { dayContext } from '../../trips/packingPlan'
 import { nextOutfitInBackground } from '../../trips/plannerClient'
@@ -35,7 +35,7 @@ interface TripDayCardProps {
 /** One day of the trip: its weather, what it is for and the outfit, which can be changed piece by piece. */
 export default function TripDayCard({ day, days, index, style, garments, data, options, onChange, onDataChanged, onAvailabilityChange }: TripDayCardProps) {
   /** The place being chosen; for an accessory, the one touched (to replace) or none (to add another). */
-  const [picking, setPicking] = useState<{ role: GarmentRole; replacing?: Garment }>()
+  const [picking, setPicking] = useState<{ role: GarmentRole; replacing?: Garment; under?: boolean }>()
   const [notice, setNotice] = useState('')
   /** A new outfit is being chosen (in the planner's worker): its controls wait. */
   const [choosing, setChoosing] = useState(false)
@@ -58,7 +58,10 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
     if (role === 'Una pieza') return false
     return !(onePiece && (role === 'Top' || role === 'Bottom'))
   })
-  const pickerCurrent = picking && (picking.replacing ?? (isAccessory(picking) ? undefined : outfit.find((garment) => garment.role === picking.role)))
+  const layers = topLayers(outfit)
+  // Under a top that goes over one, room for a T-shirt.
+  const canAddUnder = Boolean(layers.outer && goesOver(layers.outer) && !layers.under && garments.some(goesUnder))
+  const pickerCurrent = picking && (picking.replacing ?? (isAccessory(picking) || picking.under ? undefined : picking.role === 'Top' ? layers.outer : outfit.find((garment) => garment.role === picking.role)))
 
   async function otherOutfit() {
     seen.current.add(key)
@@ -97,7 +100,8 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
   }
 
   function pick(garment: Garment) {
-    onChange({ ...day, garmentIds: withGarment(outfit, garment, picking?.replacing).map((item) => item.id), edited: true })
+    const next = picking?.under && !picking.replacing ? withUnder(outfit, garment) : withGarment(outfit, garment, picking?.replacing)
+    onChange({ ...day, garmentIds: next.map((item) => item.id), edited: true })
     setPicking(undefined)
   }
 
@@ -126,7 +130,7 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
         <ul className="trip-pieces">
           {outfit.map((garment) => (
             <li key={garment.id}>
-              <button type="button" onClick={() => setPicking({ role: garment.role, ...(isAccessory(garment) ? { replacing: garment } : {}) })} aria-label={`Cambiar ${garmentLabel(garment)}`}>
+              <button type="button" onClick={() => setPicking({ role: garment.role, ...(isAccessory(garment) || garment === layers.under ? { replacing: garment } : {}), ...(garment === layers.under ? { under: true } : {}) })} aria-label={`Cambiar ${garmentLabel(garment)}`}>
                 <span className="garment-tile"><GarmentThumbnail garment={garment} alt={garmentLabel(garment)} /></span>
                 <span className="trip-piece-name">{garmentLabel(garment)}</span>
               </button>
@@ -143,6 +147,7 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
       <div className="trip-day-actions">
         <button type="button" className="button button-outline" onClick={() => void otherOutfit()} disabled={choosing}><HugeiconsIcon icon={ShuffleIcon} size={15} />{choosing ? 'Buscando…' : 'Otra opción'}</button>
         {isToday && outfit.length > 0 && <button type="button" className="button button-dark" onClick={() => void wear()} disabled={wornToday}>{wornToday ? 'Puesto hoy' : 'Me lo pongo hoy'}</button>}
+        {canAddUnder && <button type="button" className="trip-add" onClick={() => setPicking({ role: 'Top', under: true })}><HugeiconsIcon icon={Add01Icon} size={13} />camiseta debajo</button>}
         {missing.map((role) => (
           <button key={role} type="button" className="trip-add" onClick={() => setPicking({ role })}><HugeiconsIcon icon={Add01Icon} size={13} />{ROLE_LABELS[role]}</button>
         ))}
@@ -150,11 +155,13 @@ export default function TripDayCard({ day, days, index, style, garments, data, o
 
       {picking && (
         <GarmentPicker
-          title={isAccessory(picking) && !picking.replacing ? 'Añade un accesorio' : `Elige ${ROLE_LABELS[picking.role]}`}
-          options={optionsForRole(picking.role, outfit, garments, context, options, picking.replacing)}
-          unavailable={garments.filter((garment) => (isAccessory(picking) ? isAccessory(garment) : garment.role === picking.role) && (garment.availability === 'laundry' || garment.availability === 'unavailable'))}
+          title={picking.under
+            ? picking.replacing ? 'Elige la camiseta de debajo' : 'Añade una camiseta debajo'
+            : isAccessory(picking) && !picking.replacing ? 'Añade un accesorio' : `Elige ${ROLE_LABELS[picking.role]}`}
+          options={picking.under && !picking.replacing ? optionsUnder(outfit, garments, context, options) : optionsForRole(picking.role, outfit, garments, context, options, picking.replacing)}
+          unavailable={garments.filter((garment) => (picking.under ? goesUnder(garment) : isAccessory(picking) ? isAccessory(garment) : garment.role === picking.role) && (garment.availability === 'laundry' || garment.availability === 'unavailable'))}
           current={pickerCurrent}
-          canRemove={picking.role === 'Capa' || picking.role === 'Calzado' || isAccessory(picking)}
+          canRemove={picking.role === 'Capa' || picking.role === 'Calzado' || isAccessory(picking) || Boolean(picking.under)}
           onPick={pick}
           onRemove={() => {
             onChange({ ...day, garmentIds: outfit.filter((garment) => garment.id !== pickerCurrent?.id).map((garment) => garment.id), edited: true })
