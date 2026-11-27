@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Tick02Icon, TShirtIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { database } from '../../db/database'
@@ -157,7 +157,7 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen, onCrea
               {/* Name and when, with «Me lo pongo hoy» as a small button beside them. */}
               <div className="saved-foot">
                 <div className="saved-foot-text">
-                  <input className="saved-name" aria-label="Nombre del outfit" defaultValue={title} key={title} onBlur={(event) => rename(outfit, event.target.value === outfit.occasion ? '' : event.target.value)} maxLength={60} />
+                  <OutfitName key={title} title={title} onRename={(value) => rename(outfit, value === outfit.occasion ? '' : value)} />
                   <p className="saved-meta">
                     {outfit.occasion} · {outfit.wornAt ? `puesto ${daysAgo(outfit.wornAt)}${count > 1 ? ` · ${count} veces` : ''}` : `guardado ${daysAgo(outfit.createdAt)}`}
                   </p>
@@ -180,5 +180,37 @@ export default function SavedOutfits({ garments, data, onChanged, onOpen, onCrea
       </div>
       {!shown.length && <p className="batch-none">Nada en este filtro todavía.</p>}
     </section>
+  )
+}
+
+/**
+ * The outfit's name, edited where it is shown. A long name wraps onto more lines instead of being cut off: the field
+ * grows with its text. Enter confirms it (there are no line breaks in a name), as leaving the field does.
+ */
+function OutfitName({ title, onRename }: { title: string; onRename: (name: string) => void }) {
+  const field = useRef<HTMLTextAreaElement>(null)
+  const fit = () => {
+    const element = field.current
+    if (!element) return
+    element.style.height = 'auto'
+    element.style.height = `${element.scrollHeight}px`
+  }
+  useLayoutEffect(fit, [title])
+  return (
+    <textarea
+      ref={field}
+      className="saved-name"
+      aria-label="Nombre del outfit"
+      defaultValue={title}
+      rows={1}
+      maxLength={60}
+      onInput={fit}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter') return
+        event.preventDefault()
+        event.currentTarget.blur()
+      }}
+      onBlur={(event) => onRename(event.target.value.replace(/\s+/g, ' '))}
+    />
   )
 }
