@@ -34,6 +34,7 @@ import AnalysisCard from './garmentForm/AnalysisCard'
 import { analysisRecord } from './garmentForm/analysisRecord'
 import { ChipsField, FormFold, FieldHeading, FormSection, SuggestedBadge, SuggestInput } from './garmentForm/fields'
 import { createSuggestedGarmentName, isProposedName } from './garmentForm/garmentName'
+import { imagesFromPaste } from './imageIntake'
 import LabelPhotoSlot, { type LabelFinding } from './garmentForm/LabelPhotoSlot'
 import PhotoCollection from './garmentForm/PhotoCollection'
 
@@ -69,9 +70,11 @@ interface GarmentFormProps {
   submitLabel?: string
   /** Adding a new garment: takes the chosen photos (and label) to «Varias prendas» when they seem several garments. */
   onSwitchToBatch?: (files: File[]) => void
+  /** Photos shared to Molt from another app (src/sw.ts), added as the form opens, as from the internet. */
+  sharedPhotos?: File[]
 }
 
-export default function GarmentForm({ garment, stored, onSave, onCancel, submitLabel, onSwitchToBatch }: GarmentFormProps) {
+export default function GarmentForm({ garment, stored, onSave, onCancel, submitLabel, onSwitchToBatch, sharedPhotos }: GarmentFormProps) {
   const fieldId = useId()
   const [name, setName] = useState(garment?.name ?? '')
   const [category, setCategory] = useState<GarmentCategory>(garment?.category ?? 'Parte superior')
@@ -86,6 +89,9 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
   const [selectedSeasons, setSelectedSeasons] = useState<Season[]>(garment?.seasons ?? [])
   const [styles, setStyles] = useState<string[]>(garment?.styles ?? [])
   const [levels, setLevels] = useState<DressLevel[]>(garment?.dressLevels ?? [])
+  // Photos from a shop or the internet (pasted, dragged from a web page, shared): ticked on its own when they come that
+  // way, and never used to train the model (datasetExport.ts). The user can change it.
+  const [webPhoto, setWebPhoto] = useState(Boolean(garment?.webPhoto))
   const [nameManuallyEdited, setNameManuallyEdited] = useState(Boolean(garment?.name))
   const [photos, setPhotos] = useState<Blob[]>(() => stored ? [stored.image, ...(stored.additionalImages ?? [])] : [])
   const [imageChanged, setImageChanged] = useState(false)
@@ -188,8 +194,32 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
     })
   }
 
-  function selectImages(files: FileList | null) {
+  // Ctrl+V anywhere in the form adds a copied image (a shop's photo, say); pasting text into a field works as always.
+  const takeImages = useRef(selectImages)
+  takeImages.current = selectImages
+  const busy = useRef(saving)
+  busy.current = saving
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const files = imagesFromPaste(event.clipboardData)
+      if (!files.length || busy.current) return
+      event.preventDefault()
+      takeImages.current(files, true)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
+  // Photos shared from another app open the form with them, once (StrictMode runs effects twice in development).
+  const tookShared = useRef<File[] | undefined>(undefined)
+  useEffect(() => {
+    if (!sharedPhotos?.length || tookShared.current === sharedPhotos) return
+    tookShared.current = sharedPhotos
+    takeImages.current(sharedPhotos, true)
+  }, [sharedPhotos])
+
+  function selectImages(files: FileList | File[] | null, web = false) {
     setFormError('')
+    if (web && files?.length) setWebPhoto(true)
     const selectedFiles = Array.from(files ?? [])
     if (!selectedFiles.length) return
     // One unusable photo does not lose the others chosen with it.
@@ -469,6 +499,7 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
         dressLevels: levels,
         role: roleByCategory[category],
         availability: garment?.availability,
+        ...(webPhoto ? { webPhoto: true } : {}),
         image,
         ...(additionalImages.length ? { additionalImages } : {}),
         ...(labelImage ? { labelImage } : {}),
@@ -517,12 +548,19 @@ export default function GarmentForm({ garment, stored, onSave, onCancel, submitL
             max={maxPhotos}
             disabled={saving}
             onAdd={selectImages}
+            onIntakeError={setFormError}
             onChange={updatePhotos}
             cutout={useCutout ? cutout : undefined}
             cuttingOut={cuttingOut}
             canToggleCutout={Boolean(cutout)}
             onToggleCutout={() => setUseCutout((current) => !current)}
           />
+          {hasPhotos && (
+            <label className="web-photo">
+              <input type="checkbox" checked={webPhoto} onChange={(event) => setWebPhoto(event.target.checked)} disabled={saving} />
+              <span>De una tienda o de internet <small>No se usa para entrenar el modelo de Molt.</small></span>
+            </label>
+          )}
           {severalGarments && onSwitchToBatch && (
             <p className="moved-label" role="status">
               <span>¿Son varias prendas? Estas fotos se hicieron con minutos de diferencia.</span>

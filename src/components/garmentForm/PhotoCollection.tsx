@@ -1,19 +1,22 @@
 import { useState, type DragEvent } from 'react'
-import { Add01Icon, Cancel01Icon, Image02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Cancel01Icon, ClipboardPasteIcon, Image02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { MAX_PHOTO_MB } from '../../db/photoLimits'
 import GarmentPhoto from '../GarmentPhoto'
 import { LatticeLoader } from '../reactBits'
 import TakePhoto from '../TakePhoto'
 import EditIcon from '../EditIcon'
+import { canReadClipboardImages, imagesFromClipboard, imagesFromDrop, type IntakeResult } from '../imageIntake'
 import PhotoEditor from './PhotoEditor'
 
 interface PhotoCollectionProps {
   photos: Blob[]
   max: number
   disabled: boolean
-  /** Files chosen by the user, still to be checked. */
-  onAdd: (files: FileList | null) => void
+  /** Files chosen by the user, still to be checked; `web` when they came from a web page or the clipboard. */
+  onAdd: (files: FileList | File[] | null, web?: boolean) => void
+  /** Why a drop or a paste brought nothing. */
+  onIntakeError: (message: string) => void
   /** The new list after making a photo the main one or removing it. */
   onChange: (photos: Blob[]) => void
   /** The main photo without background, shown in its place. */
@@ -27,7 +30,7 @@ interface PhotoCollectionProps {
  * The garment's photos: before the first one, a place to drop them; then the photo in large with the others as
  * thumbnails. The first is the main one; the one in view can be made main, edited (turned and cropped) or removed.
  */
-export default function PhotoCollection({ photos, max, disabled, onAdd, onChange, cutout, cuttingOut, canToggleCutout, onToggleCutout }: PhotoCollectionProps) {
+export default function PhotoCollection({ photos, max, disabled, onAdd, onIntakeError, onChange, cutout, cuttingOut, canToggleCutout, onToggleCutout }: PhotoCollectionProps) {
   const [viewed, setViewed] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -49,7 +52,8 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
   )
   const dropHandlers = {
     onDragOver: (event: DragEvent) => {
-      if (!event.dataTransfer.types.includes('Files')) return
+      // Files, or an image dragged from another tab (its address).
+      if (!['Files', 'text/uri-list', 'text/html'].some((type) => event.dataTransfer.types.includes(type))) return
       event.preventDefault()
       setDragging(true)
     },
@@ -59,9 +63,20 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
     onDrop: (event: DragEvent) => {
       event.preventDefault()
       setDragging(false)
-      if (!disabled) onAdd(event.dataTransfer.files)
+      // From the computer, files; from another tab, the image (downloaded from its address when it is not a file).
+      if (!disabled) void imagesFromDrop(event.dataTransfer).then(take)
     }
   }
+  const take = ({ files, fromWeb, error }: IntakeResult) => {
+    if (files.length) onAdd(files, fromWeb)
+    else if (error) onIntakeError(error)
+  }
+  // «Pegar imagen», where the browser lets a button read the clipboard; Ctrl+V works anywhere in the form.
+  const pasteButton = canReadClipboardImages() && (
+    <button type="button" className="button button-outline photo-paste" onClick={() => void imagesFromClipboard().then(take)} disabled={disabled}>
+      <HugeiconsIcon icon={ClipboardPasteIcon} size={16} aria-hidden="true" />Pegar imagen
+    </button>
+  )
 
   if (!photo) {
     return (
@@ -72,8 +87,10 @@ export default function PhotoCollection({ photos, max, disabled, onAdd, onChange
         <div className="photo-drop-actions">
           <TakePhoto label="Hacer foto" ariaLabel="Hacer una foto de la prenda" disabled={disabled} onTake={onAdd} />
           <label className="button button-dark photo-drop-choose">Elegir fotos{fileInput}</label>
+          {pasteButton}
         </div>
         <small>Hasta {max} fotos · JPG, PNG o WebP · {MAX_PHOTO_MB} MB cada una</small>
+        <small className="photo-drop-web">¿Una foto de una tienda? Cópiala y pégala aquí (Ctrl+V) o arrástrala desde su pestaña.</small>
       </div>
     )
   }

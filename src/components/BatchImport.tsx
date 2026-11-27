@@ -16,6 +16,7 @@ import {
 import { MAX_PHOTO_BYTES, MAX_PHOTO_MB } from '../db/photoLimits'
 import { isStorageFull, STORAGE_FULL_MESSAGE } from '../db/storageHealth'
 import GarmentPhoto from './GarmentPhoto'
+import { canReadClipboardImages, imagesFromClipboard, imagesFromDrop, imagesFromPaste, type IntakeResult } from './imageIntake'
 import { LatticeLoader } from './reactBits'
 
 interface BatchImportProps {
@@ -73,14 +74,34 @@ export default function BatchImport({ onDone }: BatchImportProps) {
     return () => window.clearInterval(timer)
   }, [batch.running])
 
-  function choose(files: FileList | null) {
+  function choose(files: FileList | File[] | null, web = false) {
     setError('')
     const chosen = [...(files ?? [])]
     const valid = chosen.filter((file) => accepted.includes(file.type) && file.size > 0 && file.size <= MAX_PHOTO_BYTES)
     const rejected = chosen.length - valid.length
     if (rejected) setError(`${plural(rejected, 'archivo no se ha añadido', 'archivos no se han añadido')}: solo fotos JPG, PNG o WebP de ${MAX_PHOTO_MB} MB o menos.`)
-    if (valid.length) void addPhotos(valid)
+    if (valid.length) void addPhotos(valid, web)
   }
+  const take = ({ files, fromWeb, error: problem }: IntakeResult) => {
+    if (files.length) choose(files, fromWeb)
+    else if (problem) setError(problem)
+  }
+
+  // Ctrl+V adds copied images (a shop's photos) to the batch, as from the internet.
+  const takeRef = useRef(choose)
+  takeRef.current = choose
+  const savingRef = useRef(saving)
+  savingRef.current = saving
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const files = imagesFromPaste(event.clipboardData)
+      if (!files.length || savingRef.current) return
+      event.preventDefault()
+      takeRef.current(files, true)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
 
   async function save() {
     setSaving(true)
@@ -121,7 +142,7 @@ export default function BatchImport({ onDone }: BatchImportProps) {
 
   const dropHandlers = {
     onDragOver: (event: DragEvent) => {
-      if (!event.dataTransfer.types.includes('Files')) return
+      if (!['Files', 'text/uri-list', 'text/html'].some((type) => event.dataTransfer.types.includes(type))) return
       event.preventDefault()
       setDragging(true)
     },
@@ -131,7 +152,8 @@ export default function BatchImport({ onDone }: BatchImportProps) {
     onDrop: (event: DragEvent) => {
       event.preventDefault()
       setDragging(false)
-      if (!saving) choose(event.dataTransfer.files)
+      // From the computer, files; from another tab, the image (downloaded from its address when it is not a file).
+      if (!saving) void imagesFromDrop(event.dataTransfer).then(take)
     }
   }
 
@@ -149,6 +171,10 @@ export default function BatchImport({ onDone }: BatchImportProps) {
           <span className="button button-dark">Elegir fotos</span>
           {fileInput}
         </label>
+        <p className="batch-web">
+          ¿Fotos de una tienda? Cópialas y pégalas aquí (Ctrl+V) o arrástralas desde su pestaña.
+          {canReadClipboardImages() && <button type="button" className="studio-link" onClick={() => void imagesFromClipboard().then(take)}>Pegar imagen</button>}
+        </p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <ol className="batch-steps">
           <li><strong>Fotografía prenda a prenda</strong><p>Delante, detrás y la etiqueta, seguidas. Después, pasa a la siguiente.</p></li>

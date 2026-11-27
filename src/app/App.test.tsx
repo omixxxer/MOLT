@@ -542,6 +542,30 @@ describe('wardrobe flow', () => {
     expect(screen.getByRole('button', { name: 'Quitar Gris' })).toBeInTheDocument()
   })
 
+  it('adds a pasted photo (Ctrl+V), marks it as from the internet and saves the garment out of training', async () => {
+    vi.mocked(analyzeGarmentImage).mockResolvedValue({
+      category: 'Parte superior', subcategory: 'Camisa', colors: ['Blanco'], alternatives: [], confidenceByAttribute: { category: 0.9 },
+      unknownAttributes: [], modelId: 'molt/dinov2-small-heads', modelVersion: 'heads-test', calibrated: true, segmentations: [], analyzedAt: '2026-11-28T12:00:00.000Z'
+    })
+    const user = userEvent.setup()
+    await renderInWardrobe()
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    expect(await screen.findByText(/Cópiala y pégala aquí \(Ctrl\+V\)/)).toBeInTheDocument()
+
+    const image = new File(['png'], 'image.png', { type: 'image/png' })
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', { value: { files: [image], items: [{ kind: 'file', type: 'image/png', getAsFile: () => image }] } })
+    document.dispatchEvent(paste)
+    expect(paste.defaultPrevented).toBe(true)
+
+    const mark = await screen.findByRole('checkbox', { name: /De una tienda o de internet/ })
+    expect(mark).toBeChecked()
+    await waitFor(() => expect(screen.getByPlaceholderText('p. ej. Camiseta azul · Marca')).toHaveValue('Camisa blanca'))
+    await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
+    await waitFor(async () => expect(await database.garments.count()).toBe(1))
+    expect((await database.garments.toArray())[0]).toMatchObject({ webPhoto: true })
+  })
+
   it('re-analysing a saved garment renames it when its name was the proposed one', async () => {
     const analysis = (category: 'Parte superior' | 'Abrigo', subcategory: string) => ({
       category, subcategory, colors: ['Negro'], alternatives: [], confidenceByAttribute: { category: 0.9 }, unknownAttributes: [],

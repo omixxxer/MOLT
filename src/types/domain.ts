@@ -83,6 +83,8 @@ export interface Garment {
   dressLevels: DressLevel[]
   role: GarmentRole
   availability?: GarmentAvailability
+  /** Its photos come from a shop or the internet (pasted, dragged from a web page or shared): never used to train. */
+  webPhoto?: boolean
   /** Whether a cut-out of the main photo is stored (the thumbnail then has a transparent background). */
   hasCutout?: boolean
   /** Size of the thumbnail, so the gallery can lay out before the image loads. */

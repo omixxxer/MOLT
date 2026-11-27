@@ -64,7 +64,7 @@ async function analysed() {
 
 afterEach(async () => {
   clearBatch()
-  await Promise.all([database.garments.clear(), database.garmentPhotos.clear(), database.garmentThumbnails.clear()])
+  await Promise.all([database.garments.clear(), database.garmentPhotos.clear(), database.garmentThumbnails.clear(), database.garmentCodeCounters.clear()])
 })
 
 describe('many garments at once', () => {
@@ -197,6 +197,16 @@ describe('many garments at once', () => {
     expect(getBatch().photos.find((entry) => entry.id === mainId)!.status).toBe('done')
     expect(getBatch().garments).toHaveLength(1)
     expect(getBatch().garments[0]).toMatchObject({ photoIds: [mainId, backId], cutoutStatus: 'done' })
+  })
+
+  it('saves the garments of photos from a shop or the internet as such, and the others not', async () => {
+    await addPhotos([photo('Parte superior|Camiseta|Blanco|0')], true)
+    await addPhotos([photo('Calzado|Zapatillas|Gris|300')])
+    await analysed()
+    expect(await saveBatch(() => {})).toBe(2)
+    const saved = await database.garments.toArray()
+    expect(saved.find((garment) => garment.category === 'Parte superior')).toMatchObject({ webPhoto: true })
+    expect(saved.find((garment) => garment.category === 'Calzado')).not.toHaveProperty('webPhoto')
   })
 
   it('saves the chosen garments with their photos, label, cut-out and what the label says', async () => {
